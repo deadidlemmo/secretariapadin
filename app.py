@@ -848,6 +848,12 @@ def gerar_declaracao_escolar(
                 f"na data de hoje, estando apto(a) a cursar o(a) "
                 f"<strong><u>{serie}</u></strong>."
             )
+
+            if not deve_historico:
+                declaracao_text += (
+                    " Informamos, ainda, que o histórico escolar será emitido no prazo de "
+                    "até 30 (trinta) dias."
+                )
         else:
             serie_mod = re.sub(r"^(\d+º).*", r"\1 ano", str(serie))
             declaracao_text = (
@@ -859,6 +865,13 @@ def gerar_declaracao_escolar(
                 f"o aluno está apto(a) a cursar o(a) "
                 f"<strong><u>{serie_mod}</u></strong>."
             )
+
+            if not deve_historico:
+                declaracao_text += (
+                    " Informamos, ainda, que o histórico escolar será emitido no prazo de "
+                    "até 30 (trinta) dias."
+                )
+
             # Anexa a tabela de notas (apenas Fundamental)
             if notas_tabela_html:
                 declaracao_text += notas_tabela_html
@@ -3380,8 +3393,18 @@ def quadro_atendimento_mensal():
 
 
 # ==========================================================
-#  QUADRO – TRANSFERÊNCIAS (FIX H/I/J)
+#  QUADRO – TRANSFERÊNCIAS (FIX H/I/J + ALERTAS DE FALTA DE INFORMAÇÃO)
 # ==========================================================
+
+from typing import Optional
+from collections import defaultdict
+import re
+import os
+import uuid
+import json
+import base64
+from io import BytesIO
+from datetime import datetime
 
 _RX_TE = re.compile(
     r"(?i)(?<![A-Z0-9])TE\s*[-:\s–—]*\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?"
@@ -3489,6 +3512,33 @@ def _label_set(ws, addr: str, label: str, value: str):
 
     set_merged_cell_value(ws, addr, val)
 
+def _push_missing_info_alert(alert_items, seen_keys, *, turma, nome, ra, tipo, data_str, campo, detalhe):
+    """
+    Guarda inconsistências sem duplicar o mesmo caso.
+    """
+    key = (
+        _safe_str(turma),
+        _safe_str(nome),
+        _safe_str(ra),
+        _safe_str(tipo),
+        _safe_str(data_str),
+        _safe_str(campo),
+        _safe_str(detalhe),
+    )
+    if key in seen_keys:
+        return
+    seen_keys.add(key)
+
+    alert_items.append({
+        "turma": _safe_str(turma) or "-",
+        "nome": _safe_str(nome) or "-",
+        "ra": _safe_str(ra) or "-",
+        "tipo": _safe_str(tipo) or "-",
+        "data": _safe_str(data_str) or "-",
+        "campo": _safe_str(campo) or "-",
+        "detalhe": _safe_str(detalhe) or "-",
+    })
+
 
 @app.route("/quadros/transferencias", methods=["GET", "POST"])
 @login_required
@@ -3549,6 +3599,10 @@ def quadro_transferencias():
 
         data_quadro_dt = _parse_user_date(data_quadro_in) or datetime.now()
 
+        # ALERTAS de inconsistência que NÃO impedem gerar o arquivo
+        missing_info_alerts = []
+        missing_info_seen = set()
+
         # Lê LISTA CORRIDA (Fundamental)
         try:
             df_fundamental = pd.read_excel(fundamental_path, sheet_name="LISTA CORRIDA")
@@ -3576,6 +3630,19 @@ def quadro_transferencias():
             f"SÉRIE='{col_serie}', NOME='{col_nome}', DATA NASC.='{col_dn}', RA='{col_ra}', "
             f"OBS='{col_obs}', LOCAL TE='{col_local_te}'"
         )
+
+        if not col_local_te:
+            _push_missing_info_alert(
+                missing_info_alerts,
+                missing_info_seen,
+                turma="(Estrutura do arquivo)",
+                nome="-",
+                ra="-",
+                tipo="TE",
+                data_str="-",
+                campo="LOCAL TE",
+                detalhe="A coluna 'LOCAL TE' não foi encontrada na Lista Piloto Fundamental."
+            )
 
         transfer_records = []
         invalid_te_dates = 0
@@ -3617,9 +3684,23 @@ def quadro_transferencias():
             ra = _safe_str(row_dict.get(col_ra))
             nivel_classe = _safe_str(row_dict.get(col_serie))
 
-            # FIX H/I/J:
+            # FIX H/I/J
             local_te_raw = _safe_str(row_dict.get(col_local_te)) if col_local_te else ""
             local_te = "-" if _is_missing_text(local_te_raw) else local_te_raw
+
+            # ALERTA: registro encontrado, mas sem LOCAL TE
+            if _is_missing_text(local_te_raw):
+                _push_missing_info_alert(
+                    missing_info_alerts,
+                    missing_info_seen,
+                    turma=nivel_classe,
+                    nome=nome,
+                    ra=ra,
+                    tipo="TE",
+                    data_str=te_dt.strftime("%d/%m/%Y"),
+                    campo="LOCAL TE",
+                    detalhe="Registro encontrado no período, mas o campo LOCAL TE está vazio ou inválido."
+                )
 
             record = {
                 "nome": nome,
@@ -3653,6 +3734,19 @@ def quadro_transferencias():
             eja_col_serie = _pick_col(colmap_eja, "SÉRIE", "SERIE")
             eja_col_obs = _pick_col(colmap_eja, "OBS")
             eja_col_local_te = _pick_col(colmap_eja, "LOCAL TE", "LOCALTE")
+
+            if not eja_col_local_te:
+                _push_missing_info_alert(
+                    missing_info_alerts,
+                    missing_info_seen,
+                    turma="(Estrutura do arquivo EJA)",
+                    nome="-",
+                    ra="-",
+                    tipo="TE/MC/MCC",
+                    data_str="-",
+                    campo="LOCAL TE",
+                    detalhe="A coluna 'LOCAL TE' não foi encontrada na Lista Piloto EJA."
+                )
 
             if eja_col_nome and eja_col_ra and eja_col_serie and eja_col_obs:
                 df_eja_sub = df_eja[
@@ -3703,6 +3797,20 @@ def quadro_transferencias():
 
                     local_te_raw = _safe_str(row_dict.get(eja_col_local_te)) if eja_col_local_te else ""
                     local_te = "-" if _is_missing_text(local_te_raw) else local_te_raw
+
+                    # ALERTA: registro encontrado, mas sem LOCAL TE
+                    if _is_missing_text(local_te_raw):
+                        _push_missing_info_alert(
+                            missing_info_alerts,
+                            missing_info_seen,
+                            turma=nivel_classe,
+                            nome=nome,
+                            ra=ra,
+                            tipo=tipo_str,
+                            data_str=dt.strftime("%d/%m/%Y"),
+                            campo="LOCAL TE",
+                            detalhe="Registro encontrado no período, mas o campo LOCAL TE está vazio ou inválido."
+                        )
 
                     transfer_records.append({
                         "nome": nome,
@@ -3764,6 +3872,8 @@ def quadro_transferencias():
             current_row += 1
 
         debug.append(f"[quadro_transferencias] Linhas preenchidas no modelo: {len(transfer_records)} (início A12)")
+        debug.append(f"[quadro_transferencias] Alertas de falta de informação: {len(missing_info_alerts)}")
+
         try:
             current_app.logger.info("\n".join(debug))
         except Exception:
@@ -3774,12 +3884,23 @@ def quadro_transferencias():
         output.seek(0)
 
         filename = f"Quadro_de_Transferencias_{period_start.strftime('%d%m')}_{period_end.strftime('%d%m')}.xlsx"
-        return send_file(
+        resp = send_file(
             output,
             as_attachment=True,
             download_name=filename,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+
+        # Envia alertas no header para o front exibir sem impedir o download
+        if missing_info_alerts:
+            payload = json.dumps(missing_info_alerts, ensure_ascii=False)
+            b64 = base64.b64encode(payload.encode("utf-8")).decode("ascii")
+            if len(b64) > 7000:
+                b64 = b64[:7000]
+                resp.headers["X-Transferencias-MissingInfo-Truncated"] = "1"
+            resp.headers["X-Transferencias-MissingInfo"] = b64
+
+        return resp
 
     return render_template("quadro_transferencias.html")
 
@@ -4252,10 +4373,14 @@ def quadro_quantitativo_mensal():
 #  - Regras:
 #      * Turma: Coluna A
 #      * RM (identificador único): Coluna C (NÃO contabiliza vazio/0)
+#      * Matrícula Ativa: Coluna H deve conter "MA"
 #      * Inclusão: Coluna N == "Sim" (case/trim)
-#      * Plano de Ação: Coluna P com profissional válido (ignora vazio/0/-)
+#      * Plano de Ação: Coluna P com profissional válido,
+#                       MAS SOMENTE se o aluno também for Inclusão
 #      * Profissionais: únicos por turma (dedupe case-insensitive e colapsando espaços)
-#  - Alerta: turmas com 2+ profissionais distintos (Plano de Ação)
+#  - Alertas:
+#      * Turmas com 2+ profissionais distintos (Plano de Ação)
+#      * Aluno com profissional na P, mas sem Inclusão na N
 #  - Preenchimento por mapeamento automático do MODELO
 # ==========================================================
 
@@ -4302,16 +4427,14 @@ def _normalize_rm(v) -> str:
     if v is None:
         return ""
 
-    # int direto
     if isinstance(v, int):
         if v == 0:
             return ""
         return str(v).strip()
 
-    # float comum no Excel
     if isinstance(v, float):
         if not v.is_integer():
-            return ""  # RM com decimal é inválido
+            return ""
         iv = int(v)
         if iv == 0:
             return ""
@@ -4321,19 +4444,16 @@ def _normalize_rm(v) -> str:
     if not s:
         return ""
 
-    # casos de "nan"/"none" etc
     if s.casefold() in {"nan", "none"}:
         return ""
 
-    # extrai somente dígitos (tolerante a RM com espaços/pontos)
     digits = re.sub(r"\D+", "", s)
     if not digits:
         return ""
 
-    # remove zeros à esquerda
     digits = digits.lstrip("0")
     if not digits:
-        return ""  # era tudo zero
+        return ""
 
     return digits
 
@@ -4345,6 +4465,7 @@ def _normalize_turma(v) -> str:
     """
     if v is None:
         return ""
+
     s = _collapse_spaces(str(v))
     if not s:
         return ""
@@ -4357,6 +4478,7 @@ def _normalize_turma(v) -> str:
     m = re.match(r"^(\d{1,2})([A-Z])$", s)
     if not m:
         return ""
+
     num = int(m.group(1))
     letra = m.group(2)
     return f"{num}º{letra}"
@@ -4368,17 +4490,45 @@ def _is_sim(v) -> bool:
     return s.casefold() == "sim"
 
 
-def _is_valid_prof(v) -> bool:
-    """Coluna P: profissional válido (ignora vazio, 0, -)."""
+def _has_ma(v) -> bool:
+    """
+    Coluna H: a linha só deve ser contada se houver o código MA
+    (Matrícula Ativa).
+
+    Aceita formatos como:
+      - 'MA'
+      - ' MA '
+      - 'MA/alguma coisa'
+      - 'alguma coisa - MA'
+      - 'MA TE'
+    Não confunde com palavras como 'MARIA'.
+    """
     if v is None:
         return False
+
+    s = _collapse_spaces(str(v)).upper()
+    if not s:
+        return False
+
+    tokens = re.findall(r"[A-Z0-9]+", s)
+    return "MA" in tokens
+
+
+def _is_valid_prof(v) -> bool:
+    """Coluna P: profissional válido (ignora vazio, 0, -, nan, none)."""
+    if v is None:
+        return False
+
     s = _collapse_spaces(str(v))
     if not s:
         return False
+
     if s in {"0", "-"}:
         return False
+
     if s.casefold() in {"nan", "none"}:
         return False
+
     return True
 
 
@@ -4395,8 +4545,12 @@ def _build_template_map(ws_model):
           Inclusão:        D/H/L na linha do rótulo
           Plano de Ação:   D/H/L na linha do rótulo+1
           Profissionais:   D/H/L na linha do rótulo+2
+
     Retorna:
-      dict { '2ºA': {'inc_qtd': 'D13', 'plano_qtd': 'D14', 'prof_qtd': 'D15'}, ... }
+      dict {
+        '2ºA': {'inc_qtd': 'D13', 'plano_qtd': 'D14', 'prof_qtd': 'D15'},
+        ...
+      }
     """
     label_to_qty = {2: 4, 6: 8, 10: 12}  # B->D, F->H, J->L
     turma_cells = {}
@@ -4407,6 +4561,7 @@ def _build_template_map(ws_model):
             v = ws_model.cell(r, label_col).value
             if not isinstance(v, str):
                 continue
+
             raw = _collapse_spaces(v)
             if not re.match(r"^\d{1,2}\s*-\s*[A-Za-z]$", raw):
                 continue
@@ -4434,18 +4589,31 @@ def _collect_counts_from_lista_corrida(ws_lista, valid_turmas):
       - inc_counts[turma] = qtd alunos inclusão (N == 'Sim'), dedupe por RM
       - plano_counts[turma] = qtd alunos com plano (P válido), dedupe por RM
       - profs_by_turma[turma] = dict key-> {'display': str, 'alunos': [(rm, nome), ...]}
+      - plan_without_inclusion_by_turma[turma] = lista de alunos com P válido,
+        mas sem Inclusão na N
+
     Colunas (0-index):
-      A turma = 0
-      C RM    = 2
-      D nome  = 3 (opcional p/ auditoria)
-      N incl  = 13
-      P prof  = 15
-    Observação crítica:
-      - RM vazio/0 NÃO é contabilizado (alunos não matriculados).
+      A turma     = 0
+      C RM        = 2
+      D nome      = 3
+      H situação  = 7   -> deve conter MA
+      N inclusão  = 13
+      P prof      = 15
+
+    Observações críticas:
+      - RM vazio/0 NÃO é contabilizado.
+      - Só contabiliza se a coluna H contiver MA.
+      - Plano só conta se o aluno também for Inclusão.
+      - Se houver P válido sem Inclusão, o aluno NÃO conta no plano,
+        mas entra na lista de alerta.
     """
     inc_rms = defaultdict(set)
     plano_rms = defaultdict(set)
     profs_by_turma = defaultdict(lambda: defaultdict(lambda: {"display": "", "alunos": []}))
+
+    # alertas: plano preenchido sem inclusão
+    plan_without_inclusion_by_turma = defaultdict(list)
+    plan_without_inclusion_seen = defaultdict(set)
 
     for row in ws_lista.iter_rows(min_row=2, values_only=True):
         if not row:
@@ -4456,21 +4624,36 @@ def _collect_counts_from_lista_corrida(ws_lista, valid_turmas):
             continue
 
         rm = _normalize_rm(row[2] if len(row) > 2 else None)
-
-        # >>> CORREÇÃO PRINCIPAL: ignora RM inválido (vazio/0/etc)
         if not rm:
+            continue
+
+        status_val = row[7] if len(row) > 7 else None
+        if not _has_ma(status_val):
             continue
 
         nome = _collapse_spaces(str(row[3])) if len(row) > 3 and row[3] is not None else ""
 
-        # Inclusão: coluna N (index 13) == "Sim"
         incl_val = row[13] if len(row) > 13 else None
-        if _is_sim(incl_val):
+        is_inclusao = _is_sim(incl_val)
+
+        if is_inclusao:
             inc_rms[turma].add(rm)
 
-        # Plano de Ação / Profissionais: coluna P (index 15)
         prof_val = row[15] if len(row) > 15 else None
-        if _is_valid_prof(prof_val):
+        has_prof = _is_valid_prof(prof_val)
+
+        # Caso inválido: tem plano/profissional, mas não está marcado como inclusão
+        if has_prof and not is_inclusao:
+            if rm not in plan_without_inclusion_seen[turma]:
+                plan_without_inclusion_seen[turma].add(rm)
+                plan_without_inclusion_by_turma[turma].append({
+                    "rm": rm,
+                    "nome": nome,
+                    "profissional": _collapse_spaces(str(prof_val)),
+                })
+
+        # Plano só conta se também for inclusão
+        if is_inclusao and has_prof:
             plano_rms[turma].add(rm)
 
             display = _collapse_spaces(str(prof_val))
@@ -4480,19 +4663,17 @@ def _collect_counts_from_lista_corrida(ws_lista, valid_turmas):
             if not bucket["display"]:
                 bucket["display"] = display
 
-            # auditoria leve
             bucket["alunos"].append((rm, nome))
 
     inc_counts = {t: len(rms) for t, rms in inc_rms.items()}
     plano_counts = {t: len(rms) for t, rms in plano_rms.items()}
 
-    return inc_counts, plano_counts, profs_by_turma
+    return inc_counts, plano_counts, profs_by_turma, plan_without_inclusion_by_turma
 
 
 @app.route("/quantinclusao", methods=["GET", "POST"])
 def quantinclusao():
     if request.method == "POST":
-        # EJA foi desconsiderada conforme solicitado.
         reg_file = (
             request.files.get("lista_regular")
             or request.files.get("lista_fundamental")
@@ -4508,12 +4689,10 @@ def quantinclusao():
             flash("Informe o Responsável pelo preenchimento.", "error")
             return redirect(url_for("quantinclusao"))
 
-        # Salva upload
         reg_filename = secure_filename(f"regular_{uuid.uuid4().hex}_{reg_file.filename}")
         reg_path = os.path.join(app.config["UPLOAD_FOLDER"], reg_filename)
         reg_file.save(reg_path)
 
-        # Abre LISTA CORRIDA (read_only p/ performance)
         try:
             wb_reg = load_workbook(reg_path, data_only=True, read_only=True)
             ws_lista_reg = wb_reg["LISTA CORRIDA"]
@@ -4521,7 +4700,6 @@ def quantinclusao():
             flash(f"Erro ao ler o arquivo: {str(e)}", "error")
             return redirect(url_for("quantinclusao"))
 
-        # Abre modelo e monta mapeamento automático
         model_path = os.path.join("modelos", "Quadro Quantitativo de Inclusão - Modelo.xlsx")
         try:
             wb_model = load_workbook(model_path, data_only=False)
@@ -4533,10 +4711,12 @@ def quantinclusao():
         template_map = _build_template_map(ws_model)
         valid_turmas = set(template_map.keys())
 
-        # Contagens por turma (somente turmas existentes no modelo)
-        inc_counts, plano_counts, profs_by_turma = _collect_counts_from_lista_corrida(
-            ws_lista_reg, valid_turmas
-        )
+        (
+            inc_counts,
+            plano_counts,
+            profs_by_turma,
+            plan_without_inclusion_by_turma,
+        ) = _collect_counts_from_lista_corrida(ws_lista_reg, valid_turmas)
 
         # Preenche as 3 linhas por turma: Inclusão / Plano / Profissionais
         for turma, cells in template_map.items():
@@ -4557,7 +4737,6 @@ def quantinclusao():
         now = datetime.now()
         mes_ano = f"{meses[now.month]}/{now.year}"
 
-        # B4: troca apenas quando reconhece padrão; senão, anexa com cuidado
         try:
             b4 = ws_model["B4"].value or ""
             b4s = str(b4)
@@ -4571,10 +4750,12 @@ def quantinclusao():
         ws_model["C8"] = responsavel.strip()
         ws_model["K8"] = now.strftime("%d/%m/%Y")
 
-        # Verificação extra: turmas com 2+ profissionais distintos
+        # ==========================================================
+        # ALERTA 1: Turmas com 2+ profissionais distintos
+        # ==========================================================
         alerts = []
+
         def _turma_sort_key(x: str):
-            # "2ºA" -> (2, "A")
             try:
                 n = int(x.split("º")[0])
                 l = x.split("º")[1]
@@ -4590,10 +4771,9 @@ def quantinclusao():
                     key=lambda s: s.casefold(),
                 )
 
-                # auditoria opcional (leve): amostra por profissional
                 audit = []
                 for k in sorted(prof_dict.keys(), key=lambda s: prof_dict[s]["display"].casefold()):
-                    alunos = prof_dict[k]["alunos"][:10]  # limite p/ UI
+                    alunos = prof_dict[k]["alunos"][:10]
                     audit.append({
                         "profissional": prof_dict[k]["display"],
                         "amostra_alunos": [{"rm": rm, "nome": nome} for rm, nome in alunos],
@@ -4605,6 +4785,21 @@ def quantinclusao():
                     "profissionais": prof_names,
                     "auditoria": audit,
                 })
+
+        # ==========================================================
+        # ALERTA 2: Plano preenchido sem Inclusão
+        # ==========================================================
+        plan_without_inclusion_alerts = []
+        for turma in sorted(valid_turmas, key=_turma_sort_key):
+            casos = plan_without_inclusion_by_turma.get(turma, [])
+            if not casos:
+                continue
+
+            plan_without_inclusion_alerts.append({
+                "turma": turma,
+                "qtd_casos": len(casos),
+                "alunos": casos[:20],  # limite p/ UI/header
+            })
 
         # Gera arquivo
         output = BytesIO()
@@ -4619,7 +4814,7 @@ def quantinclusao():
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-        # Envia alertas no header (ASCII-safe via base64)
+        # Header 1: turmas com 2+ profissionais distintos
         if alerts:
             payload = json.dumps(alerts, ensure_ascii=False)
             b64 = base64.b64encode(payload.encode("utf-8")).decode("ascii")
@@ -4627,6 +4822,15 @@ def quantinclusao():
                 b64 = b64[:7000]
                 resp.headers["X-QuantInclusao-Alerts-Truncated"] = "1"
             resp.headers["X-QuantInclusao-Alerts"] = b64
+
+        # Header 2: plano preenchido sem inclusão
+        if plan_without_inclusion_alerts:
+            payload2 = json.dumps(plan_without_inclusion_alerts, ensure_ascii=False)
+            b64_2 = base64.b64encode(payload2.encode("utf-8")).decode("ascii")
+            if len(b64_2) > 7000:
+                b64_2 = b64_2[:7000]
+                resp.headers["X-QuantInclusao-PlanWithoutInclusion-Truncated"] = "1"
+            resp.headers["X-QuantInclusao-PlanWithoutInclusion"] = b64_2
 
         return resp
 

@@ -86,9 +86,73 @@
     font-size: 0.88rem;
   }
   .multi-prof-item { margin-bottom: 8px; }
-
   .multi-prof-item strong { color: #4a3300; }
   .multi-prof-profs { color: #5a3c00; }
+
+  /* ------------------------------------------ */
+  /* ALERTA: plano preenchido sem inclusão */
+  /* ------------------------------------------ */
+  .plan-wo-inc-alert {
+    display: none;
+    border-radius: 14px;
+    border: 1px solid #f5c2c7;
+    background: linear-gradient(180deg, #fff5f5 0%, #ffe3e6 100%);
+    padding: 14px 14px 12px;
+    margin-bottom: 14px;
+    color: #7a1120;
+  }
+  .plan-wo-inc-alert.show { display: block; }
+
+  .plan-wo-inc-alert .title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .plan-wo-inc-alert .title i {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #dc3545;
+    color: #fff;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .plan-wo-inc-alert .desc {
+    font-size: 0.86rem;
+    color: #7a1120;
+    margin: 0 0 10px;
+  }
+  .plan-wo-inc-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.88rem;
+  }
+  .plan-wo-inc-item { margin-bottom: 10px; }
+  .plan-wo-inc-item strong { color: #5f0d18; }
+
+  .plan-wo-inc-students {
+    margin-top: 6px;
+    padding-left: 14px;
+    color: #7a1120;
+  }
+
+  .plan-wo-inc-students li {
+    margin-bottom: 4px;
+    line-height: 1.35;
+  }
+
+  .alert-note-truncated {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: inherit;
+    opacity: 0.9;
+    font-style: italic;
+  }
 
   details.audit {
     margin-top: 6px;
@@ -109,7 +173,8 @@
     color: #6b4a00;
     line-height: 1.35;
   }
-  .audit-body code {
+  .audit-body code,
+  .plan-wo-inc-students code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     font-size: 0.82rem;
     background: rgba(0,0,0,0.06);
@@ -236,6 +301,25 @@
         Turmas com <strong>2 ou mais</strong> profissionais diferentes no <strong>Plano de Ação</strong>.
       </p>
       <ul id="multi-prof-list" class="multi-prof-list"></ul>
+      <div id="multi-prof-note" class="alert-note-truncated" style="display:none;">
+        A lista foi truncada por limite do cabeçalho da resposta. Revise a planilha para ver todos os casos.
+      </div>
+    </div>
+
+    {# ALERTA PLANO SEM INCLUSÃO (renderizado via JS após POST) #}
+    <div id="plan-wo-inc-alert" class="plan-wo-inc-alert" role="alert" aria-live="polite">
+      <div class="title">
+        <i class="fas fa-user-slash"></i>
+        <div>Inconsistência encontrada</div>
+      </div>
+      <p class="desc">
+        Há alunos com <strong>Plano de Ação</strong> preenchido, mas <strong>sem marcação de Inclusão</strong>.
+        Esses alunos <strong>não foram contados</strong> no Plano de Ação.
+      </p>
+      <ul id="plan-wo-inc-list" class="plan-wo-inc-list"></ul>
+      <div id="plan-wo-inc-note" class="alert-note-truncated" style="display:none;">
+        A lista foi truncada por limite do cabeçalho da resposta. Revise a planilha para ver todos os casos.
+      </div>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -289,8 +373,6 @@
           >
         </div>
       </div>
-
-      {# EJA removida / desconsiderada #}
 
       <button type="submit" class="btn btn-primary btn-block btn-generate" id="btn-gerar-quantinc">
         Gerar Quadro Quantitativo de Inclusão
@@ -355,7 +437,6 @@
         return;
       }
 
-      // garante setar files (alguns browsers bloqueiam set direto)
       const newDt = new DataTransfer();
       newDt.items.add(file);
       input.files = newDt.files;
@@ -403,30 +484,45 @@
     return new TextDecoder('utf-8').decode(bytes);
   }
 
-  function clearMultiProfAlert() {
-    const box = document.getElementById('multi-prof-alert');
-    const list = document.getElementById('multi-prof-list');
-    if (!box || !list) return;
-    list.innerHTML = '';
-    box.classList.remove('show');
-  }
-
-  function renderMultiProfAlert(alerts) {
-    const box = document.getElementById('multi-prof-alert');
-    const list = document.getElementById('multi-prof-list');
-    if (!box || !list) return;
-
-    if (!alerts || !alerts.length) {
-      clearMultiProfAlert();
-      return;
-    }
-
-    const escapeHtml = (s) => (s || '')
+  function escapeHtml(value) {
+    return String(value ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function clearMultiProfAlert() {
+    const box = document.getElementById('multi-prof-alert');
+    const list = document.getElementById('multi-prof-list');
+    const note = document.getElementById('multi-prof-note');
+    if (!box || !list || !note) return;
+    list.innerHTML = '';
+    note.style.display = 'none';
+    box.classList.remove('show');
+  }
+
+  function clearPlanWithoutInclusionAlert() {
+    const box = document.getElementById('plan-wo-inc-alert');
+    const list = document.getElementById('plan-wo-inc-list');
+    const note = document.getElementById('plan-wo-inc-note');
+    if (!box || !list || !note) return;
+    list.innerHTML = '';
+    note.style.display = 'none';
+    box.classList.remove('show');
+  }
+
+  function renderMultiProfAlert(alerts, truncated = false) {
+    const box = document.getElementById('multi-prof-alert');
+    const list = document.getElementById('multi-prof-list');
+    const note = document.getElementById('multi-prof-note');
+    if (!box || !list || !note) return;
+
+    if (!alerts || !alerts.length) {
+      clearMultiProfAlert();
+      return;
+    }
 
     list.innerHTML = '';
 
@@ -445,7 +541,6 @@
         </div>
       `;
 
-      // Auditoria opcional (se o backend enviar)
       if (Array.isArray(a.auditoria) && a.auditoria.length) {
         const detailsWrap = document.createElement('div');
         detailsWrap.innerHTML = a.auditoria.map(block => {
@@ -471,6 +566,58 @@
       list.appendChild(li);
     });
 
+    note.style.display = truncated ? 'block' : 'none';
+    box.classList.add('show');
+  }
+
+  function renderPlanWithoutInclusionAlert(alerts, truncated = false) {
+    const box = document.getElementById('plan-wo-inc-alert');
+    const list = document.getElementById('plan-wo-inc-list');
+    const note = document.getElementById('plan-wo-inc-note');
+    if (!box || !list || !note) return;
+
+    if (!alerts || !alerts.length) {
+      clearPlanWithoutInclusionAlert();
+      return;
+    }
+
+    list.innerHTML = '';
+
+    alerts.forEach(item => {
+      const turma = escapeHtml(item.turma || '');
+      const qtd = Number(item.qtd_casos || 0);
+      const alunos = Array.isArray(item.alunos) ? item.alunos : [];
+
+      const li = document.createElement('li');
+      li.className = 'plan-wo-inc-item';
+
+      let alunosHtml = '<li>(sem dados)</li>';
+      if (alunos.length) {
+        alunosHtml = alunos.map(aluno => {
+          const rm = escapeHtml(aluno.rm || '');
+          const nome = escapeHtml(aluno.nome || '');
+          const prof = escapeHtml(aluno.profissional || '');
+          return `
+            <li>
+              <code>${rm}</code>${nome ? ' — ' + nome : ''}${prof ? ' — Profissional: <strong>' + prof + '</strong>' : ''}
+            </li>
+          `;
+        }).join('');
+      }
+
+      li.innerHTML = `
+        <div>
+          <strong>${turma}</strong> — ${qtd} caso(s)
+        </div>
+        <ul class="plan-wo-inc-students">
+          ${alunosHtml}
+        </ul>
+      `;
+
+      list.appendChild(li);
+    });
+
+    note.style.display = truncated ? 'block' : 'none';
     box.classList.add('show');
   }
 
@@ -483,6 +630,7 @@
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
       clearMultiProfAlert();
+      clearPlanWithoutInclusionAlert();
       showQuantInclusaoLoading();
 
       const formData = new FormData(form);
@@ -496,25 +644,41 @@
         const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
 
         if (!response.ok) {
-          // fallback: tenta exibir HTML com flash/erro
           const text = await response.text();
-          document.open(); document.write(text); document.close();
+          document.open();
+          document.write(text);
+          document.close();
           return;
         }
 
-        // Lê alertas (se existirem) antes de baixar
-        const h = response.headers.get('X-QuantInclusao-Alerts');
-        if (h) {
+        // ALERTA 1: múltiplos profissionais
+        const multiProfHeader = response.headers.get('X-QuantInclusao-Alerts');
+        const multiProfTruncated = response.headers.get('X-QuantInclusao-Alerts-Truncated') === '1';
+
+        if (multiProfHeader) {
           try {
-            const jsonText = b64ToUtf8(h);
+            const jsonText = b64ToUtf8(multiProfHeader);
             const alerts = JSON.parse(jsonText);
-            renderMultiProfAlert(alerts);
+            renderMultiProfAlert(alerts, multiProfTruncated);
           } catch (err) {
-            console.error('Falha ao ler alertas:', err);
+            console.error('Falha ao ler alertas de múltiplos profissionais:', err);
           }
         }
 
-        // Se veio o Excel, baixa normalmente
+        // ALERTA 2: plano preenchido sem inclusão
+        const planWoIncHeader = response.headers.get('X-QuantInclusao-PlanWithoutInclusion');
+        const planWoIncTruncated = response.headers.get('X-QuantInclusao-PlanWithoutInclusion-Truncated') === '1';
+
+        if (planWoIncHeader) {
+          try {
+            const jsonText = b64ToUtf8(planWoIncHeader);
+            const alerts = JSON.parse(jsonText);
+            renderPlanWithoutInclusionAlert(alerts, planWoIncTruncated);
+          } catch (err) {
+            console.error('Falha ao ler alertas de plano sem inclusão:', err);
+          }
+        }
+
         if (contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
           const blob = await response.blob();
 
@@ -536,9 +700,10 @@
           a.remove();
           window.URL.revokeObjectURL(url);
         } else {
-          // fallback (se backend retornar html)
           const text = await response.text();
-          document.open(); document.write(text); document.close();
+          document.open();
+          document.write(text);
+          document.close();
         }
       } catch (err) {
         console.error(err);

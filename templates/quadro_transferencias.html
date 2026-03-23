@@ -169,6 +169,86 @@
     color: #283E51;
   }
 
+  /* ------------------------------------ */
+  /* ALERTA: informações faltando */
+  /* ------------------------------------ */
+  .missing-info-alert {
+    display: none;
+    border-radius: 14px;
+    border: 1px solid #f2d6a3;
+    background: linear-gradient(180deg, #fff8e6 0%, #fff2cc 100%);
+    padding: 14px 14px 12px;
+    margin-bottom: 14px;
+    color: #5a3c00;
+  }
+
+  .missing-info-alert.show {
+    display: block;
+  }
+
+  .missing-info-alert .title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .missing-info-alert .title i {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f59e0b;
+    color: #fff;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .missing-info-alert .desc {
+    font-size: 0.86rem;
+    color: #6b4a00;
+    margin: 0 0 10px;
+  }
+
+  .missing-info-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.88rem;
+  }
+
+  .missing-info-item {
+    margin-bottom: 10px;
+  }
+
+  .missing-info-item strong {
+    color: #4a3300;
+  }
+
+  .missing-info-detail {
+    margin-top: 4px;
+    color: #6b4a00;
+    line-height: 1.35;
+  }
+
+  .missing-info-detail code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.82rem;
+    background: rgba(0,0,0,0.06);
+    padding: 1px 6px;
+    border-radius: 8px;
+  }
+
+  .alert-note-truncated {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: inherit;
+    opacity: 0.9;
+    font-style: italic;
+  }
+
   @media (max-width: 768px) {
     .transfer-wrapper {
       padding: 24px 18px 20px;
@@ -198,6 +278,21 @@
       </div>
     </div>
 
+    <div id="missing-info-alert" class="missing-info-alert" role="alert" aria-live="polite">
+      <div class="title">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>Atenção</div>
+      </div>
+      <p class="desc">
+        O quadro foi gerado, mas foram encontradas <strong>informações importantes ausentes</strong>
+        em alguns registros. Revise os casos abaixo.
+      </p>
+      <ul id="missing-info-list" class="missing-info-list"></ul>
+      <div id="missing-info-note" class="alert-note-truncated" style="display:none;">
+        A lista foi truncada por limite do cabeçalho da resposta. Revise a planilha para verificar todos os casos.
+      </div>
+    </div>
+
     <div id="flash-container" class="flash-container">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -212,7 +307,6 @@
     </div>
 
     <form id="form-transferencias" method="POST" enctype="multipart/form-data">
-      <!-- Dados que vão para o MODELO (A7, A8, B9, J9) -->
       <div class="form-row">
         <div class="form-group col-md-6">
           <label for="diretor_nome">Diretor(a) / Nome padrão (A8)</label>
@@ -243,7 +337,6 @@
         </div>
       </div>
 
-      <!-- Período de filtro -->
       <div class="form-row">
         <div class="form-group col-md-6">
           <label for="period_start">Data inicial do período</label>
@@ -273,7 +366,6 @@
         </div>
       </div>
 
-      <!-- Rodapé/Responsável -->
       <div class="form-group">
         <label for="responsavel">Responsável pelo preenchimento (B9)</label>
         <input
@@ -289,7 +381,6 @@
         </small>
       </div>
 
-      <!-- Upload Fundamental -->
       <div class="upload-group">
         <div class="section-title">Lista Piloto – Ensino Fundamental</div>
         <div id="drop-fundamental" class="dropzone">
@@ -315,7 +406,6 @@
         </div>
       </div>
 
-      <!-- Upload EJA (opcional / pode estar desativada no backend) -->
       {% if enable_eja %}
         <div class="upload-group">
           <div class="section-title">
@@ -344,8 +434,6 @@
             Opcional. Se não enviar, o quadro será gerado apenas com o Fundamental.
           </div>
         </div>
-      {% else %}
-        {# EJA desativada: mantemos o formulário limpo #}
       {% endif %}
 
       <button type="submit" class="btn btn-primary btn-block btn-generate">
@@ -453,6 +541,78 @@
     }
   }
 
+  function b64ToUtf8(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array([...bin].map(ch => ch.charCodeAt(0)));
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function clearMissingInfoAlert() {
+    const box = document.getElementById('missing-info-alert');
+    const list = document.getElementById('missing-info-list');
+    const note = document.getElementById('missing-info-note');
+    if (!box || !list || !note) return;
+
+    list.innerHTML = '';
+    note.style.display = 'none';
+    box.classList.remove('show');
+  }
+
+  function renderMissingInfoAlert(items, truncated = false) {
+    const box = document.getElementById('missing-info-alert');
+    const list = document.getElementById('missing-info-list');
+    const note = document.getElementById('missing-info-note');
+    if (!box || !list || !note) return;
+
+    if (!items || !items.length) {
+      clearMissingInfoAlert();
+      return;
+    }
+
+    list.innerHTML = '';
+
+    items.forEach(item => {
+      const turma = escapeHtml(item.turma || '-');
+      const nome = escapeHtml(item.nome || '-');
+      const ra = escapeHtml(item.ra || '-');
+      const tipo = escapeHtml(item.tipo || '-');
+      const data = escapeHtml(item.data || '-');
+      const campo = escapeHtml(item.campo || '-');
+      const detalhe = escapeHtml(item.detalhe || '-');
+
+      const li = document.createElement('li');
+      li.className = 'missing-info-item';
+      li.innerHTML = `
+        <div>
+          <strong>${turma}</strong> — ${nome}
+        </div>
+        <div class="missing-info-detail">
+          <code>RA: ${ra}</code>
+          &nbsp;|&nbsp;
+          <code>Tipo: ${tipo}</code>
+          &nbsp;|&nbsp;
+          <code>Data: ${data}</code>
+          &nbsp;|&nbsp;
+          <code>Campo: ${campo}</code>
+          <div style="margin-top:4px;">${detalhe}</div>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+
+    note.style.display = truncated ? 'block' : 'none';
+    box.classList.add('show');
+  }
+
   let transferenciasDownloading = false;
 
   function showTransferenciasLoading() {
@@ -501,6 +661,7 @@
         e.preventDefault();
 
         renderFlashMessages([]);
+        clearMissingInfoAlert();
         showTransferenciasLoading();
 
         const formData = new FormData(form);
@@ -513,8 +674,20 @@
 
           const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
 
-          // Sucesso: arquivo excel
           if (response.ok && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+            const missingInfoHeader = response.headers.get('X-Transferencias-MissingInfo');
+            const missingInfoTruncated = response.headers.get('X-Transferencias-MissingInfo-Truncated') === '1';
+
+            if (missingInfoHeader) {
+              try {
+                const jsonText = b64ToUtf8(missingInfoHeader);
+                const items = JSON.parse(jsonText);
+                renderMissingInfoAlert(items, missingInfoTruncated);
+              } catch (err) {
+                console.error('Falha ao ler alertas de informações ausentes:', err);
+              }
+            }
+
             const blob = await response.blob();
 
             let filename = 'Quadro_de_Transferencias.xlsx';
@@ -537,7 +710,6 @@
             return;
           }
 
-          // Erro: geralmente vem HTML com flashes
           const text = await response.text();
           const extracted = extractAlertsFromHTML(text);
 
