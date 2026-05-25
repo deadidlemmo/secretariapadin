@@ -1,0 +1,562 @@
+/* Estilos da tela de declaracoes. Extraido de templates/declaracao_tipo.html. */
+.page-card {
+    position: relative;
+    z-index: 1;
+    background: #fdfdfd;
+    padding: 32px 32px 40px;
+    border-radius: 18px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    width: 100%;
+    max-width: 980px;
+    color: #283E51;
+  }
+
+  .page-title {
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+    color: #283E51;
+  }
+
+  .page-subtitle {
+    text-align: center;
+    font-size: 0.95rem;
+    color: #5b6f92;
+    margin-bottom: 16px;
+  }
+
+  .page-subtitle strong {
+    color: #283E51;
+  }
+
+  /* Indicador de passo (tutorial) */
+  .step-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #1e293b;
+    font-size: 0.9rem;
+    margin-bottom: 18px;
+  }
+
+  .step-indicator i {
+    color: #4B79A1;
+    font-size: 1rem;
+  }
+
+  .segmento-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .segmento-card {
+    border-radius: 14px;
+    border: 2px solid #dde3ea;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    text-decoration: none;
+    background: linear-gradient(135deg, #f7fbff, #ffffff);
+    transition: all 0.18s ease-in-out;
+    color: #283E51;
+  }
+
+  .segmento-card-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #e3f2fd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1e88e5;
+    flex-shrink: 0;
+  }
+
+  .segmento-card-title {
+    font-weight: 700;
+    font-size: 0.98rem;
+  }
+
+  .segmento-card-text {
+    margin: 2px 0 0;
+    font-size: 0.84rem;
+    color: #607d8b;
+  }
+
+  .segmento-card:hover {
+    border-color: #4B79A1;
+    box-shadow: 0 10px 22px rgba(75, 121, 161, 0.25);
+    transform: translateY(-1px);
+  }
+
+  .segmento-card.ativo {
+    border-color: #283E51;
+    box-shadow: 0 12px 26px rgba(40, 62, 81, 0.35);
+    background: linear-gradient(135deg, #f0f6ff, #ffffff);
+  }
+
+  /* Destaque do tutorial no bloco de segmentos */
+  @keyframes tutorialPulse {
+    0% {
+      transform: translateY(0);
+      box-shadow: 0 0 0 0 rgba(75, 121, 161, 0.0);
+    }
+    50% {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(75, 121, 161, 0.35);
+    }
+    100% {
+      transform: translateY(0);
+      box-shadow: 0 0 0 0 rgba(75, 121, 161, 0.0);
+    }
+  }
+
+  .segmento-cards.step-highlight .segmento-card {
+    border-color: #4B79A1;
+    animation: tutorialPulse 1.8s ease-in-out infinite;
+  }
+
+  .status-alert {
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    margin-bottom: 18px;
+  }
+
+  .status-alert.success {
+    background: #e3f8e6;
+    border: 1px solid #52b56b;
+    color: #256029;
+  }
+
+  .status-alert.info {
+    background: #e3f5ff;
+    border: 1px solid #49a3ff;
+    color: #0a4b78;
+  }
+
+  .status-alert i {
+    margin-right: 8px;
+  }
+
+  .form-section-title {
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #283E51;
+  }
+
+  .form-section-title i {
+    margin-right: 6px;
+    color: #283E51;
+  }
+
+  .page-card label {
+    color: #37474f;
+  }
+
+  .page-card .form-control {
+    border-radius: 10px;
+    border: 1px solid #d0d7de;
+    font-size: 0.94rem;
+    color: #283E51;
+    background-color: #ffffff;
+  }
+
+  .page-card .form-control:focus {
+    border-color: #4B79A1;
+    box-shadow: 0 0 0 0.15rem rgba(75, 121, 161, 0.25);
+  }
+
+  /* Select2 – mesmos estilos para todos os selects */
+  .select2-container--default .select2-selection--single {
+    border-radius: 10px;
+    border: 1px solid #d0d7de;
+    height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: #283E51 !important;
+    padding-left: 12px;
+    font-size: 0.94rem;
+  }
+
+  .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 100%;
+    right: 8px;
+  }
+
+  .select2-dropdown {
+    border-radius: 10px;
+    border: 1px solid #d0d7de;
+  }
+
+  .select2-search--dropdown .select2-search__field {
+    border-radius: 6px;
+    border: 1px solid #d0d7de;
+    font-size: 0.9rem;
+  }
+
+  .select2-results__option {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    color: #283E51 !important;
+  }
+
+  .select2-results__option--highlighted {
+    background-color: #4B79A1 !important;
+    color: #ffffff !important;
+  }
+
+  /* Esconde o "X" de limpar do Select2 */
+  .select2-container--default .select2-selection--single .select2-selection__clear {
+    display: none !important;
+  }
+
+  #historico-container,
+  #unidade-anterior-container,
+  #frequencia-container {
+    display: none;
+    border-radius: 12px;
+    border: 1px dashed #cfd8dc;
+    padding: 12px 14px;
+    background: #f8fafc;
+    margin-bottom: 16px;
+  }
+
+  #historico-container legend,
+  #unidade-anterior-container legend,
+  #frequencia-container legend {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #37474f;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  #historico-container legend i,
+  #unidade-anterior-container legend i,
+  #frequencia-container legend i {
+    color: #283E51;
+    font-size: 0.9rem;
+  }
+
+  .freq-mes-row {
+    border-bottom: 1px dashed #e2e8f0;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+  }
+
+  .freq-mes-row:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .freq-mes-row small {
+    font-size: 0.78rem;
+  }
+
+  /* Destaque do passo atual (campos do formulário) – com pulso */
+  .step-highlight-field {
+    position: relative;
+    border-radius: 12px;
+    box-shadow: 0 0 0 2px rgba(75, 121, 161, 0.55), 0 8px 18px rgba(15, 23, 42, 0.25);
+    background: linear-gradient(135deg, #f0f4ff, #ffffff);
+    animation: tutorialPulse 1.8s ease-in-out infinite;
+  }
+
+  .declaracao-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+
+  .btn-declaracao,
+  .btn-lote,
+  .btn-voltar,
+  .btn-clear {
+    border-radius: 999px;
+    padding: 10px 24px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn-declaracao {
+    background: linear-gradient(135deg, #283E51, #4B79A1);
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(40, 62, 81, 0.35);
+  }
+
+  /* ESTADO INATIVO do botão Gerar declaração */
+  .btn-declaracao:disabled {
+    background: #cbd5e1;
+    color: #9ca3af;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+    animation: none;
+    opacity: 0.9;
+  }
+
+  .btn-lote {
+    background: #28a745;
+    color: #fff;
+  }
+  .btn-lote:hover {
+    background: #218838;
+    color: #fff;
+  }
+
+  .btn-voltar {
+    background: #e0e7ff;
+    color: #283E51;
+  }
+  .btn-voltar:hover {
+    background: #c7d2ff;
+    color: #1f2933;
+  }
+
+  .btn-clear {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+  .btn-clear:hover {
+    background: #fecaca;
+    color: #7f1d1d;
+  }
+
+  /* Animação suave no botão Gerar declaração (quando habilitado) */
+  @keyframes pulseBtn {
+    0% {
+      transform: translateY(0) scale(1);
+      box-shadow: 0 4px 10px rgba(40, 62, 81, 0.35);
+    }
+    50% {
+      transform: translateY(-1px) scale(1.03);
+      box-shadow: 0 10px 22px rgba(75, 121, 161, 0.45);
+    }
+    100% {
+      transform: translateY(0) scale(1);
+      box-shadow: 0 4px 10px rgba(40, 62, 81, 0.35);
+    }
+  }
+
+  .btn-declaracao:not(:disabled) {
+    animation: pulseBtn 2s ease-in-out infinite;
+  }
+
+  .btn-declaracao.step-highlight-field {
+    animation: tutorialPulse 1.8s ease-in-out infinite !important;
+  }
+
+  /* Overlay de carregamento */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+
+  .loading-box {
+    background: #ffffff;
+    padding: 22px 26px;
+    border-radius: 14px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+    text-align: center;
+    min-width: 260px;
+    color: #283E51;
+  }
+
+  .loading-spinner {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 4px solid #4B79A1;
+    border-top-color: transparent;
+    margin: 0 auto 12px;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .loading-text {
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  /* ------------------------------ */
+  /* Modal de confirmação customizado (Fundamental/EJA) */
+  /* ------------------------------ */
+
+  .confirm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+  }
+
+  .confirm-modal-overlay.show {
+    display: flex;
+  }
+
+  .confirm-modal-box {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    padding: 18px 22px 20px;
+    max-width: 480px;
+    width: calc(100% - 32px);
+    color: #111827;
+  }
+
+  .confirm-modal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .confirm-modal-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: #eff6ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1d4ed8;
+    flex-shrink: 0;
+  }
+
+  .confirm-modal-headline {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .confirm-modal-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #6b7280;
+  }
+
+  .confirm-modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+    color: #111827;
+  }
+
+  .confirm-modal-body {
+    font-size: 0.94rem;
+    color: #4b5563;
+    margin: 0;
+  }
+
+  .confirm-modal-body + .confirm-modal-body {
+    margin-top: 6px;
+    margin-bottom: 18px;
+  }
+
+  .confirm-modal-body strong {
+    color: #111827;
+  }
+
+  .confirm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .confirm-btn {
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .confirm-btn-secondary {
+    background: #e5e7eb;
+    color: #374151;
+  }
+  .confirm-btn-secondary:hover {
+    background: #d1d5db;
+  }
+
+  .confirm-btn-primary {
+    background: linear-gradient(135deg, #283E51, #4B79A1);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(40, 62, 81, 0.45);
+  }
+  .confirm-btn-primary:hover {
+    filter: brightness(1.05);
+  }
+
+  /* ------------------------------ */
+  /* Tutorial interativo - tip mais afastado do ícone (libs externas) */
+  /* ------------------------------ */
+
+  .driver-popover,
+  .introjs-tooltip {
+    margin-top: 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  @media (max-width: 768px) {
+    .page-card {
+      padding: 24px 18px 30px;
+    }
+    .segmento-cards {
+      grid-template-columns: 1fr;
+    }
+    .declaracao-actions {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+    .declaracao-actions .btn-declaracao,
+    .declaracao-actions .btn-lote,
+    .declaracao-actions .btn-voltar,
+    .declaracao-actions .btn-clear {
+      width: 100%;
+      justify-content: center;
+    }
+  }

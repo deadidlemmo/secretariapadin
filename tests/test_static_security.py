@@ -56,6 +56,19 @@ class StaticSecurityTests(unittest.TestCase):
         for expected in ["uploads/", "static/fotos/", "__pycache__/", "*.py[cod]", ".env", "env/", "venv/"]:
             self.assertIn(expected, gitignore)
 
+    def test_declaracao_tipo_assets_are_externalized(self):
+        template = read_text("templates/declaracao_tipo.html")
+        js = read_text("static/js/declaracao_tipo.js")
+
+        self.assertNotIn("{% block extra_styles %}", template)
+        self.assertNotIn("  <script>\n", template)
+        self.assertIn("css/declaracao_tipo.css", template)
+        self.assertIn("js/declaracao_tipo.js", template)
+        self.assertTrue((ROOT / "static" / "css" / "declaracao_tipo.css").exists())
+        self.assertTrue((ROOT / "static" / "js" / "declaracao_tipo.js").exists())
+        self.assertNotIn("{{", js)
+        self.assertNotIn("{%", js)
+
 
 if __name__ == "__main__":
     unittest.main()
