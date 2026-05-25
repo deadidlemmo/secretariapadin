@@ -30,14 +30,13 @@ from services.carteirinhas_log import (
     get_printed_set as _get_printed_set,
     mark_printed_rms as _mark_printed_rms,
 )
+from services.fotos import get_student_photo_url, save_student_photo, student_has_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
 from services.upload_sessions import save_excel_upload_to_session
 from utils.excel import set_merged_cell_value
 from utils.uploads import (
-    allowed_image_file as allowed_file,
     save_excel_upload,
     validate_excel_upload,
-    validate_image_upload,
 )
 
 
@@ -253,8 +252,6 @@ def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False, somente_nao_i
     alunos_sem_fotos_list = []
     alunos = []
 
-    allowed_exts = [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
-
     for row in registros_validos:
         rm_int = int(row["RM"])
         nome = row["NOME"]
@@ -289,12 +286,7 @@ def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False, somente_nao_i
             status_icon = "&#9888;"
 
         # Foto
-        foto_url = None
-        for ext in allowed_exts:
-            caminho_foto = f"static/fotos/{rm_int}{ext}"
-            if os.path.exists(caminho_foto):
-                foto_url = f"/static/fotos/{rm_int}{ext}"
-                break
+        foto_url = get_student_photo_url(rm_int)
 
         if not foto_url:
             alunos_sem_fotos_list.append(
@@ -381,17 +373,6 @@ from flask import request, jsonify
 # from flask_wtf.csrf import CSRFProtect
 # csrf = CSRFProtect(app)
 
-ALLOWED_FOTO_EXTS = [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
-
-
-def _rm_tem_foto(rm: int) -> bool:
-    for ext in ALLOWED_FOTO_EXTS:
-        caminho = os.path.join("static", "fotos", f"{rm}{ext}")
-        if os.path.exists(caminho):
-            return True
-    return False
-
-
 @app.route("/carteirinhas/marcar_impressas", methods=["POST"])
 @login_required
 # @csrf.exempt  # use isto se CSRF estiver bloqueando POST JSON
@@ -401,7 +382,7 @@ def marcar_carteirinhas_impressas():
     ano = int(payload.get("ano") or datetime.now().year)
 
     # REGRA-CHAVE: só marca como "impressa" se tiver foto de verdade
-    rms = [rm for rm in rms if _rm_tem_foto(rm)]
+    rms = [rm for rm in rms if student_has_photo(rm)]
 
     added, total_printed = _mark_printed_rms(ano, rms)
 
@@ -2633,20 +2614,11 @@ def upload_foto():
         return redirect(url_for("carteirinhas"))
 
     file = request.files.get("foto_file")
-    valid, message = validate_image_upload(file)
-    if not valid:
-        flash(message, "error")
+    try:
+        save_student_photo(file, rm)
+    except ValueError as exc:
+        flash(str(exc), "error")
         return redirect(url_for("carteirinhas"))
-
-    original_filename = secure_filename(file.filename)
-    _, ext = os.path.splitext(original_filename)
-
-    fotos_dir = os.path.join("static", "fotos")
-    os.makedirs(fotos_dir, exist_ok=True)
-
-    new_filename = secure_filename(f"{rm}{ext.lower()}")
-    file_path = os.path.join(fotos_dir, new_filename)
-    file.save(file_path)
 
     flash("Foto anexada com sucesso.", "success")
     return redirect(url_for("carteirinhas"))
@@ -2662,25 +2634,17 @@ def upload_multiplas_fotos():
         flash("Nenhuma foto enviada.", "error")
         return redirect(url_for("carteirinhas"))
 
-    fotos_dir = os.path.join("static", "fotos")
-    os.makedirs(fotos_dir, exist_ok=True)
-
     total_salvas = 0
     total_ignoradas = 0
 
     for rm, file in zip(rms, files):
         rm = (rm or "").strip()
-
-        valid, _message = validate_image_upload(file)
-        if not rm or not valid:
+        try:
+            save_student_photo(file, rm)
+        except ValueError:
             total_ignoradas += 1
             continue
 
-        original_filename = secure_filename(file.filename)
-        _, ext = os.path.splitext(original_filename)
-        new_filename = secure_filename(f"{rm}{ext.lower()}")
-        file_path = os.path.join(fotos_dir, new_filename)
-        file.save(file_path)
         total_salvas += 1
 
     if total_salvas:
@@ -2703,21 +2667,12 @@ def upload_inline_foto():
     if not rm:
         return jsonify({"error": "RM não fornecido"}), 400
 
-    valid, message = validate_image_upload(file)
-    if not valid:
-        return jsonify({"error": message}), 400
+    try:
+        saved = save_student_photo(file, rm)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
-    original_filename = secure_filename(file.filename)
-    _, ext = os.path.splitext(original_filename)
-
-    fotos_dir = os.path.join("static", "fotos")
-    os.makedirs(fotos_dir, exist_ok=True)
-
-    new_filename = secure_filename(f"{rm}{ext.lower()}")
-    file_path = os.path.join(fotos_dir, new_filename)
-    file.save(file_path)
-
-    return jsonify({"url": f"/static/fotos/{new_filename}", "message": "Foto anexada com sucesso"}), 200
+    return jsonify({"url": saved["url"], "message": "Foto anexada com sucesso"}), 200
 
 
 # ==========================================================

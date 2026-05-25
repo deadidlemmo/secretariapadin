@@ -70,7 +70,7 @@ def validate_image_upload(file_storage):
     try:
         with Image.open(file_storage.stream) as img:
             img.verify()
-    except (UnidentifiedImageError, OSError, ValueError):
+    except (UnidentifiedImageError, OSError, ValueError, SyntaxError):
         return False, "Arquivo de imagem invalido ou corrompido."
     finally:
         try:

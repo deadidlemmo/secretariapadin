@@ -50,6 +50,7 @@ As dependencias estao em `requirements.txt`.
 |-- gunicorn.conf.py               # Configuracao alternativa do Gunicorn
 |-- services/
 |   |-- carteirinhas_log.py        # Log SQLite das carteirinhas impressas
+|   |-- fotos.py                   # Busca e salvamento de fotos por RM
 |   |-- prazos.py                  # Regras de feriados e alertas de prazo
 |   `-- upload_sessions.py         # Salvamento de Excel e persistencia na sessao
 |-- utils/                         # Helpers reutilizaveis de Excel e uploads

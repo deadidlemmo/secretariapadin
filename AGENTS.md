@@ -67,6 +67,7 @@ Se precisar criar arquivos de teste, use nomes claramente ficticios e remova-os 
 - Configuracoes globais ficam em `config.py`.
 - Regras de feriados e alertas de prazo ficam em `services/prazos.py`.
 - Log transacional de carteirinhas impressas fica em `services/carteirinhas_log.py`.
+- Busca e salvamento de fotos por RM ficam em `services/fotos.py`.
 - Salvamento de uploads Excel com caminho em sessao fica em `services/upload_sessions.py`.
 - Helpers compartilhados de planilha e upload ficam em `utils/excel.py` e `utils/uploads.py`.
 
