@@ -1,8 +1,13 @@
 import os
-from flask import Blueprint, Flask, request, render_template, flash, redirect, url_for, jsonify
+import uuid
+from functools import wraps
+
+from flask import Blueprint, Flask, request, render_template, flash, redirect, url_for, jsonify, session
 import pandas as pd
 import pdfplumber
 import unicodedata
+
+from utils.uploads import allowed_excel_file, allowed_extension, unique_secure_filename
 
 # Cria o blueprint
 confere_bp = Blueprint('confere', __name__, template_folder='templates')
@@ -14,8 +19,43 @@ UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), "upload
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# Variável global para armazenar o caminho do arquivo Excel atual
-current_excel_file = None
+ALLOWED_PDF_EXTENSIONS = {".pdf"}
+CONFERE_EXCEL_SESSION_KEY = "confere_excel_file"
+
+
+def confere_login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login_route", next=request.url))
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+def _save_excel_to_session(file_storage):
+    filename = unique_secure_filename(file_storage.filename or "", prefix="confere")
+    if not filename:
+        return None, "Nenhum arquivo selecionado."
+    if not allowed_excel_file(filename):
+        return None, "Formato invalido. Envie uma planilha .xlsx, .xls ou .xlsm."
+
+    excel_path = os.path.join(UPLOAD_FOLDER, filename)
+    file_storage.save(excel_path)
+    session[CONFERE_EXCEL_SESSION_KEY] = excel_path
+    return excel_path, None
+
+
+def _get_session_excel_path():
+    path = session.get(CONFERE_EXCEL_SESSION_KEY)
+    if path and os.path.exists(path):
+        return path
+    session.pop(CONFERE_EXCEL_SESSION_KEY, None)
+    return None
+
+
+def _is_valid_pdf_upload(file_storage):
+    return bool(file_storage and file_storage.filename and allowed_extension(file_storage.filename, ALLOWED_PDF_EXTENSIONS))
 
 # Mapeamento de séries para os intervalos de linhas (usado quando não for "Todas as séries")
 mapeamento = {
@@ -205,9 +245,9 @@ def comparar_listas(df_excel, df_pdf):
         return None
 
 @confere_bp.route('/upload_excel', methods=['POST'])
+@confere_login_required
 def upload_excel():
-    global current_excel_file
-    if current_excel_file is not None:
+    if _get_session_excel_path() is not None:
         return jsonify({"success": False, "message": "Arquivo Excel já foi carregado anteriormente."})
     
     if 'listaExcel' not in request.files:
@@ -215,23 +255,26 @@ def upload_excel():
     file_excel = request.files['listaExcel']
     if file_excel.filename == '':
         return jsonify({"success": False, "message": "Nenhum arquivo selecionado."})
-    excel_path = os.path.join(UPLOAD_FOLDER, file_excel.filename)
-    file_excel.save(excel_path)
-    current_excel_file = excel_path
+
+    _excel_path, error = _save_excel_to_session(file_excel)
+    if error:
+        return jsonify({"success": False, "message": error}), 400
+
     return jsonify({"success": True, "message": "Arquivo Excel carregado com sucesso!"})
 
 @confere_bp.route('/', methods=['GET', 'POST'])
+@confere_login_required
 def index():
-    global current_excel_file
     dados_excel = None
     dados_pdf = None
     divergencias = None
     error_excel = None
     selected_series = None
+    excel_path = _get_session_excel_path()
 
     if request.method == 'POST':
         selected_series = request.form.get('serie')
-        if current_excel_file is None:
+        if excel_path is None:
             flash("Nenhum arquivo Excel foi carregado. Por favor, anexe um arquivo Excel.", "danger")
         else:
             if selected_series == "Todas as séries":
@@ -241,13 +284,16 @@ def index():
                     if key.startswith("listaPDF_"):
                         file_pdf = request.files.get(key)
                         if file_pdf and file_pdf.filename != '':
+                            if not _is_valid_pdf_upload(file_pdf):
+                                flash(f"Arquivo PDF inválido para {key}. Envie um arquivo .pdf.", "warning")
+                                continue
                             # O sufixo indica a série
                             serie_from_key = key.replace("listaPDF_", "")
                             pdf_dict[serie_from_key] = file_pdf
 
                 divergencias_dict = {}
                 for serie in mapeamento.keys():
-                    df_excel_serie = obter_dados_serie(serie, current_excel_file)
+                    df_excel_serie = obter_dados_serie(serie, excel_path)
                     if isinstance(df_excel_serie, str):
                         flash(f"Erro na série {serie}: {df_excel_serie}", "danger")
                         continue
@@ -266,7 +312,7 @@ def index():
                     divergencias = divergencias_dict
             else:
                 # Opção de série individual
-                result = obter_dados_serie(selected_series, current_excel_file)
+                result = obter_dados_serie(selected_series, excel_path)
                 if isinstance(result, str):
                     error_excel = result
                 else:
@@ -275,7 +321,10 @@ def index():
                 if 'listaPDF' in request.files:
                     file_pdf = request.files['listaPDF']
                     if file_pdf.filename != '':
-                        dados_pdf = obter_dados_pdf(file_pdf)
+                        if _is_valid_pdf_upload(file_pdf):
+                            dados_pdf = obter_dados_pdf(file_pdf)
+                        else:
+                            flash("Arquivo PDF inválido. Envie um arquivo .pdf.", "danger")
                 if dados_excel is not None and dados_pdf is not None:
                     divergencias = comparar_listas(dados_excel, dados_pdf)
     
@@ -288,6 +337,6 @@ def index():
 
 if __name__ == '__main__':
     app = Flask(__name__)
-    app.secret_key = 'sua_chave_secreta_aqui'
+    app.secret_key = os.getenv("FLASK_SECRET_KEY") or uuid.uuid4().hex
     app.register_blueprint(confere_bp, url_prefix='/confere')
     app.run(debug=True)

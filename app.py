@@ -7,11 +7,11 @@ from flask import (
     jsonify,
     session,
     flash,
+    current_app,
     get_flashed_messages,
     send_file,
 )
 import os
-import uuid
 import re
 import locale
 from datetime import datetime
@@ -20,10 +20,25 @@ from io import BytesIO
 
 import pandas as pd
 import xlrd  # Para ler arquivos .xls, se necessário
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook, Workbook  # Usado para trabalhar com XLSX
 from openpyxl.utils import get_column_letter  # Para obter a coluna em letra
-from openpyxl.cell import MergedCell  # Para identificar células mescladas
+
+from config import configure_app
+from services.carteirinhas_log import (
+    get_printed_set as _get_printed_set,
+    mark_printed_rms as _mark_printed_rms,
+)
+from services.prazos import build_deadline_alerts as build_deadline_alerts_service
+from services.upload_sessions import save_excel_upload_to_session
+from utils.excel import set_merged_cell_value
+from utils.uploads import (
+    allowed_image_file as allowed_file,
+    save_excel_upload,
+    validate_excel_upload,
+    validate_image_upload,
+)
 
 
 # ==========================================================
@@ -37,12 +52,7 @@ except locale.Error:
     pass
 
 app = Flask(__name__)
-app.secret_key = "sua_chave_secreta"  # Altere para uma chave segura
-ACCESS_TOKEN = "minha_senha"  # Token de acesso
-
-app.config["UPLOAD_FOLDER"] = "uploads"
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif"}
-app.config["HOLIDAYS_JSON_PATH"] = os.path.join(os.path.dirname(__file__), "modelos", "feriados_nacionais.json")
+ACCESS_TOKEN = configure_app(app)
 
 
 # Cria os diretórios necessários, se não existirem
@@ -120,6 +130,17 @@ def escolas_search():
 carregar_escolas()
 
 
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_entity_too_large(_error):
+    limit_mb = app.config.get("MAX_CONTENT_LENGTH", 0) // (1024 * 1024)
+    message = f"Arquivo muito grande. O limite atual é de {limit_mb} MB."
+    wants_json = request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html
+    if wants_json:
+        return jsonify({"error": message}), 413
+    flash(message, "error")
+    return redirect(request.referrer or url_for("dashboard"))
+
+
 # ==========================================================
 #  BLUEPRINTS
 # ==========================================================
@@ -133,11 +154,6 @@ app.register_blueprint(confere_bp, url_prefix="/confere")
 #  HELPERS GERAIS
 # ==========================================================
 
-def allowed_file(filename):
-    _, ext = os.path.splitext(filename)
-    return ext.lower() in ALLOWED_EXTENSIONS
-
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -146,25 +162,6 @@ def login_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
-
-
-def set_merged_cell_value(ws, cell_coord, value):
-    """
-    Atualiza o valor de uma célula mesclada em uma planilha openpyxl
-    preservando a mesclagem.
-    """
-    cell = ws[cell_coord]
-    if isinstance(cell, MergedCell):
-        for merged_range in ws.merged_cells.ranges:
-            if cell_coord in merged_range:
-                range_str = str(merged_range)
-                ws.unmerge_cells(range_str)
-                min_col, min_row, _, _ = merged_range.bounds
-                top_left_coord = f"{get_column_letter(min_col)}{min_row}"
-                ws[top_left_coord] = value
-                ws.merge_cells(range_str)
-                return
-    ws[cell_coord] = value
 
 
 def convert_xls_to_xlsx(file_like):
@@ -229,55 +226,6 @@ def is_valid_plano(val):
         return False
     s = str(val).strip()
     return s not in ["", "-", "0", "#REF"]
-
-
-import os
-import json
-from datetime import datetime
-import pandas as pd
-from flask import render_template, request, jsonify
-
-# ==========================================================
-#  CARTEIRINHAS – LOG DE IMPRESSÃO (JSON)
-# ==========================================================
-
-def _carteirinhas_printlog_path():
-    # usa a mesma pasta de uploads do sistema (ajuste se necessário)
-    base_dir = "uploads"
-    os.makedirs(base_dir, exist_ok=True)
-    return os.path.join(base_dir, "carteirinhas_print_log.json")
-
-
-def _load_print_log():
-    path = _carteirinhas_printlog_path()
-    if not os.path.exists(path):
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f) or {}
-    except Exception:
-        # se corromper por qualquer motivo, não trava o sistema
-        return {}
-
-
-def _save_print_log(data: dict):
-    path = _carteirinhas_printlog_path()
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
-
-
-def _get_printed_set(ano: int) -> set:
-    log = _load_print_log()
-    bloco = log.get(str(ano), {})
-    printed = set()
-    for v in bloco.get("printed_rms", []):
-        try:
-            printed.add(int(v))
-        except Exception:
-            pass
-    return printed
 
 
 # ==========================================================
@@ -455,31 +403,7 @@ def marcar_carteirinhas_impressas():
     # REGRA-CHAVE: só marca como "impressa" se tiver foto de verdade
     rms = [rm for rm in rms if _rm_tem_foto(rm)]
 
-    log = _load_print_log()
-    key = str(ano)
-
-    if key not in log:
-        log[key] = {"printed_rms": [], "printed_at": {}}
-
-    printed_set = set()
-    for v in log[key].get("printed_rms", []):
-        try:
-            printed_set.add(int(v))
-        except Exception:
-            pass
-
-    now_iso = datetime.now().isoformat(timespec="seconds")
-    added = 0
-
-    for rm in rms:
-        if rm not in printed_set:
-            printed_set.add(rm)
-            added += 1
-        # você pode manter isso (atualiza o timestamp mesmo se já constava)
-        log[key].setdefault("printed_at", {})[str(rm)] = now_iso
-
-    log[key]["printed_rms"] = sorted(list(printed_set))
-    _save_print_log(log)
+    added, total_printed = _mark_printed_rms(ano, rms)
 
     return jsonify({
         "ok": True,
@@ -487,7 +411,7 @@ def marcar_carteirinhas_impressas():
         "received": len(_normalize_rms(payload.get("rms", []))),  # recebido bruto
         "considered_with_photo": len(rms),                        # após filtro foto
         "added": added,
-        "total_printed": len(printed_set),
+        "total_printed": total_printed,
     })
 
 
@@ -1961,6 +1885,10 @@ def gerar_declaracao_personalizada(dados):
 def login_route():
     error = None
     if request.method == "POST":
+        if not ACCESS_TOKEN:
+            error = "ACCESS_TOKEN não configurado no servidor. Configure a variável de ambiente antes de usar o sistema."
+            return render_template("login.html", error=error), 503
+
         token = request.form.get("token")
         if token == ACCESS_TOKEN:
             session["logged_in"] = True
@@ -1997,21 +1925,35 @@ def upload_listas():
             flash("Selecione a Lista Piloto - REGULAR - 2025", "error")
             return redirect(url_for("upload_listas"))
 
+        valid, message = validate_excel_upload(fundamental_file)
+        if not valid:
+            flash(message, "error")
+            return redirect(url_for("upload_listas"))
+
+        valid, message = validate_excel_upload(eja_file, required=False)
+        if not valid:
+            flash(f"Lista EJA inválida: {message}", "error")
+            return redirect(url_for("upload_listas"))
+
         # Salva Fundamental (obrigatório)
-        fundamental_filename = secure_filename(
-            f"fundamental_{uuid.uuid4().hex}_" + fundamental_file.filename
+        save_excel_upload_to_session(
+            fundamental_file,
+            session,
+            "lista_fundamental",
+            app.config["UPLOAD_FOLDER"],
+            prefix="fundamental",
         )
-        fundamental_path = os.path.join(app.config["UPLOAD_FOLDER"], fundamental_filename)
-        fundamental_file.save(fundamental_path)
-        session["lista_fundamental"] = fundamental_path
 
         # Salva EJA (opcional)
         eja_salva = False
         if eja_file and eja_file.filename:
-            eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_" + eja_file.filename)
-            eja_path = os.path.join(app.config["UPLOAD_FOLDER"], eja_filename)
-            eja_file.save(eja_path)
-            session["lista_eja"] = eja_path
+            save_excel_upload_to_session(
+                eja_file,
+                session,
+                "lista_eja",
+                app.config["UPLOAD_FOLDER"],
+                prefix="eja",
+            )
             eja_salva = True
 
         if eja_salva:
@@ -2057,11 +1999,18 @@ def carteirinhas():
 
         if "excel_file" in request.files and request.files["excel_file"].filename != "":
             file = request.files["excel_file"]
-            filename = secure_filename(file.filename)
-            unique_filename = f"carteirinhas_{uuid.uuid4().hex}_{filename}"
-            file_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_filename)
-            file.save(file_path)
-            session["lista_fundamental"] = file_path
+            valid, message = validate_excel_upload(file)
+            if not valid:
+                flash(message, "error")
+                return redirect(url_for("carteirinhas"))
+
+            file_path = save_excel_upload_to_session(
+                file,
+                session,
+                "lista_fundamental",
+                app.config["UPLOAD_FOLDER"],
+                prefix="carteirinhas",
+            )
         else:
             file_path = session.get("lista_fundamental")
 
@@ -2213,7 +2162,10 @@ def declaracao_conclusao_5ano():
         flash("Nenhum aluno de 5º ano encontrado na lista piloto.", "error")
         return redirect(url_for("declaracao_tipo", segmento="Fundamental"))
 
-    data_extenso_str = "Praia Grande, 22 de dezembro de 2025"
+    data_extenso_str = current_app.config.get(
+        "CONCLUSAO_5ANO_DATE_TEXT",
+        f"Praia Grande, 22 de dezembro de {datetime.now().year}",
+    )
     titulo = "Declaração de Conclusão"
 
     registros_duas_vias = []
@@ -2397,15 +2349,19 @@ def declaracao_tipo():
         novo_upload = excel_file is not None and excel_file.filename
 
         if novo_upload:
-            filename = secure_filename(excel_file.filename)
-            unique_filename = f"declaracao_{uuid.uuid4().hex}_{filename}"
-            file_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_filename)
-            excel_file.save(file_path)
+            valid, message = validate_excel_upload(excel_file)
+            if not valid:
+                flash(message, "error")
+                return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-            if segmento == "Fundamental":
-                session["lista_fundamental"] = file_path
-            else:
-                session["lista_eja"] = file_path
+            session_key = "lista_fundamental" if segmento == "Fundamental" else "lista_eja"
+            file_path = save_excel_upload_to_session(
+                excel_file,
+                session,
+                session_key,
+                app.config["UPLOAD_FOLDER"],
+                prefix="declaracao",
+            )
         else:
             if segmento == "Fundamental":
                 file_path = session.get("lista_fundamental")
@@ -2677,12 +2633,9 @@ def upload_foto():
         return redirect(url_for("carteirinhas"))
 
     file = request.files.get("foto_file")
-    if not file or file.filename == "":
-        flash("Nenhuma foto selecionada.", "error")
-        return redirect(url_for("carteirinhas"))
-
-    if not allowed_file(file.filename):
-        flash("Formato de imagem não permitido. Envie JPG, PNG, GIF ou BMP.", "error")
+    valid, message = validate_image_upload(file)
+    if not valid:
+        flash(message, "error")
         return redirect(url_for("carteirinhas"))
 
     original_filename = secure_filename(file.filename)
@@ -2718,7 +2671,8 @@ def upload_multiplas_fotos():
     for rm, file in zip(rms, files):
         rm = (rm or "").strip()
 
-        if not rm or not file or file.filename == "" or not allowed_file(file.filename):
+        valid, _message = validate_image_upload(file)
+        if not rm or not valid:
             total_ignoradas += 1
             continue
 
@@ -2749,11 +2703,9 @@ def upload_inline_foto():
     if not rm:
         return jsonify({"error": "RM não fornecido"}), 400
 
-    if not file or file.filename == "":
-        return jsonify({"error": "Nenhum arquivo enviado"}), 400
-
-    if not allowed_file(file.filename):
-        return jsonify({"error": "Formato de imagem não permitido"}), 400
+    valid, message = validate_image_upload(file)
+    if not valid:
+        return jsonify({"error": message}), 400
 
     original_filename = secure_filename(file.filename)
     _, ext = os.path.splitext(original_filename)
@@ -2797,7 +2749,6 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook
-from openpyxl.cell import MergedCell
 
 # ----------------------------------------------------------
 # EJA: liga/desliga (FIX)
@@ -2837,9 +2788,6 @@ def _save_upload_to_session(file_storage, session_key: str, prefix: str) -> str:
     Salva arquivo enviado em UPLOAD_FOLDER e grava em session[session_key].
     Retorna o path salvo.
     """
-    filename = secure_filename(file_storage.filename)
-    unique_filename = f"{prefix}_{uuid.uuid4().hex}_{filename}"
-
     upload_folder = None
     try:
         upload_folder = current_app.config.get("UPLOAD_FOLDER")
@@ -2850,10 +2798,13 @@ def _save_upload_to_session(file_storage, session_key: str, prefix: str) -> str:
         # mantém compatibilidade com seu app.py original (que define app.config["UPLOAD_FOLDER"])
         upload_folder = "uploads"
 
-    file_path = os.path.join(upload_folder, unique_filename)
-    file_storage.save(file_path)
-    session[session_key] = file_path
-    return file_path
+    return save_excel_upload_to_session(
+        file_storage,
+        session,
+        session_key,
+        upload_folder,
+        prefix=prefix,
+    )
 
 
 def _find_sheet_case_insensitive(wb, target_name: str):
@@ -2866,28 +2817,6 @@ def _find_sheet_case_insensitive(wb, target_name: str):
         if (name or "").strip().lower() == target:
             return name
     return None
-
-
-# ----------------------------------------------------------
-# Helper comum: escrita segura em célula mesclada
-# ----------------------------------------------------------
-def set_merged_cell_value(ws, cell_coord: str, value):
-    """
-    Atualiza o valor de uma célula (inclusive se estiver mesclada),
-    preservando a mesclagem.
-    """
-    cell = ws[cell_coord]
-    if isinstance(cell, MergedCell):
-        for merged_range in ws.merged_cells.ranges:
-            if cell_coord in merged_range:
-                range_str = str(merged_range)
-                ws.unmerge_cells(range_str)
-                min_col, min_row, _, _ = merged_range.bounds
-                top_left = ws.cell(row=min_row, column=min_col)
-                top_left.value = value
-                ws.merge_cells(range_str)
-                return
-    ws[cell_coord].value = value
 
 
 # ----------------------------------------------------------
@@ -3236,11 +3165,15 @@ def quadro_atendimento_mensal():
         fundamental_file = request.files.get('lista_fundamental')
         eja_file = request.files.get('lista_eja')
 
-        if fundamental_file and fundamental_file.filename != '':
-            _save_upload_to_session(fundamental_file, 'lista_fundamental', prefix='atendimento')
+        try:
+            if fundamental_file and fundamental_file.filename != '':
+                _save_upload_to_session(fundamental_file, 'lista_fundamental', prefix='atendimento')
 
-        if enable_eja and eja_file and eja_file.filename != '':
-            _save_upload_to_session(eja_file, 'lista_eja', prefix='atendimento_eja')
+            if enable_eja and eja_file and eja_file.filename != '':
+                _save_upload_to_session(eja_file, 'lista_eja', prefix='atendimento_eja')
+        except ValueError as e:
+            flash(str(e), "error")
+            return redirect(url_for('quadro_atendimento_mensal'))
 
         file_path = session.get('lista_fundamental')
         if not file_path or not os.path.exists(file_path):
@@ -3540,6 +3473,31 @@ def _push_missing_info_alert(alert_items, seen_keys, *, turma, nome, ra, tipo, d
     })
 
 
+def _replace_workbook_sheet(wb, title: str):
+    if title in wb.sheetnames:
+        wb.remove(wb[title])
+    return wb.create_sheet(title)
+
+
+def _add_transfer_alerts_sheet(wb, alert_items):
+    if not alert_items:
+        return
+    ws_alert = _replace_workbook_sheet(wb, "ALERTAS")
+    ws_alert.append(["Turma", "Nome", "RA", "Tipo", "Data", "Campo", "Detalhe"])
+    for item in alert_items:
+        ws_alert.append([
+            item.get("turma", "-"),
+            item.get("nome", "-"),
+            item.get("ra", "-"),
+            item.get("tipo", "-"),
+            item.get("data", "-"),
+            item.get("campo", "-"),
+            item.get("detalhe", "-"),
+        ])
+    for col in range(1, 8):
+        ws_alert.column_dimensions[get_column_letter(col)].width = 24
+
+
 @app.route("/quadros/transferencias", methods=["GET", "POST"])
 @login_required
 def quadro_transferencias():
@@ -3562,13 +3520,19 @@ def quadro_transferencias():
 
         # FUNDAMENTAL
         if fundamental_file and fundamental_file.filename != "":
-            fundamental_filename = secure_filename(
-                f"fundamental_{uuid.uuid4().hex}_" + fundamental_file.filename
-            )
+            valid, message = validate_excel_upload(fundamental_file)
+            if not valid:
+                flash(message, "error")
+                return redirect(url_for("quadro_transferencias"))
+
             upload_folder = current_app.config.get("UPLOAD_FOLDER", "uploads")
-            fundamental_path = os.path.join(upload_folder, fundamental_filename)
-            fundamental_file.save(fundamental_path)
-            session["lista_fundamental"] = fundamental_path
+            fundamental_path = save_excel_upload_to_session(
+                fundamental_file,
+                session,
+                "lista_fundamental",
+                upload_folder,
+                prefix="fundamental",
+            )
         else:
             fundamental_path = session.get("lista_fundamental")
             if not fundamental_path or not os.path.exists(fundamental_path):
@@ -3578,11 +3542,19 @@ def quadro_transferencias():
         # EJA opcional
         eja_path = None
         if enable_eja and eja_file and eja_file.filename != "":
-            eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_" + eja_file.filename)
+            valid, message = validate_excel_upload(eja_file)
+            if not valid:
+                flash(f"Lista EJA inválida: {message}", "error")
+                return redirect(url_for("quadro_transferencias"))
+
             upload_folder = current_app.config.get("UPLOAD_FOLDER", "uploads")
-            eja_path = os.path.join(upload_folder, eja_filename)
-            eja_file.save(eja_path)
-            session["lista_eja"] = eja_path
+            eja_path = save_excel_upload_to_session(
+                eja_file,
+                session,
+                "lista_eja",
+                upload_folder,
+                prefix="eja",
+            )
         elif enable_eja:
             eja_path = session.get("lista_eja")
 
@@ -3879,6 +3851,8 @@ def quadro_transferencias():
         except Exception:
             print("\n".join(debug))
 
+        _add_transfer_alerts_sheet(wb, missing_info_alerts)
+
         output = BytesIO()
         wb.save(output)
         output.seek(0)
@@ -3891,14 +3865,9 @@ def quadro_transferencias():
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-        # Envia alertas no header para o front exibir sem impedir o download
+        # Dados pessoais ficam na aba ALERTAS do Excel, não em headers HTTP.
         if missing_info_alerts:
-            payload = json.dumps(missing_info_alerts, ensure_ascii=False)
-            b64 = base64.b64encode(payload.encode("utf-8")).decode("ascii")
-            if len(b64) > 7000:
-                b64 = b64[:7000]
-                resp.headers["X-Transferencias-MissingInfo-Truncated"] = "1"
-            resp.headers["X-Transferencias-MissingInfo"] = b64
+            resp.headers["X-Transferencias-MissingInfo-Count"] = str(len(missing_info_alerts))
 
         return resp
 
@@ -4114,13 +4083,19 @@ def quadro_quantitativo_mensal():
 
         fundamental_file = request.files.get("lista_fundamental")
         if fundamental_file and fundamental_file.filename:
-            fundamental_filename = secure_filename(
-                f"fundamental_{uuid.uuid4().hex}_" + fundamental_file.filename
-            )
+            valid, message = validate_excel_upload(fundamental_file)
+            if not valid:
+                flash(message, "error")
+                return redirect(url_for("quadro_quantitativo_mensal"))
+
             upload_folder = current_app.config.get("UPLOAD_FOLDER", "uploads")
-            fundamental_path = os.path.join(upload_folder, fundamental_filename)
-            fundamental_file.save(fundamental_path)
-            session["lista_fundamental"] = fundamental_path
+            fundamental_path = save_excel_upload_to_session(
+                fundamental_file,
+                session,
+                "lista_fundamental",
+                upload_folder,
+                prefix="fundamental",
+            )
         else:
             fundamental_path = session.get("lista_fundamental")
             if not fundamental_path or not os.path.exists(fundamental_path):
@@ -4336,7 +4311,8 @@ def quadro_quantitativo_mensal():
         with _temp_unprotect_sheet(ws):
             set_merged_cell_value(ws, "A6", "E.M José Padin Mouta")
             set_merged_cell_value(ws, "A8", mes_ano)
-            set_merged_cell_value(ws, "A10", "QUADRO GERAL DE TRANSFERENCIAS EXPEDIDAS - 2026")
+            ano_letivo = int(current_app.config.get("SCHOOL_YEAR", datetime.now().year))
+            set_merged_cell_value(ws, "A10", f"QUADRO GERAL DE TRANSFERENCIAS EXPEDIDAS - {ano_letivo}")
 
         current_app.logger.info(
             "[QUADRO_QUANTITATIVO] periodo=%s..%s | counted=%s | discarded=%s | ano_padrao_sem_ano=%s",
@@ -4671,7 +4647,59 @@ def _collect_counts_from_lista_corrida(ws_lista, valid_turmas):
     return inc_counts, plano_counts, profs_by_turma, plan_without_inclusion_by_turma
 
 
+def _add_quant_inclusao_alerts_sheet(wb, multi_prof_alerts, plan_without_inclusion_alerts):
+    if not multi_prof_alerts and not plan_without_inclusion_alerts:
+        return
+
+    ws_alert = _replace_workbook_sheet(wb, "ALERTAS")
+    ws_alert.append(["Categoria", "Turma", "Detalhe", "RM", "Nome"])
+
+    for alert in multi_prof_alerts:
+        turma = alert.get("turma", "-")
+        profissionais = ", ".join(alert.get("profissionais", []))
+        ws_alert.append([
+            "Múltiplos profissionais",
+            turma,
+            f"{alert.get('qtd_profissionais', 0)} profissionais: {profissionais}",
+            "",
+            "",
+        ])
+        for block in alert.get("auditoria", []):
+            profissional = block.get("profissional", "-")
+            for aluno in block.get("amostra_alunos", []):
+                ws_alert.append([
+                    "Amostra por profissional",
+                    turma,
+                    profissional,
+                    aluno.get("rm", ""),
+                    aluno.get("nome", ""),
+                ])
+
+    for alert in plan_without_inclusion_alerts:
+        turma = alert.get("turma", "-")
+        ws_alert.append([
+            "Plano sem inclusão",
+            turma,
+            f"{alert.get('qtd_casos', 0)} caso(s)",
+            "",
+            "",
+        ])
+        for aluno in alert.get("alunos", []):
+            ws_alert.append([
+                "Plano sem inclusão",
+                turma,
+                aluno.get("profissional", "-"),
+                aluno.get("rm", ""),
+                aluno.get("nome", ""),
+            ])
+
+    widths = [26, 14, 42, 14, 36]
+    for idx, width in enumerate(widths, start=1):
+        ws_alert.column_dimensions[get_column_letter(idx)].width = width
+
+
 @app.route("/quantinclusao", methods=["GET", "POST"])
+@login_required
 def quantinclusao():
     if request.method == "POST":
         reg_file = (
@@ -4685,13 +4713,20 @@ def quantinclusao():
             flash("Selecione o arquivo da Lista Piloto (Regular/Fundamental).", "error")
             return redirect(url_for("quantinclusao"))
 
+        valid, message = validate_excel_upload(reg_file)
+        if not valid:
+            flash(message, "error")
+            return redirect(url_for("quantinclusao"))
+
         if not responsavel or responsavel.strip() == "":
             flash("Informe o Responsável pelo preenchimento.", "error")
             return redirect(url_for("quantinclusao"))
 
-        reg_filename = secure_filename(f"regular_{uuid.uuid4().hex}_{reg_file.filename}")
-        reg_path = os.path.join(app.config["UPLOAD_FOLDER"], reg_filename)
-        reg_file.save(reg_path)
+        reg_path = save_excel_upload(
+            reg_file,
+            app.config["UPLOAD_FOLDER"],
+            prefix="regular",
+        )
 
         try:
             wb_reg = load_workbook(reg_path, data_only=True, read_only=True)
@@ -4801,6 +4836,8 @@ def quantinclusao():
                 "alunos": casos[:20],  # limite p/ UI/header
             })
 
+        _add_quant_inclusao_alerts_sheet(wb_model, alerts, plan_without_inclusion_alerts)
+
         # Gera arquivo
         output = BytesIO()
         wb_model.save(output)
@@ -4814,369 +4851,23 @@ def quantinclusao():
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-        # Header 1: turmas com 2+ profissionais distintos
+        # Dados pessoais ficam na aba ALERTAS do Excel, não em headers HTTP.
         if alerts:
-            payload = json.dumps(alerts, ensure_ascii=False)
-            b64 = base64.b64encode(payload.encode("utf-8")).decode("ascii")
-            if len(b64) > 7000:
-                b64 = b64[:7000]
-                resp.headers["X-QuantInclusao-Alerts-Truncated"] = "1"
-            resp.headers["X-QuantInclusao-Alerts"] = b64
+            resp.headers["X-QuantInclusao-Alerts-Count"] = str(len(alerts))
 
-        # Header 2: plano preenchido sem inclusão
         if plan_without_inclusion_alerts:
-            payload2 = json.dumps(plan_without_inclusion_alerts, ensure_ascii=False)
-            b64_2 = base64.b64encode(payload2.encode("utf-8")).decode("ascii")
-            if len(b64_2) > 7000:
-                b64_2 = b64_2[:7000]
-                resp.headers["X-QuantInclusao-PlanWithoutInclusion-Truncated"] = "1"
-            resp.headers["X-QuantInclusao-PlanWithoutInclusion"] = b64_2
+            resp.headers["X-QuantInclusao-PlanWithoutInclusion-Count"] = str(len(plan_without_inclusion_alerts))
 
         return resp
 
     return render_template("quantinclusao.html")
 
-import os
-import json
-import calendar
-from dataclasses import dataclass
-from datetime import datetime, date, timedelta
-
-# ============================
-# ALERTAS DE PRAZO (SEM DB)
-# - usa feriados.json (dict: "YYYY-MM-DD": "Nome")
-# - calcula D0 ajustado para dia útil conforme regra:
-#   * Dia 20: próximo dia útil (posterior)
-#   * Último dia do mês: último dia útil do mês (anterior, se não útil)
-#   * Semanal: próximo dia útil (posterior) a partir do dia configurado
-# - EXIBE SOMENTE NAS JANELAS PEDIDAS:
-#   * Dia 20:        D-2, D-1, D0, D+1, D+2
-#   * Último do mês: D-2, D-1, D0, D+1, D+2
-#   * Semanal:       D-1, D0, D+1
-# ============================
-
-# Timezone (Render costuma rodar em UTC; aqui forçamos America/Sao_Paulo)
-try:
-    from zoneinfo import ZoneInfo
-    _TZ = ZoneInfo("America/Sao_Paulo")
-except Exception:
-    _TZ = None
-
-
-def _today_sp() -> date:
-    if _TZ:
-        return datetime.now(_TZ).date()
-    return date.today()
-
-
-# Caminho padrão do arquivo no projeto:
-# .../secretariapadin/modelos/feriados.json
-def _default_holidays_path() -> str:
-    return os.path.join(app.root_path, "modelos", "feriados.json")
-
-
-app.config.setdefault("HOLIDAYS_JSON_PATH", _default_holidays_path())
-
-# Configurável: qual dia fecha o "Informativo Semanal"
-# 0=Seg, 1=Ter, 2=Qua, 3=Qui, 4=Sex, 5=Sáb, 6=Dom
-app.config.setdefault("INFORMATIVO_WEEKDAY_DUE", 4)  # padrão: sexta-feira
-
-
-# ----------------------------
-# Cache de feriados (memória)
-# ----------------------------
-_HOLIDAYS_CACHE = {
-    "loaded": False,
-    "dates": set(),      # set(date)
-    "names": {},         # dict[date] = "Nome"
-    "error": None,
-    "path": None,
-}
-
-
-def _load_holidays_json_once() -> None:
-    """
-    Espera formato:
-      {
-        "2001-01-01": "Confraternização Universal",
-        "2001-02-27": "Carnaval",
-        ...
-      }
-    """
-    if _HOLIDAYS_CACHE["loaded"]:
-        return
-
-    path = app.config.get("HOLIDAYS_JSON_PATH") or _default_holidays_path()
-    _HOLIDAYS_CACHE["path"] = path
-
-    try:
-        if not os.path.exists(path):
-            _HOLIDAYS_CACHE["loaded"] = True
-            _HOLIDAYS_CACHE["error"] = f"feriados.json não encontrado em: {path}"
-            return
-
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        if not isinstance(data, dict):
-            _HOLIDAYS_CACHE["loaded"] = True
-            _HOLIDAYS_CACHE["error"] = "feriados.json inválido: esperado um objeto JSON (dict)."
-            return
-
-        for k, v in data.items():
-            if not isinstance(k, str):
-                continue
-            # chave esperada: YYYY-MM-DD
-            try:
-                y = int(k[0:4]); m = int(k[5:7]); d = int(k[8:10])
-                dt = date(y, m, d)
-            except Exception:
-                continue
-
-            _HOLIDAYS_CACHE["dates"].add(dt)
-            name = str(v).strip() if v is not None else ""
-            if name:
-                _HOLIDAYS_CACHE["names"][dt] = name
-
-        _HOLIDAYS_CACHE["loaded"] = True
-        _HOLIDAYS_CACHE["error"] = None
-
-    except Exception as e:
-        _HOLIDAYS_CACHE["loaded"] = True
-        _HOLIDAYS_CACHE["error"] = str(e)
-
-
-def _holiday_name(d: date) -> str:
-    _load_holidays_json_once()
-    return _HOLIDAYS_CACHE["names"].get(d, "")
-
-
-def _is_business_day(d: date) -> bool:
-    _load_holidays_json_once()
-    if d.weekday() >= 5:  # 5=sábado, 6=domingo
-        return False
-    return d not in _HOLIDAYS_CACHE["dates"]
-
-
-def _next_business_day(d: date) -> date:
-    cur = d
-    while not _is_business_day(cur):
-        cur += timedelta(days=1)
-    return cur
-
-
-def _prev_business_day(d: date) -> date:
-    cur = d
-    while not _is_business_day(cur):
-        cur -= timedelta(days=1)
-    return cur
-
-
-def _last_day_of_month(y: int, m: int) -> date:
-    last = calendar.monthrange(y, m)[1]
-    return date(y, m, last)
-
-
-def _add_months(base: date, months: int) -> date:
-    y = base.year + (base.month - 1 + months) // 12
-    m = (base.month - 1 + months) % 12 + 1
-    day = min(base.day, calendar.monthrange(y, m)[1])
-    return date(y, m, day)
-
-
-def _fmt_br(d: date) -> str:
-    return d.strftime("%d/%m/%Y")
-
-
-def _window_hit(today: date, due: date, before: int, after: int) -> bool:
-    return (due - timedelta(days=before)) <= today <= (due + timedelta(days=after))
-
-
-def _days_delta(today: date, due: date) -> int:
-    return (due - today).days
-
-
-@dataclass
-class DeadlineAlert:
-    key: str
-    title: str
-    due_base: date
-    due_adjusted: date
-    window_before: int
-    window_after: int
-    message: str
-
-
-def _compute_due_day20(ref: date) -> tuple[date, date]:
-    """
-    D0 base: dia 20 do mês de referência.
-    D0 ajustado: próximo dia útil (posterior).
-    Se já passou da janela (D0 ajustado + 2), usa próximo mês.
-    """
-    base = date(ref.year, ref.month, 20)
-    adj = _next_business_day(base)
-
-    # janela: D-2..D+2
-    if ref > (adj + timedelta(days=2)):
-        base2 = _add_months(base, 1)
-        base2 = date(base2.year, base2.month, 20)
-        return base2, _next_business_day(base2)
-
-    return base, adj
-
-
-def _compute_due_month_end(ref: date) -> tuple[date, date]:
-    """
-    REGRA AJUSTADA CONFORME SEU ADENDO:
-
-    D0 base: último dia do mês.
-    D0 ajustado: ÚLTIMO DIA ÚTIL DO MÊS (se o último dia cair em não útil,
-                 volta para o dia útil anterior).
-
-    Se já passou da janela (D0 ajustado + 2), usa o mês seguinte.
-    """
-    base = _last_day_of_month(ref.year, ref.month)
-
-    # Se o último dia não for útil, usa o último dia útil do mês (anterior)
-    if _is_business_day(base):
-        adj = base
-    else:
-        adj = _prev_business_day(base)
-
-    # janela: D-2..D+2
-    if ref > (adj + timedelta(days=2)):
-        nextm = _add_months(date(ref.year, ref.month, 1), 1)
-        base2 = _last_day_of_month(nextm.year, nextm.month)
-        if _is_business_day(base2):
-            adj2 = base2
-        else:
-            adj2 = _prev_business_day(base2)
-        return base2, adj2
-
-    return base, adj
-
-
-def _compute_due_weekly(ref: date) -> tuple[date, date]:
-    """
-    D0 base: dia da semana configurado (default sexta) na semana de ref.
-    D0 ajustado: próximo dia útil (posterior) se cair em não útil/feriado.
-    Se já passou da janela (D0 ajustado + 1), usa próxima semana.
-    """
-    due_wd = int(app.config.get("INFORMATIVO_WEEKDAY_DUE", 4))
-    due_wd = max(0, min(6, due_wd))
-
-    # segunda-feira da semana atual
-    monday = ref - timedelta(days=ref.weekday())
-    base = monday + timedelta(days=due_wd)
-    adj = _next_business_day(base)
-
-    # janela semanal: D-1..D+1
-    if ref > (adj + timedelta(days=1)):
-        monday2 = monday + timedelta(days=7)
-        base2 = monday2 + timedelta(days=due_wd)
-        return base2, _next_business_day(base2)
-
-    return base, adj
-
-
-def build_deadline_alerts(today: date | None = None) -> list[dict]:
-    """
-    Retorna lista de dicts pronta para template.
-    Exibe somente quando estiver dentro da janela correta.
-    """
-    today = today or _today_sp()
-
-    # monta D0 base e ajustado por quadro
-    day20_base, day20_adj = _compute_due_day20(today)
-    mend_base, mend_adj = _compute_due_month_end(today)
-    wk_base, wk_adj = _compute_due_weekly(today)
-
-    alerts: list[DeadlineAlert] = []
-
-    # 1) Quantitativo de Inclusão (dia 20 ou próximo útil) -> D-2..D+2
-    if _window_hit(today, day20_adj, before=2, after=2):
-        extra = ""
-        if day20_adj != day20_base:
-            hn = _holiday_name(day20_base)
-            extra = f" (ajustado para próximo dia útil{': ' + hn if hn else ''})"
-        alerts.append(DeadlineAlert(
-            key="quant_inclusao",
-            title="Prazo: Quantitativo de Inclusão",
-            due_base=day20_base,
-            due_adjusted=day20_adj,
-            window_before=2,
-            window_after=2,
-            message=f"O Quadro Quantitativo de Inclusão deve ser enviado até {_fmt_br(day20_adj)}{extra}."
-        ))
-
-    # 2) Atendimento Mensal (último dia útil do mês) -> D-2..D+2
-    if _window_hit(today, mend_adj, before=2, after=2):
-        extra = ""
-        if mend_adj != mend_base:
-            hn = _holiday_name(mend_base)
-            extra = f" (ajustado para último dia útil do mês{': ' + hn if hn else ''})"
-        alerts.append(DeadlineAlert(
-            key="atendimento_mensal",
-            title="Prazo: Atendimento Mensal",
-            due_base=mend_base,
-            due_adjusted=mend_adj,
-            window_before=2,
-            window_after=2,
-            message=f"O Quadro de Atendimento Mensal deve ser enviado até {_fmt_br(mend_adj)}{extra}."
-        ))
-
-    # 3) Quantitativo Mensal de Transferências Expedidas (último dia útil do mês) -> D-2..D+2
-    if _window_hit(today, mend_adj, before=2, after=2):
-        extra = ""
-        if mend_adj != mend_base:
-            hn = _holiday_name(mend_base)
-            extra = f" (ajustado para último dia útil do mês{': ' + hn if hn else ''})"
-        alerts.append(DeadlineAlert(
-            key="quant_mensal_te",
-            title="Prazo: Quantitativo Mensal de Transferências Expedidas",
-            due_base=mend_base,
-            due_adjusted=mend_adj,
-            window_before=2,
-            window_after=2,
-            message=f"O Quadro Mensal de Transferências Expedidas deve ser enviado até {_fmt_br(mend_adj)}{extra}."
-        ))
-
-    # 4) Informativo Semanal -> D-1..D+1
-    if _window_hit(today, wk_adj, before=1, after=3):
-        extra = ""
-        if wk_adj != wk_base:
-            hn = _holiday_name(wk_base)
-            extra = f" (ajustado para próximo dia útil{': ' + hn if hn else ''})"
-        alerts.append(DeadlineAlert(
-            key="informativo_semanal",
-            title="Prazo: Informativo Semanal",
-            due_base=wk_base,
-            due_adjusted=wk_adj,
-            window_before=1,
-            window_after=1,
-            message=f"O Informativo Semanal deve ser enviado até {_fmt_br(wk_adj)}{extra}."
-        ))
-
-    # converte para dict simples + status por D- / D+
-    out: list[dict] = []
-    for a in alerts:
-        delta = _days_delta(today, a.due_adjusted)
-        if delta > 0:
-            when = f"Faltam {delta} dia(s)."
-        elif delta == 0:
-            when = "Vence hoje."
-        else:
-            when = f"Vencido há {abs(delta)} dia(s)."
-
-        out.append({
-            "key": a.key,
-            "title": a.title,
-            "message": a.message,
-            "due": _fmt_br(a.due_adjusted),
-            "status": when,
-        })
-
-    return out
+def build_deadline_alerts(today=None):
+    return build_deadline_alerts_service(
+        today=today,
+        holidays_path=app.config.get("HOLIDAYS_JSON_PATH"),
+        weekly_due_weekday=app.config.get("INFORMATIVO_WEEKDAY_DUE", 4),
+    )
 
 
 # Injeta automaticamente para TODOS os templates

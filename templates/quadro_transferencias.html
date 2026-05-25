@@ -675,17 +675,18 @@
           const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
 
           if (response.ok && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
-            const missingInfoHeader = response.headers.get('X-Transferencias-MissingInfo');
-            const missingInfoTruncated = response.headers.get('X-Transferencias-MissingInfo-Truncated') === '1';
-
-            if (missingInfoHeader) {
-              try {
-                const jsonText = b64ToUtf8(missingInfoHeader);
-                const items = JSON.parse(jsonText);
-                renderMissingInfoAlert(items, missingInfoTruncated);
-              } catch (err) {
-                console.error('Falha ao ler alertas de informações ausentes:', err);
-              }
+            // Os detalhes com nomes/RAs ficam na aba ALERTAS do Excel, não em headers HTTP.
+            const missingInfoCount = Number(response.headers.get('X-Transferencias-MissingInfo-Count') || 0);
+            if (missingInfoCount > 0) {
+              renderMissingInfoAlert([{
+                turma: 'Aba ALERTAS',
+                nome: `${missingInfoCount} alerta(s)`,
+                ra: '-',
+                tipo: '-',
+                data: '-',
+                campo: 'Confira o arquivo baixado',
+                detalhe: 'Os detalhes foram inseridos na aba ALERTAS da planilha.'
+              }], false);
             }
 
             const blob = await response.blob();

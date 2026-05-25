@@ -651,32 +651,23 @@
           return;
         }
 
-        // ALERTA 1: múltiplos profissionais
-        const multiProfHeader = response.headers.get('X-QuantInclusao-Alerts');
-        const multiProfTruncated = response.headers.get('X-QuantInclusao-Alerts-Truncated') === '1';
-
-        if (multiProfHeader) {
-          try {
-            const jsonText = b64ToUtf8(multiProfHeader);
-            const alerts = JSON.parse(jsonText);
-            renderMultiProfAlert(alerts, multiProfTruncated);
-          } catch (err) {
-            console.error('Falha ao ler alertas de múltiplos profissionais:', err);
-          }
+        // Os detalhes com nomes/RMs ficam na aba ALERTAS do Excel, não em headers HTTP.
+        const multiProfCount = Number(response.headers.get('X-QuantInclusao-Alerts-Count') || 0);
+        if (multiProfCount > 0) {
+          renderMultiProfAlert([{
+            turma: 'Aba ALERTAS',
+            qtd_profissionais: multiProfCount,
+            profissionais: ['Confira os detalhes no arquivo baixado']
+          }], false);
         }
 
-        // ALERTA 2: plano preenchido sem inclusão
-        const planWoIncHeader = response.headers.get('X-QuantInclusao-PlanWithoutInclusion');
-        const planWoIncTruncated = response.headers.get('X-QuantInclusao-PlanWithoutInclusion-Truncated') === '1';
-
-        if (planWoIncHeader) {
-          try {
-            const jsonText = b64ToUtf8(planWoIncHeader);
-            const alerts = JSON.parse(jsonText);
-            renderPlanWithoutInclusionAlert(alerts, planWoIncTruncated);
-          } catch (err) {
-            console.error('Falha ao ler alertas de plano sem inclusão:', err);
-          }
+        const planWoIncCount = Number(response.headers.get('X-QuantInclusao-PlanWithoutInclusion-Count') || 0);
+        if (planWoIncCount > 0) {
+          renderPlanWithoutInclusionAlert([{
+            turma: 'Aba ALERTAS',
+            qtd_casos: planWoIncCount,
+            alunos: []
+          }], false);
         }
 
         if (contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {

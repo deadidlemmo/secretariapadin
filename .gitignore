@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local environments
+.env
+.env.*
+!.env.example
+env/
+venv/
+.venv/
+
+# Runtime uploads and sensitive local data
+uploads/
+static/fotos/
+
+# Generated/runtime artifacts
+*.tmp
+*.log
+*.sqlite
+*.sqlite3
+*.db
+carteirinhas.html
+carteirinhas.pdf
+temp_image.jpg
+
+# Office lock files and OS metadata
+~$*
+Thumbs.db
+.DS_Store
+
+# Local helper placeholders
+py
+python
+
