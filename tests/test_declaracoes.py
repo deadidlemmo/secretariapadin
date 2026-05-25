@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from services.declaracoes import (
+    build_declaracao_personalizada_context,
     build_notas_tabela_html,
     contexto_segmento,
     data_extenso_praia_grande,
@@ -71,6 +72,60 @@ class DeclaracoesServiceTests(unittest.TestCase):
         self.assertIn("color:red", html)
         self.assertIn("8,00", html)
         self.assertIn("color:blue", html)
+
+    def test_build_declaracao_personalizada_context_conclusao(self):
+        context = build_declaracao_personalizada_context(
+            {
+                "segmento": "Fundamental",
+                "tipo_declaracao": "Conclus\u00e3o",
+                "nome_aluno": "Aluno Ficticio",
+                "ra": "123",
+                "data_nascimento": "2026-05-25",
+                "ano_serie_concluida": "5\u00ba ano",
+                "ano_conclusao": "2026",
+                "deve_historico_unidade": "sim",
+            }
+        )
+
+        self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Conclus\u00e3o")
+        self.assertIn("Aluno Ficticio", context["declaracao_text"])
+        self.assertIn("Ensino Fundamental", context["declaracao_text"])
+        self.assertIn("pend\u00eancia de hist\u00f3rico", context["declaracao_text"])
+
+    def test_build_declaracao_personalizada_context_matricula_cancelada_eja(self):
+        context = build_declaracao_personalizada_context(
+            {
+                "segmento": "EJA",
+                "tipo_declaracao": "matricula_cancelada",
+                "nome_aluno": "Aluno EJA",
+                "ra": "456",
+                "data_nascimento": "25/05/2026",
+                "ano_serie_matricula": "2\u00aa S\u00c9RIE E.F",
+                "ano_matricula": "2026",
+                "semestre_matricula": "1\u00ba semestre",
+            }
+        )
+
+        self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Matr\u00edcula Cancelada")
+        self.assertIn("Educa\u00e7\u00e3o de Jovens e Adultos", context["declaracao_text"])
+        self.assertIn("1\u00ba semestre", context["declaracao_text"])
+
+    def test_build_declaracao_personalizada_context_ncom_and_invalid(self):
+        context = build_declaracao_personalizada_context(
+            {
+                "segmento": "Fundamental",
+                "tipo_declaracao": "ncom",
+                "nome_aluno": "Aluno NCOM",
+                "ra": "789",
+                "data_nascimento": "2026-05-25",
+                "ano_serie_vaga": "4\u00ba ano",
+                "ano_referencia_ncom": "2026",
+            }
+        )
+
+        self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de N\u00e3o Comparecimento (NCOM)")
+        self.assertIn("N\u00e3o Comparecimento", context["declaracao_text"])
+        self.assertIsNone(build_declaracao_personalizada_context({"tipo_declaracao": "desconhecida"}))
 
 
 if __name__ == "__main__":

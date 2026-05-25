@@ -31,18 +31,13 @@ from services.carteirinhas_log import (
 )
 from services.declaracoes import (
     DECLARACAO_PRINT_CSS,
+    build_declaracao_personalizada_context,
     build_notas_tabela_html,
-    contexto_segmento,
     data_extenso_praia_grande,
     format_date_br,
     format_eja_rm,
     format_rm,
     format_serie_ano,
-    get_str as _decl_get_str,
-    normalizar_segmento_personalizado,
-    normalizar_semestre,
-    normalizar_tipo_declaracao,
-    parse_data_nascimento_personalizada,
 )
 from services.fotos import get_student_photo_url, save_student_photo, student_has_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
@@ -1031,159 +1026,8 @@ def gerar_declaracao_personalizada(dados):
     Gera o HTML de declarações personalizadas (Conclusão, Matrícula cancelada
     ou Não Comparecimento - NCOM).
     """
-
-    nome = _decl_get_str(dados, "nome_aluno")
-    ra = _decl_get_str(dados, "ra")
-    data_nasc = parse_data_nascimento_personalizada(_decl_get_str(dados, "data_nascimento"))
-    segmento = normalizar_segmento_personalizado(dados)
-    segmento_label, prep_segmento = contexto_segmento(segmento)
-    tipo_decl = normalizar_tipo_declaracao(dados)
-
-    declaracao_text = ""
-    titulo = ""
-
-    if tipo_decl in ("conclusao", "conclusão"):
-        titulo = "Declaração de Conclusão"
-        ano_serie = _decl_get_str(dados, "ano_serie_concluida")
-        ano_conclusao = _decl_get_str(dados, "ano_conclusao")
-
-        deve_hist_val_raw = dados.get("deve_historico_unidade")
-        deve_hist_str = str(deve_hist_val_raw or "").strip().lower()
-        deve_hist_unidade = deve_hist_str in ("sim", "1", "true", "on")
-
-        if segmento == "Fundamental":
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, concluiu o(a) "
-                f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
-                f"<strong><u>{segmento_label}</u></strong>, no ano letivo de "
-                f"<strong><u>{ano_conclusao}</u></strong>, nesta unidade escolar."
-            )
-        else:
-            semestre_conclusao = normalizar_semestre(
-                dados,
-                "semestre_conclusao",
-                "semestre_conclusao_opcao",
-                "semestre_matricula",
-                "semestre_matricula_opcao",
-            )
-
-            if semestre_conclusao:
-                periodo_conclusao = (
-                    f"no <strong><u>{semestre_conclusao}</u></strong> do ano de "
-                    f"<strong><u>{ano_conclusao}</u></strong>"
-                )
-            else:
-                periodo_conclusao = (
-                    f"no ano letivo de <strong><u>{ano_conclusao}</u></strong>"
-                )
-
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, concluiu o(a) "
-                f"<strong><u>{ano_serie}</u></strong> no segmento de "
-                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong>, "
-                f"{periodo_conclusao}, nesta unidade escolar."
-            )
-
-        if deve_hist_unidade:
-            declaracao_text += (
-                " Ressalta-se que consta, junto a esta unidade escolar, "
-                "pendência de histórico escolar referente ao(à) aluno(a) citado(a)."
-            )
-
-    elif tipo_decl in ("matriculacancelada", "matricula cancelada", "matricula_cancelada"):
-        titulo = "Declaração de Matrícula Cancelada"
-        ano_serie = _decl_get_str(dados, "ano_serie_matricula")
-        ano_matricula = _decl_get_str(dados, "ano_matricula")
-        semestre_matricula = normalizar_semestre(
-            dados,
-            "semestre_matricula",
-            "semestre_matricula_opcao",
-        )
-
-        if segmento == "EJA" and semestre_matricula:
-            periodo_matricula = (
-                f"no <strong><u>{semestre_matricula}</u></strong> do ano de "
-                f"<strong><u>{ano_matricula}</u></strong>"
-            )
-        else:
-            periodo_matricula = (
-                f"no ano de <strong><u>{ano_matricula}</u></strong>"
-            )
-
-        if segmento == "EJA":
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, esteve matriculado(a) no(a) "
-                f"<strong><u>{ano_serie}</u></strong> no segmento de "
-                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong>, "
-                f"{periodo_matricula}, nesta unidade escolar, tendo sua matrícula cancelada."
-            )
-        else:
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, esteve matriculado(a) no(a) "
-                f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
-                f"<strong><u>{segmento_label}</u></strong>, {periodo_matricula}, "
-                "nesta unidade escolar, tendo sua matrícula cancelada."
-            )
-
-    elif tipo_decl == "ncom":
-        titulo = "Declaração de Não Comparecimento (NCOM)"
-        ano_serie = _decl_get_str(dados, "ano_serie_vaga")
-        ano_ref = _decl_get_str(dados, "ano_referencia_ncom")
-        semestre_ref = normalizar_semestre(
-            dados,
-            "semestre_referencia_ncom",
-            "semestre_referencia",
-        )
-
-        if segmento == "EJA" and semestre_ref:
-            periodo_ref = (
-                f"para o <strong><u>{semestre_ref}</u></strong> do ano de "
-                f"<strong><u>{ano_ref}</u></strong>"
-            )
-        else:
-            periodo_ref = (
-                f"para o ano de <strong><u>{ano_ref}</u></strong>"
-            )
-
-        if segmento == "EJA":
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, teve vaga destinada ao(à) "
-                f"<strong><u>{ano_serie}</u></strong> no segmento de "
-                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong>, "
-                f"{periodo_ref} nesta unidade escolar. Todavia, o(a) aluno(a) "
-                "não compareceu à unidade escolar, sendo considerado(a) NCOM – "
-                "Não Comparecimento, motivo pelo qual a vaga foi cancelada nesta "
-                "unidade escolar."
-            )
-        else:
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, teve vaga destinada ao(à) "
-                f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
-                f"<strong><u>{segmento_label}</u></strong>, {periodo_ref} "
-                "nesta unidade escolar. Todavia, o(a) aluno(a) não compareceu à unidade "
-                "escolar, sendo considerado(a) NCOM – Não Comparecimento, motivo pelo qual "
-                "a vaga foi cancelada nesta unidade escolar."
-            )
-
-    else:
+    context = build_declaracao_personalizada_context(dados)
+    if context is None:
         return None
 
     data_extenso_str = data_extenso_praia_grande()
@@ -1191,9 +1035,9 @@ def gerar_declaracao_personalizada(dados):
 
     return render_template(
         "declaracao_print.html",
-        titulo=titulo,
+        titulo=context["titulo"],
         data_extenso=data_extenso_str,
-        declaracao_text=declaracao_text,
+        declaracao_text=context["declaracao_text"],
         additional_css=additional_css,
         body_classes=[],
         print_body_padding="1.5cm 1.5cm",

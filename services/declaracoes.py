@@ -132,6 +132,165 @@ def parse_data_nascimento_personalizada(value) -> str:
     return "Desconhecida"
 
 
+def build_declaracao_personalizada_context(dados):
+    """
+    Monta titulo e texto HTML das declaracoes personalizadas.
+
+    Retorna None quando o tipo de declaracao nao e reconhecido.
+    """
+    nome = get_str(dados, "nome_aluno")
+    ra = get_str(dados, "ra")
+    data_nasc = parse_data_nascimento_personalizada(get_str(dados, "data_nascimento"))
+    segmento = normalizar_segmento_personalizado(dados)
+    segmento_label, prep_segmento = contexto_segmento(segmento)
+    tipo_decl = normalizar_tipo_declaracao(dados)
+
+    declaracao_text = ""
+    titulo = ""
+
+    if tipo_decl in ("conclusao", "conclus\u00e3o"):
+        titulo = "Declara\u00e7\u00e3o de Conclus\u00e3o"
+        ano_serie = get_str(dados, "ano_serie_concluida")
+        ano_conclusao = get_str(dados, "ano_conclusao")
+
+        deve_hist_value = dados.get("deve_historico_unidade")
+        deve_hist_text = str(deve_hist_value or "").strip().lower()
+        deve_hist_unidade = deve_hist_text in ("sim", "1", "true", "on")
+
+        if segmento == "Fundamental":
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, concluiu o(a) "
+                f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
+                f"<strong><u>{segmento_label}</u></strong>, no ano letivo de "
+                f"<strong><u>{ano_conclusao}</u></strong>, nesta unidade escolar."
+            )
+        else:
+            semestre_conclusao = normalizar_semestre(
+                dados,
+                "semestre_conclusao",
+                "semestre_conclusao_opcao",
+                "semestre_matricula",
+                "semestre_matricula_opcao",
+            )
+
+            if semestre_conclusao:
+                periodo_conclusao = (
+                    f"no <strong><u>{semestre_conclusao}</u></strong> do ano de "
+                    f"<strong><u>{ano_conclusao}</u></strong>"
+                )
+            else:
+                periodo_conclusao = f"no ano letivo de <strong><u>{ano_conclusao}</u></strong>"
+
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, concluiu o(a) "
+                f"<strong><u>{ano_serie}</u></strong> no segmento de "
+                f"<strong><u>Educa\u00e7\u00e3o de Jovens e Adultos (EJA)</u></strong>, "
+                f"{periodo_conclusao}, nesta unidade escolar."
+            )
+
+        if deve_hist_unidade:
+            declaracao_text += (
+                " Ressalta-se que consta, junto a esta unidade escolar, "
+                "pend\u00eancia de hist\u00f3rico escolar referente ao(\u00e0) aluno(a) citado(a)."
+            )
+
+    elif tipo_decl in ("matriculacancelada", "matricula cancelada", "matricula_cancelada"):
+        titulo = "Declara\u00e7\u00e3o de Matr\u00edcula Cancelada"
+        ano_serie = get_str(dados, "ano_serie_matricula")
+        ano_matricula = get_str(dados, "ano_matricula")
+        semestre_matricula = normalizar_semestre(
+            dados,
+            "semestre_matricula",
+            "semestre_matricula_opcao",
+        )
+
+        if segmento == "EJA" and semestre_matricula:
+            periodo_matricula = (
+                f"no <strong><u>{semestre_matricula}</u></strong> do ano de "
+                f"<strong><u>{ano_matricula}</u></strong>"
+            )
+        else:
+            periodo_matricula = f"no ano de <strong><u>{ano_matricula}</u></strong>"
+
+        if segmento == "EJA":
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, esteve matriculado(a) no(a) "
+                f"<strong><u>{ano_serie}</u></strong> no segmento de "
+                f"<strong><u>Educa\u00e7\u00e3o de Jovens e Adultos (EJA)</u></strong>, "
+                f"{periodo_matricula}, nesta unidade escolar, tendo sua matr\u00edcula cancelada."
+            )
+        else:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, esteve matriculado(a) no(a) "
+                f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
+                f"<strong><u>{segmento_label}</u></strong>, {periodo_matricula}, "
+                "nesta unidade escolar, tendo sua matr\u00edcula cancelada."
+            )
+
+    elif tipo_decl == "ncom":
+        titulo = "Declara\u00e7\u00e3o de N\u00e3o Comparecimento (NCOM)"
+        ano_serie = get_str(dados, "ano_serie_vaga")
+        ano_ref = get_str(dados, "ano_referencia_ncom")
+        semestre_ref = normalizar_semestre(
+            dados,
+            "semestre_referencia_ncom",
+            "semestre_referencia",
+        )
+
+        if segmento == "EJA" and semestre_ref:
+            periodo_ref = (
+                f"para o <strong><u>{semestre_ref}</u></strong> do ano de "
+                f"<strong><u>{ano_ref}</u></strong>"
+            )
+        else:
+            periodo_ref = f"para o ano de <strong><u>{ano_ref}</u></strong>"
+
+        if segmento == "EJA":
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, teve vaga destinada ao(\u00e0) "
+                f"<strong><u>{ano_serie}</u></strong> no segmento de "
+                f"<strong><u>Educa\u00e7\u00e3o de Jovens e Adultos (EJA)</u></strong>, "
+                f"{periodo_ref} nesta unidade escolar. Todavia, o(a) aluno(a) "
+                "n\u00e3o compareceu \u00e0 unidade escolar, sendo considerado(a) NCOM \u2013 "
+                "N\u00e3o Comparecimento, motivo pelo qual a vaga foi cancelada nesta "
+                "unidade escolar."
+            )
+        else:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, teve vaga destinada ao(\u00e0) "
+                f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
+                f"<strong><u>{segmento_label}</u></strong>, {periodo_ref} "
+                "nesta unidade escolar. Todavia, o(a) aluno(a) n\u00e3o compareceu \u00e0 unidade "
+                "escolar, sendo considerado(a) NCOM \u2013 N\u00e3o Comparecimento, motivo pelo qual "
+                "a vaga foi cancelada nesta unidade escolar."
+            )
+    else:
+        return None
+
+    return {
+        "titulo": titulo,
+        "declaracao_text": declaracao_text,
+    }
+
+
 def _format_nota(value):
     if pd.isna(value):
         return "\u2014", None
