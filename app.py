@@ -32,6 +32,15 @@ from services.carteirinhas_log import (
 )
 from services.fotos import get_student_photo_url, save_student_photo, student_has_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
+from services.quadros_transferencias import (
+    RX_EJA_TRANSFER as _RX_EJA,
+    add_transfer_alerts_sheet as _add_transfer_alerts_sheet,
+    label_set as _label_set,
+    normalize_tipo_te as _normalize_tipo_te,
+    push_missing_info_alert as _push_missing_info_alert,
+    replace_workbook_sheet as _replace_workbook_sheet,
+    serie_key_from_value as _serie_key_from_value,
+)
 from services.upload_sessions import save_excel_upload_to_session
 from utils.dates import (
     detect_te_date_from_obs_flexible,
@@ -3218,7 +3227,6 @@ def quadro_atendimento_mensal():
 #  QUADRO – TRANSFERÊNCIAS (FIX H/I/J + ALERTAS DE FALTA DE INFORMAÇÃO)
 # ==========================================================
 
-from typing import Optional
 from collections import defaultdict
 import re
 import os
@@ -3227,78 +3235,6 @@ import json
 import base64
 from io import BytesIO
 from datetime import datetime
-
-_RX_EJA = re.compile(
-    r"(?i)(?<![A-Z0-9])(TE|MC|MCC)\s*[-:\s–—]*\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?"
-)
-
-def _label_set(ws, addr: str, label: str, value: str):
-    """
-    Mantém prefixo do template quando existir (ex.: 'Unidade Escolar: ...').
-    """
-    current = ws[addr].value
-    val = _safe_str(value)
-
-    if isinstance(current, str) and ":" in current:
-        left = current.split(":", 1)[0].strip()
-        if _norm_header_compact(left) == _norm_header_compact(label):
-            set_merged_cell_value(ws, addr, f"{left}: {val}")
-            return
-
-    set_merged_cell_value(ws, addr, val)
-
-def _push_missing_info_alert(alert_items, seen_keys, *, turma, nome, ra, tipo, data_str, campo, detalhe):
-    """
-    Guarda inconsistências sem duplicar o mesmo caso.
-    """
-    key = (
-        _safe_str(turma),
-        _safe_str(nome),
-        _safe_str(ra),
-        _safe_str(tipo),
-        _safe_str(data_str),
-        _safe_str(campo),
-        _safe_str(detalhe),
-    )
-    if key in seen_keys:
-        return
-    seen_keys.add(key)
-
-    alert_items.append({
-        "turma": _safe_str(turma) or "-",
-        "nome": _safe_str(nome) or "-",
-        "ra": _safe_str(ra) or "-",
-        "tipo": _safe_str(tipo) or "-",
-        "data": _safe_str(data_str) or "-",
-        "campo": _safe_str(campo) or "-",
-        "detalhe": _safe_str(detalhe) or "-",
-    })
-
-
-def _replace_workbook_sheet(wb, title: str):
-    if title in wb.sheetnames:
-        wb.remove(wb[title])
-    return wb.create_sheet(title)
-
-
-def _add_transfer_alerts_sheet(wb, alert_items):
-    if not alert_items:
-        return
-    ws_alert = _replace_workbook_sheet(wb, "ALERTAS")
-    ws_alert.append(["Turma", "Nome", "RA", "Tipo", "Data", "Campo", "Detalhe"])
-    for item in alert_items:
-        ws_alert.append([
-            item.get("turma", "-"),
-            item.get("nome", "-"),
-            item.get("ra", "-"),
-            item.get("tipo", "-"),
-            item.get("data", "-"),
-            item.get("campo", "-"),
-            item.get("detalhe", "-"),
-        ])
-    for col in range(1, 8):
-        ws_alert.column_dimensions[get_column_letter(col)].width = 24
-
 
 @app.route("/quadros/transferencias", methods=["GET", "POST"])
 @login_required
@@ -3680,55 +3616,6 @@ def quadro_transferencias():
 #  QUADRO – QUANTITATIVO MENSAL (Fundamental)
 #  (mantido: parse flexível do período + debug sheet oculta)
 # ==========================================================
-
-def _serie_key_from_value(serie_val: str) -> Optional[str]:
-    """Extrai 2º/3º/4º/5º de valores como '4ºF', '5º D', etc."""
-    s = "" if serie_val is None else str(serie_val).strip()
-    m = re.search(r"(\d)\s*º", s)
-    if not m:
-        return None
-    n = m.group(1)
-    if n in {"2", "3", "4", "5"}:
-        return f"{n}º"
-    return None
-
-
-def _normalize_tipo_te(val) -> str:
-    """
-    Normaliza o TIPO TE para bater no mapping do modelo.
-    Fora disso vira 'Sem Informação' (sem inventar dado).
-    """
-    if _is_missing_value(val):
-        return "Sem Informação"
-
-    raw = str(val).strip()
-    norm = _norm_header_compact(raw)
-
-    if "DENTRO" in norm or "REDEMUNICIPAL" in norm or "MUNICIPAL" in norm:
-        return "Dentro da Rede"
-    if "ESTAD" in norm:
-        return "Rede Estadual"
-    if "LITORAL" in norm or "BAIXADA" in norm:
-        return "Litoral"
-    if "MUDANCA" in norm and "MUNICIP" in norm:
-        return "Mudança de Municipio"
-    if "SAOPAULO" in norm:
-        return "São Paulo"
-    if "ABCD" in norm:
-        return "ABCD"
-    if "INTERIOR" in norm:
-        return "Interior"
-    if "OUTROSESTADOS" in norm or ("OUTROS" in norm and "ESTAD" in norm):
-        return "Outros Estados"
-    if "PARTICULAR" in norm:
-        return "Particular"
-    if "PAIS" in norm:
-        return "País"
-    if "SEMINFORMA" in norm:
-        return "Sem Informação"
-
-    return raw
-
 
 def _recreate_debug_sheet_hidden(wb, title: str = "DEBUG_TE"):
     """Cria/zera uma aba de debug (oculta) no workbook."""
