@@ -63,6 +63,7 @@ As dependencias estao em `requirements.txt`.
 |   `-- uploads.py                 # Validacao e nomes seguros de uploads
 |-- tests/                         # Testes unitarios/estaticos basicos
 |-- templates/                     # Telas Jinja2
+|   |-- declaracao_print.html      # Template de impressao das declaracoes unitarias
 |-- static/
 |   |-- logos/                     # Logos usadas nas telas/declaracoes
 |   `-- fotos/                     # Fotos dos alunos, nomeadas por RM

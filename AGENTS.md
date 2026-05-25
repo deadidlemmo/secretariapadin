@@ -60,6 +60,7 @@ Se precisar criar arquivos de teste, use nomes claramente ficticios e remova-os 
 - Segredos e configuracoes sensiveis devem vir de ambiente ou `.env`: `FLASK_SECRET_KEY`, `ACCESS_TOKEN`, `MAX_CONTENT_LENGTH_MB`, `SCHOOL_YEAR`, `CONCLUSAO_5ANO_DATE_TEXT`.
 - A Lista Piloto Fundamental geralmente usa a aba `LISTA CORRIDA`.
 - O Quadro de Atendimento Mensal tambem usa a aba `Total de Alunos`.
+- O HTML/CSS final das declaracoes unitarias fica em `templates/declaracao_print.html`; mantenha textos/regras separados do layout quando possivel.
 - Fotos de alunos ficam em `static/fotos/` e sao buscadas por RM.
 - Modelos de quadro sao arquivos Excel em `modelos/`.
 - O sistema calcula prazos usando `modelos/feriados.json` e timezone de Sao Paulo quando disponivel.

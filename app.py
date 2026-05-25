@@ -8,12 +8,13 @@ from flask import (
     session,
     flash,
     current_app,
-    get_flashed_messages,
     send_file,
 )
+import copy
 import os
 import re
 import locale
+from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
 from io import BytesIO
@@ -21,7 +22,6 @@ from io import BytesIO
 import pandas as pd
 import xlrd  # Para ler arquivos .xls, se necessário
 from werkzeug.exceptions import RequestEntityTooLarge
-from werkzeug.utils import secure_filename
 from openpyxl import load_workbook, Workbook  # Usado para trabalhar com XLSX
 
 from config import configure_app
@@ -386,10 +386,6 @@ def _normalize_rms(rms):
     # unique preservando ordem
     return list(dict.fromkeys(out))
 
-
-import os
-from datetime import datetime
-from flask import request, jsonify
 
 # Se você usa CSRFProtect (Flask-WTF), descomente a linha do csrf.exempt
 # from flask_wtf.csrf import CSRFProtect
@@ -1088,257 +1084,15 @@ def gerar_declaracao_escolar(
     if tipo == "Transferencia" and tem_observacoes:
         classes_body.append("transferencia-com-observacoes")
 
-    body_class_attr = f' class="{" ".join(classes_body)}"' if classes_body else ""
-
-    base_template = f"""<!doctype html>
-<html lang="pt-br">
-<head>
-  <meta charset="utf-8">
-  <title>{titulo} - E.M José Padin Mouta</title>
-  <style>
-    @page {{
-      margin: 0;
-    }}
-    html, body {{
-      margin: 0;
-      padding: 0.5cm;
-      font-family: 'Montserrat', sans-serif;
-      font-size: 16px;
-      line-height: 1.5;
-      color: #333;
-    }}
-    .header {{
-      text-align: center;
-      border-bottom: 2px solid #283E51;
-      padding-bottom: 5px;
-      margin-bottom: 10px;
-    }}
-    .header h1 {{
-      margin: 0;
-      font-size: 24px;
-      text-transform: uppercase;
-      color: #283E51;
-    }}
-    .header p {{
-      margin: 3px 0;
-      font-size: 16px;
-    }}
-    .date {{
-      text-align: right;
-      font-size: 16px;
-      margin-bottom: 10px;
-    }}
-    .content {{
-      text-align: justify;
-      margin-bottom: 10px;
-      padding: 0 2cm;
-      box-sizing: border-box;
-      hyphens: auto;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }}
-    .content p {{
-      white-space: normal !important;
-      word-break: break-word !important;
-      overflow-wrap: break-word !important;
-      hyphens: auto !important;
-    }}
-    .signature {{
-      text-align: center;
-      margin: 0;
-      padding: 0;
-    }}
-    .signature .line {{
-      height: 1px;
-      background-color: #333;
-      width: 60%;
-      margin: 0 auto 5px auto;
-    }}
-    .footer {{
-      text-align: center;
-      border-top: 2px solid #283E51;
-      padding-top: 5px;
-      margin: 0;
-      font-size: 14px;
-      color: #555;
-    }}
-    .warning-icon {{
-      display: inline-block;
-      width: 18px;
-      height: 18px;
-      color: red;
-      font-weight: bold;
-      font-size: 18px;
-      line-height: 18px;
-      vertical-align: middle;
-      user-select: none;
-    }}
-
-    /* Ajustes específicos apenas para a declaração de Frequência (tela) */
-    body.tipo-frequencia {{
-      font-size: 14px;
-    }}
-    body.tipo-frequencia .content {{
-      padding: 0 1.5cm;
-      margin-bottom: 8px;
-    }}
-    body.tipo-frequencia table {{
-      font-size: 14px;
-    }}
-    body.tipo-frequencia .footer {{
-      font-size: 14px;
-    }}
-    body.tipo-frequencia .signature p {{
-      font-size: 14px;
-    }}
-
-    @media print {{
-      .no-print {{ display: none !important; }}
-      body {{
-        margin: 0;
-        padding: 0.5cm 0.5cm;
-        font-size: 14px;
-        font-family: 'Montserrat', sans-serif;
-        color: #000;
-      }}
-      .declaration-bottom {{
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-      }}
-      .date {{
-        margin: 1cm 0 1cm 0;
-        text-align: right;
-        hyphens: none !important;
-      }}
-      .content {{
-        margin: 0;
-        padding: 0;
-        text-align: justify !important;
-        hyphens: none !important;
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
-      }}
-      .content p {{
-        margin: 0 0 1em 0;
-        text-align: justify !important;
-        hyphens: none !important;
-      }}
-      body, .content, .content p {{
-        width: auto !important;
-        max-width: none !important;
-      }}
-
-      /* Override APENAS na declaração de frequência */
-      body.tipo-frequencia {{
-        padding: 0.3cm 0.3cm;
-        font-size: 14px;
-      }}
-      body.tipo-frequencia .content {{
-        margin: 0 0 0.3cm 0;
-        padding: 0;
-      }}
-      body.tipo-frequencia .declaration-bottom {{
-        position: static;
-        margin-top: 1.0cm;
-      }}
-      body.tipo-frequencia .footer,
-      body.tipo-frequencia .signature p {{
-        font-size: 14px;
-      }}
-
-      /* Transferência com observações */
-      body.transferencia-com-observacoes {{
-        padding: 1.2cm 1.2cm;
-        font-size: 14px;
-      }}
-      body.transferencia-com-observacoes .content {{
-        margin: 0 0 0.6cm 0;
-        padding: 0;
-      }}
-      body.transferencia-com-observacoes .declaration-bottom {{
-        position: static;
-        margin-top: 1.2cm;
-      }}
-      body.transferencia-com-observacoes .footer,
-      body.transferencia-com-observacoes .signature p {{
-        font-size: 14px;
-      }}
-    }}
-
-    .content, .content p, .date {{
-      hyphens: none !important;
-      word-break: normal !important;
-      overflow-wrap: normal !important;
-    }}
-
-    {additional_css}
-
-    .checkbox-label {{
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      text-align: left !important;
-      font-size: 14px;
-      margin-top: 8px;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-    }}
-
-    header {{
-      background: linear-gradient(90deg, #283E51, #4B79A1);
-      color: #fff;
-      padding: 20px;
-      text-align: center;
-      border-bottom: 3px solid #1d2d3a;
-      border-radius: 0 0 15px 15px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }}
-  </style>
-</head>
-<body{body_class_attr}>
-  <div class="declaration-container">
-    <div class="header">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <img src="/static/logos/escola.png" alt="Escola Logo" style="height:80px;">
-        <div>
-          <h1>Secretaria de Educação</h1>
-          <p>E.M José Padin Mouta</p>
-          <p>Município da Estância Balneária de Praia Grande</p>
-          <p>Estado de São Paulo</p>
-        </div>
-        <img src="/static/logos/municipio.png" alt="Município Logo" style="height:80px;">
-      </div>
-    </div>
-    <div class="date">
-      <p>{data_extenso_str}</p>
-    </div>
-    <div class="content">
-      <h2 style="text-align:center;text-transform:uppercase;color:#283E51;">
-        {titulo}
-      </h2>
-      <p>{declaracao_text}</p>
-    </div>
-    <div class="declaration-bottom">
-      <div class="signature">
-        <div class="line"></div>
-        <p>Luciana Rocha Augustinho</p>
-        <p>Diretora da Unidade Escolar</p>
-      </div>
-      <div class="footer">
-        <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP - Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
-      </div>
-    </div>
-  </div>
-  <div class="no-print" style="text-align:center;margin-top:20px;">
-    <button onclick="window.print()" class="print-button">Imprimir Declaração</button>
-  </div>
-</body>
-</html>
-"""
-    return base_template
+    return render_template(
+        "declaracao_print.html",
+        titulo=titulo,
+        data_extenso=data_extenso_str,
+        declaracao_text=declaracao_text,
+        additional_css=additional_css,
+        body_classes=classes_body,
+        print_body_padding="0.5cm 0.5cm",
+    )
 
 
 # ==========================================================
@@ -1683,201 +1437,15 @@ def gerar_declaracao_personalizada(dados):
 }
 """
 
-    base_template = f"""<!doctype html>
-<html lang="pt-br">
-<head>
-  <meta charset="utf-8">
-  <title>{titulo} - E.M José Padin Mouta</title>
-  <style>
-    @page {{
-      margin: 0;
-    }}
-    html, body {{
-      margin: 0;
-      padding: 0.5cm;
-      font-family: 'Montserrat', sans-serif;
-      font-size: 16px;
-      line-height: 1.5;
-      color: #333;
-    }}
-    .header {{
-      text-align: center;
-      border-bottom: 2px solid #283E51;
-      padding-bottom: 5px;
-      margin-bottom: 10px;
-    }}
-    .header h1 {{
-      margin: 0;
-      font-size: 24px;
-      text-transform: uppercase;
-      color: #283E51;
-    }}
-    .header p {{
-      margin: 3px 0;
-      font-size: 16px;
-    }}
-    .date {{
-      text-align: right;
-      font-size: 16px;
-      margin-bottom: 10px;
-    }}
-    .content {{
-      text-align: justify;
-      margin-bottom: 10px;
-      padding: 0 2cm;
-      box-sizing: border-box;
-      hyphens: auto;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }}
-    .content p {{
-      white-space: normal !important;
-      word-break: break-word !important;
-      overflow-wrap: break-word !important;
-      hyphens: auto !important;
-    }}
-    .signature {{
-      text-align: center;
-      margin: 0;
-      padding: 0;
-    }}
-    .signature .line {{
-      height: 1px;
-      background-color: #333;
-      width: 60%;
-      margin: 0 auto 5px auto;
-    }}
-    .footer {{
-      text-align: center;
-      border-top: 2px solid #283E51;
-      padding-top: 5px;
-      margin: 0;
-      font-size: 14px;
-      color: #555;
-    }}
-    .warning-icon {{
-      display: inline-block;
-      width: 18px;
-      height: 18px;
-      color: red;
-      font-weight: bold;
-      font-size: 18px;
-      line-height: 18px;
-      vertical-align: middle;
-      user-select: none;
-    }}
-
-    @media print {{
-      .no-print {{ display: none !important; }}
-      body {{
-        margin: 0;
-        padding: 1.5cm 1.5cm;
-        font-size: 14px;
-        font-family: 'Montserrat', sans-serif;
-        color: #000;
-      }}
-      .declaration-bottom {{
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-      }}
-      .date {{
-        margin: 1cm 0 1cm 0;
-        text-align: right;
-        hyphens: none !important;
-      }}
-      .content {{
-        margin: 0;
-        padding: 0;
-        text-align: justify !important;
-        hyphens: none !important;
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
-      }}
-      .content p {{
-        margin: 0 0 1em 0;
-        text-align: justify !important;
-        hyphens: none !important;
-      }}
-      body, .content, .content p {{
-        width: auto !important;
-         max-width: none !important;
-      }}
-    }}
-
-    .content, .content p, .date {{
-      hyphens: none !important;
-      word-break: normal !important;
-      overflow-wrap: normal !important;
-    }}
-
-    {additional_css}
-
-    .checkbox-label {{
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      text-align: left !important;
-      font-size: 14px;
-      margin-top: 8px;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-    }}
-
-    header {{
-      background: linear-gradient(90deg, #283E51, #4B79A1);
-      color: #fff;
-      padding: 20px;
-      text-align: center;
-      border-bottom: 3px solid #1d2d3a;
-      border-radius: 0 0 15px 15px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }}
-  </style>
-</head>
-<body>
-  <div class="declaration-container">
-    <div class="header">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <img src="/static/logos/escola.png" alt="Escola Logo" style="height:80px;">
-        <div>
-          <h1>Secretaria de Educação</h1>
-          <p>E.M José Padin Mouta</p>
-          <p>Município da Estância Balneária de Praia Grande</p>
-          <p>Estado de São Paulo</p>
-        </div>
-        <img src="/static/logos/municipio.png" alt="Município Logo" style="height:80px;">
-      </div>
-    </div>
-    <div class="date">
-      <p>{data_extenso_str}</p>
-    </div>
-    <div class="content">
-      <h2 style="text-align:center;text-transform:uppercase;color:#283E51;">
-        {titulo}
-      </h2>
-      <p>{declaracao_text}</p>
-    </div>
-    <div class="declaration-bottom">
-      <div class="signature">
-        <div class="line"></div>
-        <p>Luciana Rocha Augustinho</p>
-        <p>Diretora da Unidade Escolar</p>
-      </div>
-      <div class="footer">
-        <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP - Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
-      </div>
-    </div>
-  </div>
-  <div class="no-print" style="text-align:center;margin-top:20px;">
-    <button onclick="window.print()" class="print-button">Imprimir Declaração</button>
-  </div>
-</body>
-</html>
-"""
-    return base_template
+    return render_template(
+        "declaracao_print.html",
+        titulo=titulo,
+        data_extenso=data_extenso_str,
+        declaracao_text=declaracao_text,
+        additional_css=additional_css,
+        body_classes=[],
+        print_body_padding="1.5cm 1.5cm",
+    )
 
 
 # ==========================================================
@@ -2702,28 +2270,6 @@ def upload_inline_foto():
 #  (FIX RÁPIDO E SEGURO: sem colisão de nomes, sem sobrescrita de helpers)
 # ==========================================================
 
-import os
-import re
-import uuid
-import copy
-from contextlib import contextmanager
-from datetime import datetime
-from io import BytesIO
-
-import pandas as pd
-from flask import (
-    request,
-    redirect,
-    url_for,
-    render_template,
-    flash,
-    session,
-    current_app,
-    send_file,
-)
-from werkzeug.utils import secure_filename
-from openpyxl import load_workbook
-
 # ----------------------------------------------------------
 # EJA: liga/desliga (FIX)
 # ----------------------------------------------------------
@@ -2955,14 +2501,6 @@ def quadro_atendimento_mensal():
 # ==========================================================
 #  QUADRO – TRANSFERÊNCIAS (FIX H/I/J + ALERTAS DE FALTA DE INFORMAÇÃO)
 # ==========================================================
-
-import re
-import os
-import uuid
-import json
-import base64
-from io import BytesIO
-from datetime import datetime
 
 @app.route("/quadros/transferencias", methods=["GET", "POST"])
 @login_required
@@ -3683,25 +3221,6 @@ def quadro_quantitativo_mensal():
 #      * Aluno com profissional na P, mas sem Inclusão na N
 #  - Preenchimento por mapeamento automático do MODELO
 # ==========================================================
-
-import os
-import re
-import json
-import base64
-import uuid
-from io import BytesIO
-from datetime import datetime
-
-from flask import (
-    request,
-    flash,
-    redirect,
-    url_for,
-    send_file,
-    render_template,
-)
-from werkzeug.utils import secure_filename
-from openpyxl import load_workbook
 
 # OBS: este código assume que você já tem:
 # - app = Flask(__name__)
