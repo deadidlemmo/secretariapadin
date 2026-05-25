@@ -69,6 +69,7 @@ Se precisar criar arquivos de teste, use nomes claramente ficticios e remova-os 
 - Log transacional de carteirinhas impressas fica em `services/carteirinhas_log.py`.
 - Busca e salvamento de fotos por RM ficam em `services/fotos.py`.
 - Salvamento de uploads Excel com caminho em sessao fica em `services/upload_sessions.py`.
+- Helpers do quadro de atendimento mensal ficam em `services/quadros_atendimento.py`.
 - Helpers do quadro quantitativo de inclusao ficam em `services/quadros_inclusao.py`.
 - Helpers de quadros de transferencia e quantitativo mensal ficam em `services/quadros_transferencias.py`.
 - Helpers compartilhados de data, texto, planilha e upload ficam em `utils/dates.py`, `utils/text.py`, `utils/excel.py` e `utils/uploads.py`.

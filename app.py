@@ -31,6 +31,17 @@ from services.carteirinhas_log import (
 )
 from services.fotos import get_student_photo_url, save_student_photo, student_has_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
+from services.quadros_atendimento import (
+    ATENDIMENTO_CONFIG,
+    extract_by_cols as _extract_atendimento_by_cols,
+    extract_by_fallback_block as _extract_atendimento_by_fallback_block,
+    fill_eja_block as _fill_atendimento_eja_block,
+    normalize_mes_ref as _normalize_atendimento_mes_ref,
+    write_block as _write_atendimento_block,
+    write_header as _write_atendimento_header,
+    write_turno_totals as _write_atendimento_turno_totals,
+    zero_eja_block as _zero_atendimento_eja_block,
+)
 from services.quadros_inclusao import (
     add_quant_inclusao_alerts_sheet as _add_quant_inclusao_alerts_sheet,
     build_multi_prof_alerts as _build_quant_multi_prof_alerts,
@@ -2695,7 +2706,6 @@ import os
 import re
 import uuid
 import copy
-import string
 from contextlib import contextmanager
 from datetime import datetime
 from io import BytesIO
@@ -2820,228 +2830,6 @@ def quadros_inclusao():
 #  QUADRO – ATENDIMENTO MENSAL (CORRIGIDO / FUTURE-PROOF)
 # ==========================================================
 
-TURMAS_MAX = list(string.ascii_uppercase[:14])  # A..N
-
-ATENDIMENTO_CONFIG = {
-    "MODEL_BLOCKS": {
-        # 1º ano SEMPRE zerado: Masc + Fem + Total
-        "1º": {"start_row": 19, "masc_col": "B", "fem_col": "C", "total_col": "D"},
-        "2º": {"start_row": 37, "masc_col": "B", "fem_col": "C", "total_col": "D"},
-        "3º": {"start_row": 55, "masc_col": "B", "fem_col": "C", "total_col": "D"},
-        "4º": {"start_row": 73, "masc_col": "B", "fem_col": "C", "total_col": "D"},
-        "5º": {"start_row": 91, "masc_col": "B", "fem_col": "C", "total_col": "D"},
-    },
-
-    # Aba "Total de Alunos" (layout padrão 2026)
-    "PILOTO_COLS_DEFAULT": {
-        "serie_col": 3,    # C
-        "turma_col": 4,    # D
-        "ma_masc_col": 7,  # G
-        "ma_fem_col": 8,   # H
-        "ma_total_col": 9  # I
-    },
-
-    # Fallback por blocos (Prioridade 2)
-    "FALLBACK_START": {
-        "2º": {"row": 6,  "masc_col": 7, "fem_col": 8},
-        "3º": {"row": 14, "masc_col": 7, "fem_col": 8},
-        "4º": {"row": 21, "masc_col": 7, "fem_col": 8},
-        "5º": {"row": 29, "masc_col": 7, "fem_col": 8},
-    },
-
-    "TOTALS": {
-        "manha_total_cell": (38, 9),  # I38
-        "tarde_total_cell": (40, 9),  # I40
-        "modelo_manha_addr": "R20",
-        "modelo_tarde_addr": "R28",
-    },
-
-    "ENABLE_DEBUG_LOG": True,
-}
-
-
-def _safe_int(val, default=0):
-    if val is None or val == "":
-        return default
-    if isinstance(val, bool):
-        return int(val)
-    if isinstance(val, (int, float)):
-        try:
-            return int(val)
-        except Exception:
-            return default
-    try:
-        s = str(val).strip()
-        s = s.replace(".", "").replace(",", ".")
-        return int(float(s))
-    except Exception:
-        return default
-
-
-def _norm_serie(val):
-    if val is None:
-        return None
-    s = str(val).strip()
-    m = re.search(r"(\d)\s*[ºo°]?", s, flags=re.IGNORECASE)
-    if not m:
-        return None
-    n = m.group(1)
-    if n in {"1", "2", "3", "4", "5"}:
-        return f"{n}º"
-    return None
-
-
-def _extract_turma_letter(val):
-    if val is None:
-        return None
-    s = str(val).strip().upper()
-    m = re.search(r"\b([A-N])\b", s)
-    if m:
-        return m.group(1)
-    m2 = re.search(r"([A-N])", s)
-    return m2.group(1) if m2 else None
-
-
-def _condense_letters(letters):
-    if not letters:
-        return "-"
-    idxs = sorted({TURMAS_MAX.index(x) for x in letters if x in TURMAS_MAX})
-    out = []
-    i = 0
-    while i < len(idxs):
-        start = idxs[i]
-        j = i
-        while j + 1 < len(idxs) and idxs[j + 1] == idxs[j] + 1:
-            j += 1
-        if j == i:
-            out.append(TURMAS_MAX[start])
-        else:
-            out.append(f"{TURMAS_MAX[start]}-{TURMAS_MAX[idxs[j]]}")
-        i = j + 1
-    return ", ".join(out)
-
-
-def _detect_ma_columns(ws_total):
-    cfg = ATENDIMENTO_CONFIG["PILOTO_COLS_DEFAULT"].copy()
-    try:
-        for r in range(1, 20):
-            for c in range(1, 30):
-                v = ws_total.cell(row=r, column=c).value
-                if v and "MATRICULAS" in str(v).upper():
-                    ma_col = c
-                    cfg["ma_masc_col"] = ma_col
-                    cfg["ma_fem_col"] = ma_col + 1
-                    cfg["ma_total_col"] = ma_col + 2
-                    return cfg
-    except Exception:
-        pass
-    return cfg
-
-
-def _extract_by_cols(ws_total, serie_label, debug_log):
-    cols = _detect_ma_columns(ws_total)
-    sc = cols["serie_col"]
-    tc = cols["turma_col"]
-    mc = cols["ma_masc_col"]
-    fc = cols["ma_fem_col"]
-
-    found = {}
-    duplicates = []
-
-    max_row = ws_total.max_row or 0
-    limit = min(max_row, 300)
-
-    for r in range(1, limit + 1):
-        serie = _norm_serie(ws_total.cell(row=r, column=sc).value)
-        if serie != serie_label:
-            continue
-
-        turma = _extract_turma_letter(ws_total.cell(row=r, column=tc).value)
-        if not turma:
-            continue
-
-        masc = _safe_int(ws_total.cell(row=r, column=mc).value, 0)
-        fem = _safe_int(ws_total.cell(row=r, column=fc).value, 0)
-
-        if turma in found:
-            duplicates.append(turma)
-            found[turma] = (found[turma][0] + masc, found[turma][1] + fem)
-        else:
-            found[turma] = (masc, fem)
-
-    if duplicates:
-        debug_log.append(f"[{serie_label}] AVISO: turmas duplicadas (somadas): {sorted(set(duplicates))}")
-
-    return found
-
-
-def _extract_by_fallback_block(ws_total, serie_label, debug_log):
-    fb = ATENDIMENTO_CONFIG["FALLBACK_START"].get(serie_label)
-    if not fb:
-        return {}
-
-    serie_col = ATENDIMENTO_CONFIG["PILOTO_COLS_DEFAULT"]["serie_col"]  # C
-    turma_col = ATENDIMENTO_CONFIG["PILOTO_COLS_DEFAULT"]["turma_col"]  # D
-
-    row = fb["row"]
-    mc = fb["masc_col"]
-    fc = fb["fem_col"]
-
-    found = {}
-    for _ in range(len(TURMAS_MAX)):
-        serie_here = _norm_serie(ws_total.cell(row=row, column=serie_col).value)
-        if serie_here != serie_label:
-            break
-
-        turma = _extract_turma_letter(ws_total.cell(row=row, column=turma_col).value)
-        if not turma:
-            break
-
-        masc = _safe_int(ws_total.cell(row=row, column=mc).value, 0)
-        fem = _safe_int(ws_total.cell(row=row, column=fc).value, 0)
-        found[turma] = (masc, fem)
-
-        row += 1
-
-    debug_log.append(f"[{serie_label}] fallback usado: capturadas {len(found)} turmas (parada por mudança de série na col C).")
-    return found
-
-
-def _write_block(ws_modelo, serie_label, turma_data, debug_log):
-    block = ATENDIMENTO_CONFIG["MODEL_BLOCKS"][serie_label]
-    start = block["start_row"]
-    masc_col = block["masc_col"]
-    fem_col = block["fem_col"]
-    total_col = block["total_col"]
-
-    found_letters = [t for t in TURMAS_MAX if t in turma_data]
-    missing_letters = [t for t in TURMAS_MAX if t not in turma_data]
-
-    for i, turma in enumerate(TURMAS_MAX):
-        r = start + i
-
-        masc = turma_data.get(turma, (0, 0))[0]
-        fem = turma_data.get(turma, (0, 0))[1]
-
-        set_merged_cell_value(ws_modelo, f"{masc_col}{r}", masc)
-
-        if fem_col:
-            set_merged_cell_value(ws_modelo, f"{fem_col}{r}", fem)
-
-        if total_col and fem_col:
-            # Força fórmula para evitar valor residual no template
-            set_merged_cell_value(ws_modelo, f"{total_col}{r}", f"={masc_col}{r}+{fem_col}{r}")
-
-    debug_log.append(f"[{serie_label}] preenchido: {_condense_letters(found_letters)}; zerado: {_condense_letters(missing_letters)}")
-
-
-def _read_total(ws_total, row, col, debug_log, label):
-    v = ws_total.cell(row=row, column=col).value
-    out = _safe_int(v, 0)
-    debug_log.append(f"[TOTAL] {label}: lido {out} de ({row},{col}).")
-    return out
-
-
 @app.route('/quadros/atendimento_mensal', methods=['GET', 'POST'])
 @login_required
 def quadro_atendimento_mensal():
@@ -3052,18 +2840,7 @@ def quadro_atendimento_mensal():
         responsavel = (request.form.get("responsavel") or "").strip()
         rf = (request.form.get("rf") or "").strip()
 
-        mes_ref_raw = (request.form.get("mes_ref") or "").strip()
-        mes_ref = None
-        if mes_ref_raw:
-            m = re.match(r"^\s*(\d{4})-(\d{2})\s*$", mes_ref_raw)  # YYYY-MM
-            if m:
-                mes_ref = f"{m.group(2)}/{m.group(1)}"
-            else:
-                m2 = re.match(r"^\s*(\d{2})/(\d{4})\s*$", mes_ref_raw)  # MM/YYYY
-                if m2:
-                    mes_ref = f"{m2.group(1)}/{m2.group(2)}"
-        if not mes_ref:
-            mes_ref = datetime.now().strftime("%m/%Y")
+        mes_ref = _normalize_atendimento_mes_ref(request.form.get("mes_ref"))
 
         fundamental_file = request.files.get('lista_fundamental')
         eja_file = request.files.get('lista_eja')
@@ -3097,11 +2874,7 @@ def quadro_atendimento_mensal():
 
         ws_modelo = wb_modelo.worksheets[1] if len(wb_modelo.worksheets) > 1 else wb_modelo.active
 
-        set_merged_cell_value(ws_modelo, "B5", "E.M José Padin Mouta")
-        set_merged_cell_value(ws_modelo, "C6", responsavel or "-")
-        set_merged_cell_value(ws_modelo, "B7", rf or "-")
-        set_merged_cell_value(ws_modelo, "A13", mes_ref)
-        debug_log.append(f"[HEADER] responsavel='{responsavel or '-'}' rf='{rf or '-'}' mes_ref='{mes_ref}'")
+        _write_atendimento_header(ws_modelo, responsavel, rf, mes_ref, debug_log)
 
         try:
             wb_lista = load_workbook(file_path, data_only=True, read_only=True)
@@ -3117,93 +2890,44 @@ def quadro_atendimento_mensal():
         ws_total = wb_lista[sheet_name]
 
         # 1º ano: SEMPRE ZERADO (Masc + Fem + Total)
-        _write_block(ws_modelo, "1º", {}, debug_log)
+        _write_atendimento_block(ws_modelo, "1º", {}, debug_log)
 
         # séries 2º..5º
         for serie_label in ["2º", "3º", "4º", "5º"]:
-            data = _extract_by_cols(ws_total, serie_label, debug_log)
+            data = _extract_atendimento_by_cols(ws_total, serie_label, debug_log)
             if not data:
                 debug_log.append(f"[{serie_label}] prioridade 1 (C/D) não encontrou turmas; tentando fallback...")
-                data = _extract_by_fallback_block(ws_total, serie_label, debug_log)
-            _write_block(ws_modelo, serie_label, data, debug_log)
+                data = _extract_atendimento_by_fallback_block(ws_total, serie_label, debug_log)
+            _write_atendimento_block(ws_modelo, serie_label, data, debug_log)
 
         # totais manhã / tarde
-        tcfg = ATENDIMENTO_CONFIG["TOTALS"]
-        manha = _read_total(ws_total, *tcfg["manha_total_cell"], debug_log=debug_log, label="Manhã")
-        tarde = _read_total(ws_total, *tcfg["tarde_total_cell"], debug_log=debug_log, label="Tarde")
-
-        set_merged_cell_value(ws_modelo, tcfg["modelo_manha_addr"], manha)
-        set_merged_cell_value(ws_modelo, "R24", "-")
-        set_merged_cell_value(ws_modelo, tcfg["modelo_tarde_addr"], tarde)
+        _write_atendimento_turno_totals(ws_modelo, ws_total, debug_log)
 
         # EJA: mantém comportamento atual
-        def _preencher_eja_zerado():
-            cells_zero = [
-                "L19", "L20", "L21", "L22",
-                "M19", "M20", "M21", "M22",
-                "L27", "L28", "L29", "L30",
-                "M27", "M28", "M29", "M30",
-                "L35", "L36", "L37",
-                "M35", "M36", "M37",
-                "R32",
-            ]
-            for addr in cells_zero:
-                set_merged_cell_value(ws_modelo, addr, 0)
-            set_merged_cell_value(ws_modelo, "R24", "-")
-
         if not enable_eja:
-            _preencher_eja_zerado()
+            _zero_atendimento_eja_block(ws_modelo)
             debug_log.append("[EJA] desativada: bloco EJA zerado.")
         else:
             eja_path = session.get('lista_eja')
             if not eja_path or not os.path.exists(eja_path):
-                _preencher_eja_zerado()
+                _zero_atendimento_eja_block(ws_modelo)
                 debug_log.append("[EJA] habilitada, mas sem arquivo: bloco EJA zerado.")
             else:
                 try:
                     wb_eja = load_workbook(eja_path, data_only=True, read_only=True)
                 except Exception as e:
                     flash(f"Erro ao ler a Lista Piloto EJA: {str(e)}. Gerando sem EJA.", "warning")
-                    _preencher_eja_zerado()
+                    _zero_atendimento_eja_block(ws_modelo)
                     debug_log.append(f"[EJA] erro ao ler: {e}. Bloco EJA zerado.")
                 else:
                     sheet_name_eja = _find_sheet_case_insensitive(wb_eja, "Total de Alunos")
                     if not sheet_name_eja:
                         flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto EJA. Gerando sem EJA.", "warning")
-                        _preencher_eja_zerado()
+                        _zero_atendimento_eja_block(ws_modelo)
                         debug_log.append("[EJA] aba Total de Alunos não encontrada. Bloco EJA zerado.")
                     else:
                         ws_total_eja = wb_eja[sheet_name_eja]
-                        set_merged_cell_value(ws_modelo, "L19", ws_total_eja.cell(row=6, column=5).value)
-                        set_merged_cell_value(ws_modelo, "L20", ws_total_eja.cell(row=7, column=5).value)
-                        set_merged_cell_value(ws_modelo, "L21", ws_total_eja.cell(row=8, column=5).value)
-                        set_merged_cell_value(ws_modelo, "L22", ws_total_eja.cell(row=9, column=5).value)
-
-                        set_merged_cell_value(ws_modelo, "M19", ws_total_eja.cell(row=6, column=6).value)
-                        set_merged_cell_value(ws_modelo, "M20", ws_total_eja.cell(row=7, column=6).value)
-                        set_merged_cell_value(ws_modelo, "M21", ws_total_eja.cell(row=8, column=6).value)
-                        set_merged_cell_value(ws_modelo, "M22", ws_total_eja.cell(row=9, column=6).value)
-
-                        set_merged_cell_value(ws_modelo, "L27", ws_total_eja.cell(row=11, column=5).value)
-                        set_merged_cell_value(ws_modelo, "L28", ws_total_eja.cell(row=12, column=5).value)
-                        set_merged_cell_value(ws_modelo, "L29", ws_total_eja.cell(row=13, column=5).value)
-                        set_merged_cell_value(ws_modelo, "L30", ws_total_eja.cell(row=14, column=5).value)
-
-                        set_merged_cell_value(ws_modelo, "M27", ws_total_eja.cell(row=11, column=6).value)
-                        set_merged_cell_value(ws_modelo, "M28", ws_total_eja.cell(row=12, column=6).value)
-                        set_merged_cell_value(ws_modelo, "M29", ws_total_eja.cell(row=13, column=6).value)
-                        set_merged_cell_value(ws_modelo, "M30", ws_total_eja.cell(row=14, column=6).value)
-
-                        set_merged_cell_value(ws_modelo, "L35", ws_total_eja.cell(row=16, column=5).value)
-                        set_merged_cell_value(ws_modelo, "L36", ws_total_eja.cell(row=17, column=5).value)
-                        set_merged_cell_value(ws_modelo, "L37", ws_total_eja.cell(row=18, column=5).value)
-
-                        set_merged_cell_value(ws_modelo, "M35", ws_total_eja.cell(row=16, column=6).value)
-                        set_merged_cell_value(ws_modelo, "M36", ws_total_eja.cell(row=17, column=6).value)
-                        set_merged_cell_value(ws_modelo, "M37", ws_total_eja.cell(row=18, column=6).value)
-
-                        set_merged_cell_value(ws_modelo, "R32", ws_total_eja.cell(row=20, column=7).value)
-                        set_merged_cell_value(ws_modelo, "R24", "-")
+                        _fill_atendimento_eja_block(ws_modelo, ws_total_eja)
                         debug_log.append("[EJA] preenchida com sucesso.")
 
         if ATENDIMENTO_CONFIG["ENABLE_DEBUG_LOG"]:
