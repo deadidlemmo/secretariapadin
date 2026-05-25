@@ -60,29 +60,23 @@ from services.quadros_inclusao import (
     collect_counts_from_lista_corrida as _collect_quant_counts_from_lista_corrida,
 )
 from services.quadros_transferencias import (
-    RX_EJA_TRANSFER as _RX_EJA,
-    add_transfer_alerts_sheet as _add_transfer_alerts_sheet,
-    label_set as _label_set,
+    TransferenciasError,
+    build_transferencias_file,
     normalize_tipo_te as _normalize_tipo_te,
-    push_missing_info_alert as _push_missing_info_alert,
     serie_key_from_value as _serie_key_from_value,
 )
 from services.upload_sessions import save_excel_upload_to_session
 from utils.dates import (
     detect_te_date_from_obs_flexible,
-    extract_te_date_from_text as _extract_te_date_from_text,
     parse_date_flexible,
     parse_period_date as _parse_period_date,
     parse_user_date as _parse_user_date,
 )
 from utils.excel import set_merged_cell_value
 from utils.text import (
-    build_colmap as _build_colmap,
     find_df_col as _find_df_col,
-    is_missing_text as _is_missing_text,
     is_missing_value as _is_missing_value,
     norm_header_compact as _norm_header_compact,
-    pick_col as _pick_col,
     safe_str as _safe_str,
 )
 from utils.uploads import (
@@ -1319,7 +1313,7 @@ def quadro_transferencias():
 
         responsavel = request.form.get("responsavel")
         diretor_nome = request.form.get("diretor_nome") or "Luciana Rocha Augustinho"
-        data_quadro_in = request.form.get("data_quadro")  # opcional
+        data_quadro_in = request.form.get("data_quadro")
 
         fundamental_file = request.files.get("lista_fundamental")
         eja_file = request.files.get("lista_eja")
@@ -1328,7 +1322,6 @@ def quadro_transferencias():
             flash("Por favor, preencha todos os campos.", "error")
             return redirect(url_for("quadro_transferencias"))
 
-        # FUNDAMENTAL
         if fundamental_file and fundamental_file.filename != "":
             valid, message = validate_excel_upload(fundamental_file)
             if not valid:
@@ -1349,7 +1342,6 @@ def quadro_transferencias():
                 flash("Lista Piloto Fundamental não encontrada.", "error")
                 return redirect(url_for("quadro_transferencias"))
 
-        # EJA opcional
         eja_path = None
         if enable_eja and eja_file and eja_file.filename != "":
             valid, message = validate_excel_upload(eja_file)
@@ -1379,305 +1371,40 @@ def quadro_transferencias():
             flash("A data final não pode ser menor que a data inicial.", "error")
             return redirect(url_for("quadro_transferencias"))
 
+        model_path = os.path.join("modelos", "Quadro Informativo - Modelo.xlsx")
         data_quadro_dt = _parse_user_date(data_quadro_in) or datetime.now()
 
-        # ALERTAS de inconsistência que NÃO impedem gerar o arquivo
-        missing_info_alerts = []
-        missing_info_seen = set()
-
-        # Lê LISTA CORRIDA (Fundamental)
         try:
-            df_fundamental = pd.read_excel(fundamental_path, sheet_name="LISTA CORRIDA")
-        except Exception as e:
-            flash(f"Erro ao ler a Lista Piloto Fundamental: {str(e)}", "error")
-            return redirect(url_for("quadro_transferencias"))
-
-        colmap = _build_colmap(df_fundamental)
-
-        col_serie = _pick_col(colmap, "SÉRIE", "SERIE")
-        col_nome = _pick_col(colmap, "NOME")
-        col_dn = _pick_col(colmap, "DATA NASC.", "DATA NASC", "DATANASC")
-        col_ra = _pick_col(colmap, "RA")
-        col_obs = _pick_col(colmap, "OBS", "OBSERVACAO", "OBSERVAÇÃO")
-        col_local_te = _pick_col(colmap, "LOCAL TE", "LOCALTE")
-
-        if not col_nome or not col_dn or not col_ra or not col_serie or not col_obs:
-            flash("A aba 'LISTA CORRIDA' não contém cabeçalhos essenciais (SÉRIE, NOME, DATA NASC., RA, OBS).", "error")
-            return redirect(url_for("quadro_transferencias"))
-
-        debug = []
-        debug.append("[quadro_transferencias] Aba lida: LISTA CORRIDA (Fundamental)")
-        debug.append(
-            f"[quadro_transferencias] Colunas detectadas: "
-            f"SÉRIE='{col_serie}', NOME='{col_nome}', DATA NASC.='{col_dn}', RA='{col_ra}', "
-            f"OBS='{col_obs}', LOCAL TE='{col_local_te}'"
-        )
-
-        if not col_local_te:
-            _push_missing_info_alert(
-                missing_info_alerts,
-                missing_info_seen,
-                turma="(Estrutura do arquivo)",
-                nome="-",
-                ra="-",
-                tipo="TE",
-                data_str="-",
-                campo="LOCAL TE",
-                detalhe="A coluna 'LOCAL TE' não foi encontrada na Lista Piloto Fundamental."
+            result = build_transferencias_file(
+                fundamental_path=fundamental_path,
+                model_path=model_path,
+                period_start=period_start,
+                period_end=period_end,
+                responsavel=responsavel,
+                diretor_nome=diretor_nome,
+                data_quadro_dt=data_quadro_dt,
+                enable_eja=enable_eja,
+                eja_path=eja_path,
             )
-
-        transfer_records = []
-        invalid_te_dates = 0
-
-        use_cols = [col_serie, col_nome, col_dn, col_ra, col_obs]
-        if col_local_te and col_local_te not in use_cols:
-            use_cols.append(col_local_te)
-
-        df_sub = df_fundamental[use_cols].copy()
-
-        for row in df_sub.itertuples(index=False, name=None):
-            row_dict = dict(zip(df_sub.columns, row))
-
-            te_dt, te_match_txt, _ = _extract_te_date_from_text(
-                row_dict.get(col_obs), period_start, period_end
-            )
-
-            if te_match_txt and not te_dt:
-                invalid_te_dates += 1
-                continue
-
-            if not te_dt:
-                continue
-
-            if not (period_start <= te_dt <= period_end):
-                continue
-
-            nome = _safe_str(row_dict.get(col_nome))
-
-            dn_val = row_dict.get(col_dn)
-            dn_str = ""
-            if pd.notna(dn_val):
-                try:
-                    dn_dt = pd.to_datetime(dn_val, errors="coerce")
-                    dn_str = dn_dt.strftime("%d/%m/%Y") if pd.notna(dn_dt) else ""
-                except Exception:
-                    dn_str = ""
-
-            ra = _safe_str(row_dict.get(col_ra))
-            nivel_classe = _safe_str(row_dict.get(col_serie))
-
-            # FIX H/I/J
-            local_te_raw = _safe_str(row_dict.get(col_local_te)) if col_local_te else ""
-            local_te = "-" if _is_missing_text(local_te_raw) else local_te_raw
-
-            # ALERTA: registro encontrado, mas sem LOCAL TE
-            if _is_missing_text(local_te_raw):
-                _push_missing_info_alert(
-                    missing_info_alerts,
-                    missing_info_seen,
-                    turma=nivel_classe,
-                    nome=nome,
-                    ra=ra,
-                    tipo="TE",
-                    data_str=te_dt.strftime("%d/%m/%Y"),
-                    campo="LOCAL TE",
-                    detalhe="Registro encontrado no período, mas o campo LOCAL TE está vazio ou inválido."
-                )
-
-            record = {
-                "nome": nome,
-                "dn": dn_str,
-                "ra": ra,
-                "situacao": "Parcial",
-                "breda": "Não",
-                "nivel_classe": nivel_classe,
-                "tipo": "TE",
-                "observacao": local_te,              # H
-                "remanejamento": "-",                # I
-                "data": te_dt.strftime("%d/%m/%Y"),  # J
-            }
-            transfer_records.append(record)
-
-        debug.append(f"[quadro_transferencias] TE válidos no período: {len(transfer_records)}")
-        debug.append(f"[quadro_transferencias] Datas TE inválidas descartadas: {invalid_te_dates}")
-
-        # EJA opcional (mantido)
-        if enable_eja and eja_path and os.path.exists(eja_path):
-            try:
-                df_eja = pd.read_excel(eja_path, sheet_name="LISTA CORRIDA")
-            except Exception as e:
-                flash(f"Erro ao ler a Lista Piloto EJA: {str(e)}", "error")
-                return redirect(url_for("quadro_transferencias"))
-
-            colmap_eja = _build_colmap(df_eja)
-            eja_col_nome = _pick_col(colmap_eja, "NOME")
-            eja_col_dn = _pick_col(colmap_eja, "DATA NASC.", "DATA NASC")
-            eja_col_ra = _pick_col(colmap_eja, "RA")
-            eja_col_serie = _pick_col(colmap_eja, "SÉRIE", "SERIE")
-            eja_col_obs = _pick_col(colmap_eja, "OBS")
-            eja_col_local_te = _pick_col(colmap_eja, "LOCAL TE", "LOCALTE")
-
-            if not eja_col_local_te:
-                _push_missing_info_alert(
-                    missing_info_alerts,
-                    missing_info_seen,
-                    turma="(Estrutura do arquivo EJA)",
-                    nome="-",
-                    ra="-",
-                    tipo="TE/MC/MCC",
-                    data_str="-",
-                    campo="LOCAL TE",
-                    detalhe="A coluna 'LOCAL TE' não foi encontrada na Lista Piloto EJA."
-                )
-
-            if eja_col_nome and eja_col_ra and eja_col_serie and eja_col_obs:
-                df_eja_sub = df_eja[
-                    [c for c in [eja_col_serie, eja_col_nome, eja_col_dn, eja_col_ra, eja_col_obs, eja_col_local_te] if c]
-                ].copy()
-
-                for row in df_eja_sub.itertuples(index=False, name=None):
-                    row_dict = dict(zip(df_eja_sub.columns, row))
-                    txt = _safe_str(row_dict.get(eja_col_obs))
-
-                    m = _RX_EJA.search(txt)
-                    if not m:
-                        continue
-
-                    tipo_str = m.group(1).upper()
-                    day = int(m.group(2))
-                    month = int(m.group(3))
-                    year_raw = m.group(4)
-
-                    if year_raw:
-                        y = int(year_raw)
-                        if y < 100:
-                            y += 2000
-                    else:
-                        y = period_start.year
-
-                    try:
-                        dt = datetime(y, month, day)
-                    except Exception:
-                        continue
-
-                    if not (period_start <= dt <= period_end):
-                        continue
-
-                    nome = _safe_str(row_dict.get(eja_col_nome))
-                    ra = _safe_str(row_dict.get(eja_col_ra))
-                    nivel_classe = _safe_str(row_dict.get(eja_col_serie))
-
-                    dn_str = ""
-                    if eja_col_dn:
-                        dn_val = row_dict.get(eja_col_dn)
-                        if pd.notna(dn_val):
-                            try:
-                                dn_dt = pd.to_datetime(dn_val, errors="coerce")
-                                dn_str = dn_dt.strftime("%d/%m/%Y") if pd.notna(dn_dt) else ""
-                            except Exception:
-                                dn_str = ""
-
-                    local_te_raw = _safe_str(row_dict.get(eja_col_local_te)) if eja_col_local_te else ""
-                    local_te = "-" if _is_missing_text(local_te_raw) else local_te_raw
-
-                    # ALERTA: registro encontrado, mas sem LOCAL TE
-                    if _is_missing_text(local_te_raw):
-                        _push_missing_info_alert(
-                            missing_info_alerts,
-                            missing_info_seen,
-                            turma=nivel_classe,
-                            nome=nome,
-                            ra=ra,
-                            tipo=tipo_str,
-                            data_str=dt.strftime("%d/%m/%Y"),
-                            campo="LOCAL TE",
-                            detalhe="Registro encontrado no período, mas o campo LOCAL TE está vazio ou inválido."
-                        )
-
-                    transfer_records.append({
-                        "nome": nome,
-                        "dn": dn_str,
-                        "ra": ra,
-                        "situacao": "Parcial",
-                        "breda": "Não",
-                        "nivel_classe": nivel_classe,
-                        "tipo": tipo_str,
-                        "observacao": local_te,           # H
-                        "remanejamento": "-",             # I
-                        "data": dt.strftime("%d/%m/%Y"),  # J
-                    })
-
-        if not transfer_records:
-            flash("Nenhum registro de TE/MC/MCC encontrado no período especificado.", "error")
-            try:
-                current_app.logger.info("\n".join(debug))
-            except Exception:
-                print("\n".join(debug))
-            return redirect(url_for("quadro_transferencias"))
-
-        model_path = os.path.join("modelos", "Quadro Informativo - Modelo.xlsx")
-        if not os.path.exists(model_path):
-            flash("Modelo de Quadro Informativo (Transferências) não encontrado.", "error")
+        except TransferenciasError as e:
+            flash(str(e), "error")
             return redirect(url_for("quadro_transferencias"))
 
         try:
-            with open(model_path, "rb") as f:
-                wb = load_workbook(f, data_only=False)
-        except Exception as e:
-            flash(f"Erro ao ler o modelo: {str(e)}", "error")
-            return redirect(url_for("quadro_transferencias"))
-
-        ws = wb.active
-
-        SCHOOL_NAME = "E.M José Padin Mouta"
-        _label_set(ws, "A7", "Unidade Escolar", SCHOOL_NAME)
-        _label_set(ws, "A8", "Diretor(a)", diretor_nome)
-
-        set_merged_cell_value(ws, "B9", responsavel)
-        set_merged_cell_value(ws, "J9", data_quadro_dt.strftime("%d/%m/%Y"))
-
-        current_row = 12
-        for record in transfer_records:
-            set_merged_cell_value(ws, f"A{current_row}", record["nome"])
-            set_merged_cell_value(ws, f"B{current_row}", record["dn"])
-            set_merged_cell_value(ws, f"C{current_row}", record["ra"])
-            set_merged_cell_value(ws, f"D{current_row}", record["situacao"])
-            set_merged_cell_value(ws, f"E{current_row}", record["breda"])
-            set_merged_cell_value(ws, f"F{current_row}", record["nivel_classe"])
-            set_merged_cell_value(ws, f"G{current_row}", record["tipo"])
-
-            # FIX H/I/J
-            set_merged_cell_value(ws, f"H{current_row}", record["observacao"])
-            set_merged_cell_value(ws, f"I{current_row}", "-")
-            set_merged_cell_value(ws, f"J{current_row}", record["data"])
-
-            current_row += 1
-
-        debug.append(f"[quadro_transferencias] Linhas preenchidas no modelo: {len(transfer_records)} (início A12)")
-        debug.append(f"[quadro_transferencias] Alertas de falta de informação: {len(missing_info_alerts)}")
-
-        try:
-            current_app.logger.info("\n".join(debug))
+            current_app.logger.info("\n".join(result.debug))
         except Exception:
-            print("\n".join(debug))
+            print("\n".join(result.debug))
 
-        _add_transfer_alerts_sheet(wb, missing_info_alerts)
-
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        filename = f"Quadro_de_Transferencias_{period_start.strftime('%d%m')}_{period_end.strftime('%d%m')}.xlsx"
         resp = send_file(
-            output,
+            result.output,
             as_attachment=True,
-            download_name=filename,
+            download_name=result.filename,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
         # Dados pessoais ficam na aba ALERTAS do Excel, não em headers HTTP.
-        if missing_info_alerts:
-            resp.headers["X-Transferencias-MissingInfo-Count"] = str(len(missing_info_alerts))
+        if result.missing_info_alerts:
+            resp.headers["X-Transferencias-MissingInfo-Count"] = str(len(result.missing_info_alerts))
 
         return resp
 
