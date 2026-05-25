@@ -31,6 +31,7 @@ from services.carteirinhas_log import (
 )
 from services.declaracoes import (
     DECLARACAO_PRINT_CSS,
+    build_declaracao_escolar_context,
     build_declaracao_personalizada_context,
     build_notas_tabela_html,
     data_extenso_praia_grande,
@@ -565,376 +566,37 @@ def gerar_declaracao_escolar(
 
         data_nasc = format_date_br(data_nasc)
 
-    # ------------------------------------------------------
-    # 2) DATA POR EXTENSO
-    # ------------------------------------------------------
+
+    context = build_declaracao_escolar_context(
+        tipo=tipo,
+        segmento=session.get("declaracao_tipo"),
+        nome=nome,
+        ra=ra,
+        ra_label=ra_label,
+        data_nasc=data_nasc,
+        serie=serie,
+        horario=horario if session.get("declaracao_tipo") != "EJA" else "Desconhecido",
+        semestre_texto=semestre_texto,
+        row=row,
+        notas_tabela_html=notas_tabela_html,
+        deve_historico=deve_historico,
+        unidade_anterior=unidade_anterior,
+        escolas_df=escolas_df,
+        dados_frequencia=dados_frequencia,
+    )
+    if context is None:
+        return None
+
     data_extenso_str = data_extenso_praia_grande()
     additional_css = DECLARACAO_PRINT_CSS
 
-    # ------------------------------------------------------
-    # 3) MONTAGEM DO TEXTO DA DECLARAÇÃO
-    # ------------------------------------------------------
-    declaracao_text = ""
-    tem_observacoes = False  # controla se há bloco de observações
-
-    if tipo == "Escolaridade":
-        titulo = "Declaração de Escolaridade"
-        if session.get("declaracao_tipo") == "EJA":
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, "
-                f"encontra-se regularmente matriculado(a) no segmento de "
-                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong> da "
-                f"E.M José Padin Mouta, cursando atualmente o(a) "
-                f"<strong><u>{serie}</u></strong>."
-            )
-        else:
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, "
-                f"encontra-se regularmente matriculado(a) na "
-                f"E.M José Padin Mouta, cursando atualmente o(a) "
-                f"<strong><u>{serie}</u></strong> no horário de aula: "
-                f"<strong><u>{horario}</u></strong>."
-            )
-
-    elif tipo == "Transferencia":
-        titulo = "Declaração de Transferência"
-        if session.get("declaracao_tipo") == "EJA":
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, matriculado(a) no segmento de "
-                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong> da "
-                f"E.M José Padin Mouta, solicitou transferência desta unidade escolar "
-                f"na data de hoje, estando apto(a) a cursar o(a) "
-                f"<strong><u>{serie}</u></strong>."
-            )
-
-            if not deve_historico:
-                declaracao_text += (
-                    " Informamos, ainda, que o histórico escolar será emitido no prazo de "
-                    "até 30 (trinta) dias."
-                )
-        else:
-            serie_mod = re.sub(r"^(\d+º).*", r"\1 ano", str(serie))
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) responsável do(a) "
-                f"aluno(a) <strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, compareceu a nossa "
-                f"unidade escolar e solicitou transferência na data de hoje, "
-                f"o aluno está apto(a) a cursar o(a) "
-                f"<strong><u>{serie_mod}</u></strong>."
-            )
-
-            if not deve_historico:
-                declaracao_text += (
-                    " Informamos, ainda, que o histórico escolar será emitido no prazo de "
-                    "até 30 (trinta) dias."
-                )
-
-            # Anexa a tabela de notas (apenas Fundamental)
-            if notas_tabela_html:
-                declaracao_text += notas_tabela_html
-
-    elif tipo == "Conclusão":
-        titulo = "Declaração de Conclusão"
-
-        if session.get("declaracao_tipo") == "EJA":
-            # Próxima série/etapa
-            mapping = {
-                "1ª SÉRIE E.F": "2ª SÉRIE E.F",
-                "2ª SÉRIE E.F": "3ª SÉRIE E.F",
-                "3ª SÉRIE E.F": "4ª SÉRIE E.F",
-                "4ª SÉRIE E.F": "5ª SÉRIE E.F",
-                "5ª SÉRIE E.F": "6ª SÉRIE E.F",
-                "6ª SÉRIE E.F": "7ª SÉRIE E.F",
-                "7ª SÉRIE E.F": "8ª SÉRIE E.F",
-                "8ª SÉRIE E.F": "1ª SÉRIE E.M",
-                "1ª SÉRIE E.M": "2ª SÉRIE E.M",
-                "2ª SÉRIE E.M": "3ª SÉRIE E.M",
-                "3ª SÉRIE E.M": "ENSINO SUPERIOR",
-            }
-            series_text = mapping.get(str(serie).upper(), "a série subsequente")
-
-            # Se tiver semestre na planilha, só acrescenta como complemento
-            semestre_parte = (
-                f", no <strong><u>{semestre_texto}</u></strong>"
-                if semestre_texto
-                else ""
-            )
-
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, concluiu com êxito o(a) "
-                f"<strong><u>{serie}</u></strong>{semestre_parte} no segmento de "
-                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong> da "
-                f"E.M José Padin Mouta, estando apto(a) a ingressar no(na) "
-                f"<strong><u>{series_text}</u></strong>."
-            )
-        else:
-            match = re.search(r"(\d+)º\s*ano", str(serie))
-            next_year = int(match.group(1)) + 1 if match else None
-            series_text = f"{next_year}º ano" if next_year else "a série subsequente"
-
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, concluiu com êxito o(a) "
-                f"<strong><u>{serie}</u></strong>, estando apto(a) a ingressar no(na) "
-                f"<strong><u>{series_text}</u></strong>."
-            )
-
-    elif tipo in ("Frequencia", "Frequência"):
-        titulo = "Declaração de Frequência"
-
-        # Se não vier dados de frequência, não há o que declarar
-        if not dados_frequencia or not dados_frequencia.get("meses"):
-            return None
-
-        # Frase inicial (EJA x Fundamental)
-        if session.get("declaracao_tipo") == "EJA":
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, regularmente matriculado(a) "
-                f"no segmento de <strong><u>Educação de Jovens e Adultos (EJA)</u></strong> "
-                f"da E.M José Padin Mouta, teve sua frequência apurada nos meses abaixo "
-                f"conforme quadro a seguir."
-            )
-        else:
-            declaracao_text = (
-                f"Declaro, para os devidos fins, que o(a) aluno(a) "
-                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-                f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, regularmente matriculado(a) "
-                f"no(a) <strong><u>{serie}</u></strong> da E.M José Padin Mouta, "
-                f"teve sua frequência apurada nos meses abaixo conforme quadro a seguir."
-            )
-
-        def _fmt_num(n):
-            try:
-                f = float(n)
-                if f.is_integer():
-                    return str(int(f))
-                return f"{f:.1f}".replace(".", ",")
-            except Exception:
-                return str(n)
-
-        # mapa padrão de meses (1–12)
-        nomes_meses_padrao = {
-            1: "Janeiro",
-            2: "Fevereiro",
-            3: "Março",
-            4: "Abril",
-            5: "Maio",
-            6: "Junho",
-            7: "Julho",
-            8: "Agosto",
-            9: "Setembro",
-            10: "Outubro",
-            11: "Novembro",
-            12: "Dezembro",
-        }
-
-        linhas_tabela = ""
-
-        for idx, item in enumerate(dados_frequencia.get("meses", []), start=1):
-            # ---------- MÊS ----------
-            raw_mes = item.get("nome_mes")
-            if raw_mes in (None, ""):
-                raw_mes = item.get("mes")
-            if raw_mes in (None, ""):
-                raw_mes = item.get("mes_nome")
-            if raw_mes in (None, ""):
-                raw_mes = item.get("descricao_mes")
-            if raw_mes in (None, ""):
-                raw_mes = item.get("descricao")
-
-            nome_mes = ""
-
-            if raw_mes not in (None, ""):
-                if isinstance(raw_mes, (int, float)):
-                    idx_int = int(raw_mes)
-                    nome_mes = nomes_meses_padrao.get(idx_int, str(idx_int))
-                else:
-                    s = str(raw_mes).strip()
-                    if s.isdigit():
-                        idx_int = int(s)
-                        nome_mes = nomes_meses_padrao.get(idx_int, s)
-                    else:
-                        nome_mes = s
-
-            # fallback final: usa o índice do loop (1..12)
-            if not nome_mes:
-                nome_mes = nomes_meses_padrao.get(idx, f"Mês {idx}")
-
-            # ---------- DIAS / FALTAS / FREQUÊNCIA ----------
-            dias_val = item.get("dias_letivos_calculados")
-            if dias_val is None:
-                dias_val = item.get("dias_letivos")
-            if dias_val is None:
-                dias_val = item.get("dias")
-
-            faltas_val = item.get("faltas_calculadas")
-            if faltas_val is None:
-                faltas_val = item.get("faltas")
-
-            freq_val = item.get("frequencia")
-            if freq_val is None:
-                freq_val = item.get("freq")
-
-            # Se não vier flag 'preenchido', deduz pelo conteúdo
-            preenchido_raw = item.get("preenchido")
-            if preenchido_raw is None:
-                preenchido = any(
-                    v not in (None, "", 0, 0.0)
-                    for v in (dias_val, faltas_val, freq_val)
-                )
-            else:
-                preenchido = bool(preenchido_raw)
-
-            if preenchido:
-                dias_txt = _fmt_num(dias_val) if dias_val not in (None, "") else "0"
-                faltas_txt = _fmt_num(faltas_val) if faltas_val not in (None, "") else "0"
-                if freq_val in (None, ""):
-                    freq_txt = "—"
-                else:
-                    try:
-                        freq_txt = f"{float(freq_val):.1f}%".replace(".", ",")
-                    except Exception:
-                        freq_txt = str(freq_val)
-            else:
-                dias_txt = "—"
-                faltas_txt = "—"
-                freq_txt = "—"
-
-            linhas_tabela += (
-                "<tr>"
-                f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{nome_mes}</td>"
-                f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{dias_txt}</td>"
-                f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{faltas_txt}</td>"
-                f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{freq_txt}</td>"
-                "</tr>"
-            )
-
-        declaracao_text += (
-            "<br><br>"
-            "<table style='width:75%;max-width:600px;margin:0 auto;"
-            "border-collapse:collapse;font-size:12px;margin-top:4px;'>"
-            "<thead>"
-            "<tr>"
-            "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Mês</th>"
-            "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Dias letivos</th>"
-            "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Faltas</th>"
-            "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Frequência</th>"
-            "</tr>"
-            "</thead>"
-            "<tbody>"
-            f"{linhas_tabela}"
-            "</tbody>"
-            "</table>"
-            "<br>"
-            "<span style='font-size:12px;color:#555;'>"
-            "</span>"
-        )
-
-    else:
-        # Tipo desconhecido
-        return None
-
-    # ------------------------------------------------------
-    # 4) OBSERVAÇÕES / HISTÓRICO / BOLSA FAMÍLIA
-    # ------------------------------------------------------
-    valor_bolsa = str(row.get("BOLSA FAMILIA", "")).strip().upper()
-
-    if deve_historico or (valor_bolsa == "SIM" and tipo != "Escolaridade"):
-        tem_observacoes = True
-        declaracao_text += "<br><br><strong>Observações:</strong><br>"
-        declaracao_text += (
-            '<label class="checkbox-label" '
-            "style='display:block;text-align:justify;font-size:14px;'>"
-        )
-
-        # Histórico escolar pendente
-        if deve_historico:
-            declaracao_text += '<span class="warning-icon">&#9888;</span> '
-            declaracao_text += (
-                "O aluno deve o histórico escolar da unidade anterior:<br><br>"
-            )
-
-            if unidade_anterior:
-                unidade_anterior = " ".join(str(unidade_anterior).strip().split())
-                esc_df = None
-                if escolas_df is not None:
-                    try:
-                        esc_df = escolas_df[
-                            escolas_df.iloc[:, 3].str.upper()
-                            == unidade_anterior.upper()
-                        ]
-                    except Exception:
-                        esc_df = None
-
-                if esc_df is not None and not esc_df.empty:
-                    unidade_nome = esc_df.iloc[0, 3]
-                    inep = esc_df.iloc[0, 4]
-                    municipio = esc_df.iloc[0, 2]
-                    uf = esc_df.iloc[0, 1]
-                    declaracao_text += (
-                        "<div style='font-size:14px;'>"
-                        f"<strong>Unidade:</strong> {unidade_nome}<br>"
-                        f"<strong>INEP:</strong> {inep}<br>"
-                        f"<strong>Cidade:</strong> {municipio}<br>"
-                        f"<strong>Estado:</strong> {uf}<br><br>"
-                        "</div>"
-                    )
-                else:
-                    declaracao_text += (
-                        f"<strong>Unidade:</strong> {unidade_anterior}<br><br>"
-                    )
-
-            declaracao_text += (
-                "Após sua entrega, o documento será confeccionado em "
-                "até 30 dias úteis.<br><br>"
-            )
-
-        # Bolsa Família (quando não for só escolaridade)
-        if valor_bolsa == "SIM" and tipo != "Escolaridade":
-            declaracao_text += (
-                '<img src="/static/logos/bolsa_familia.jpg" '
-                'alt="Bolsa Família" '
-                'style="width:28px;vertical-align:middle;margin-right:5px;">'
-                "O aluno é beneficiário do Programa Bolsa Família."
-            )
-
-        declaracao_text += "</label>"
-
-    # ------------------------------------------------------
-    # 5) HTML FINAL (DECLARAÇÃO ÚNICA)
-    # ------------------------------------------------------
-    classes_body = []
-    if tipo in ("Frequencia", "Frequência"):
-        classes_body.append("tipo-frequencia")
-    if tipo == "Transferencia" and tem_observacoes:
-        classes_body.append("transferencia-com-observacoes")
-
     return render_template(
         "declaracao_print.html",
-        titulo=titulo,
+        titulo=context["titulo"],
         data_extenso=data_extenso_str,
-        declaracao_text=declaracao_text,
+        declaracao_text=context["declaracao_text"],
         additional_css=additional_css,
-        body_classes=classes_body,
+        body_classes=context["body_classes"],
         print_body_padding="0.5cm 0.5cm",
     )
 

@@ -132,6 +132,387 @@ def parse_data_nascimento_personalizada(value) -> str:
     return "Desconhecida"
 
 
+MESES_FREQUENCIA_BR = {
+    1: "Janeiro",
+    2: "Fevereiro",
+    3: "Mar\u00e7o",
+    4: "Abril",
+    5: "Maio",
+    6: "Junho",
+    7: "Julho",
+    8: "Agosto",
+    9: "Setembro",
+    10: "Outubro",
+    11: "Novembro",
+    12: "Dezembro",
+}
+
+
+def _format_frequency_number(value) -> str:
+    try:
+        number = float(value)
+        if number.is_integer():
+            return str(int(number))
+        return f"{number:.1f}".replace(".", ",")
+    except Exception:
+        return str(value)
+
+
+def _resolve_frequency_month(item, index) -> str:
+    raw_month = item.get("nome_mes")
+    if raw_month in (None, ""):
+        raw_month = item.get("mes")
+    if raw_month in (None, ""):
+        raw_month = item.get("mes_nome")
+    if raw_month in (None, ""):
+        raw_month = item.get("descricao_mes")
+    if raw_month in (None, ""):
+        raw_month = item.get("descricao")
+
+    month_name = ""
+
+    if raw_month not in (None, ""):
+        if isinstance(raw_month, (int, float)):
+            month_index = int(raw_month)
+            month_name = MESES_FREQUENCIA_BR.get(month_index, str(month_index))
+        else:
+            text = str(raw_month).strip()
+            if text.isdigit():
+                month_index = int(text)
+                month_name = MESES_FREQUENCIA_BR.get(month_index, text)
+            else:
+                month_name = text
+
+    if not month_name:
+        month_name = MESES_FREQUENCIA_BR.get(index, f"M\u00eas {index}")
+
+    return month_name
+
+
+def _build_frequencia_tabela_html(meses) -> str:
+    linhas_tabela = ""
+
+    for index, item in enumerate(meses, start=1):
+        nome_mes = _resolve_frequency_month(item, index)
+
+        dias_val = item.get("dias_letivos_calculados")
+        if dias_val is None:
+            dias_val = item.get("dias_letivos")
+        if dias_val is None:
+            dias_val = item.get("dias")
+
+        faltas_val = item.get("faltas_calculadas")
+        if faltas_val is None:
+            faltas_val = item.get("faltas")
+
+        freq_val = item.get("frequencia")
+        if freq_val is None:
+            freq_val = item.get("freq")
+
+        preenchido_raw = item.get("preenchido")
+        if preenchido_raw is None:
+            preenchido = any(
+                value not in (None, "", 0, 0.0)
+                for value in (dias_val, faltas_val, freq_val)
+            )
+        else:
+            preenchido = bool(preenchido_raw)
+
+        if preenchido:
+            dias_txt = _format_frequency_number(dias_val) if dias_val not in (None, "") else "0"
+            faltas_txt = _format_frequency_number(faltas_val) if faltas_val not in (None, "") else "0"
+            if freq_val in (None, ""):
+                freq_txt = "\u2014"
+            else:
+                try:
+                    freq_txt = f"{float(freq_val):.1f}%".replace(".", ",")
+                except Exception:
+                    freq_txt = str(freq_val)
+        else:
+            dias_txt = "\u2014"
+            faltas_txt = "\u2014"
+            freq_txt = "\u2014"
+
+        linhas_tabela += (
+            "<tr>"
+            f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{nome_mes}</td>"
+            f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{dias_txt}</td>"
+            f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{faltas_txt}</td>"
+            f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{freq_txt}</td>"
+            "</tr>"
+        )
+
+    return (
+        "<br><br>"
+        "<table style='width:75%;max-width:600px;margin:0 auto;"
+        "border-collapse:collapse;font-size:12px;margin-top:4px;'>"
+        "<thead>"
+        "<tr>"
+        "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>M\u00eas</th>"
+        "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Dias letivos</th>"
+        "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Faltas</th>"
+        "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Frequ\u00eancia</th>"
+        "</tr>"
+        "</thead>"
+        "<tbody>"
+        f"{linhas_tabela}"
+        "</tbody>"
+        "</table>"
+        "<br>"
+        "<span style='font-size:12px;color:#555;'>"
+        "</span>"
+    )
+
+
+def _build_historico_unidade_html(unidade_anterior, escolas_df) -> str:
+    if not unidade_anterior:
+        return ""
+
+    unidade_anterior = " ".join(str(unidade_anterior).strip().split())
+    esc_df = None
+    if escolas_df is not None:
+        try:
+            esc_df = escolas_df[
+                escolas_df.iloc[:, 3].str.upper() == unidade_anterior.upper()
+            ]
+        except Exception:
+            esc_df = None
+
+    if esc_df is not None and not esc_df.empty:
+        unidade_nome = esc_df.iloc[0, 3]
+        inep = esc_df.iloc[0, 4]
+        municipio = esc_df.iloc[0, 2]
+        uf = esc_df.iloc[0, 1]
+        return (
+            "<div style='font-size:14px;'>"
+            f"<strong>Unidade:</strong> {unidade_nome}<br>"
+            f"<strong>INEP:</strong> {inep}<br>"
+            f"<strong>Cidade:</strong> {municipio}<br>"
+            f"<strong>Estado:</strong> {uf}<br><br>"
+            "</div>"
+        )
+
+    return f"<strong>Unidade:</strong> {unidade_anterior}<br><br>"
+
+
+def build_declaracao_escolar_context(
+    *,
+    tipo,
+    segmento,
+    nome,
+    ra,
+    ra_label,
+    data_nasc,
+    serie,
+    horario="Desconhecido",
+    semestre_texto="",
+    row=None,
+    notas_tabela_html="",
+    deve_historico=False,
+    unidade_anterior=None,
+    escolas_df=None,
+    dados_frequencia=None,
+):
+    """
+    Monta titulo, texto e classes de impressao das declaracoes escolares.
+
+    Retorna None para manter o contrato atual quando o tipo e desconhecido
+    ou quando frequencia nao recebe meses.
+    """
+    is_eja = segmento == "EJA"
+    declaracao_text = ""
+    tem_observacoes = False
+
+    if tipo == "Escolaridade":
+        titulo = "Declara\u00e7\u00e3o de Escolaridade"
+        if is_eja:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, "
+                f"encontra-se regularmente matriculado(a) no segmento de "
+                f"<strong><u>Educa\u00e7\u00e3o de Jovens e Adultos (EJA)</u></strong> da "
+                f"E.M Jos\u00e9 Padin Mouta, cursando atualmente o(a) "
+                f"<strong><u>{serie}</u></strong>."
+            )
+        else:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, "
+                f"encontra-se regularmente matriculado(a) na "
+                f"E.M Jos\u00e9 Padin Mouta, cursando atualmente o(a) "
+                f"<strong><u>{serie}</u></strong> no hor\u00e1rio de aula: "
+                f"<strong><u>{horario}</u></strong>."
+            )
+
+    elif tipo == "Transferencia":
+        titulo = "Declara\u00e7\u00e3o de Transfer\u00eancia"
+        if is_eja:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, matriculado(a) no segmento de "
+                f"<strong><u>Educa\u00e7\u00e3o de Jovens e Adultos (EJA)</u></strong> da "
+                f"E.M Jos\u00e9 Padin Mouta, solicitou transfer\u00eancia desta unidade escolar "
+                f"na data de hoje, estando apto(a) a cursar o(a) "
+                f"<strong><u>{serie}</u></strong>."
+            )
+
+            if not deve_historico:
+                declaracao_text += (
+                    " Informamos, ainda, que o hist\u00f3rico escolar ser\u00e1 emitido no prazo de "
+                    "at\u00e9 30 (trinta) dias."
+                )
+        else:
+            serie_mod = re.sub(r"^(\d+\u00ba).*", r"\1 ano", str(serie))
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) respons\u00e1vel do(a) "
+                f"aluno(a) <strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, compareceu a nossa "
+                f"unidade escolar e solicitou transfer\u00eancia na data de hoje, "
+                f"o aluno est\u00e1 apto(a) a cursar o(a) "
+                f"<strong><u>{serie_mod}</u></strong>."
+            )
+
+            if not deve_historico:
+                declaracao_text += (
+                    " Informamos, ainda, que o hist\u00f3rico escolar ser\u00e1 emitido no prazo de "
+                    "at\u00e9 30 (trinta) dias."
+                )
+
+            if notas_tabela_html:
+                declaracao_text += notas_tabela_html
+
+    elif tipo == "Conclus\u00e3o":
+        titulo = "Declara\u00e7\u00e3o de Conclus\u00e3o"
+
+        if is_eja:
+            mapping = {
+                "1\u00aa S\u00c9RIE E.F": "2\u00aa S\u00c9RIE E.F",
+                "2\u00aa S\u00c9RIE E.F": "3\u00aa S\u00c9RIE E.F",
+                "3\u00aa S\u00c9RIE E.F": "4\u00aa S\u00c9RIE E.F",
+                "4\u00aa S\u00c9RIE E.F": "5\u00aa S\u00c9RIE E.F",
+                "5\u00aa S\u00c9RIE E.F": "6\u00aa S\u00c9RIE E.F",
+                "6\u00aa S\u00c9RIE E.F": "7\u00aa S\u00c9RIE E.F",
+                "7\u00aa S\u00c9RIE E.F": "8\u00aa S\u00c9RIE E.F",
+                "8\u00aa S\u00c9RIE E.F": "1\u00aa S\u00c9RIE E.M",
+                "1\u00aa S\u00c9RIE E.M": "2\u00aa S\u00c9RIE E.M",
+                "2\u00aa S\u00c9RIE E.M": "3\u00aa S\u00c9RIE E.M",
+                "3\u00aa S\u00c9RIE E.M": "ENSINO SUPERIOR",
+            }
+            series_text = mapping.get(str(serie).upper(), "a s\u00e9rie subsequente")
+
+            semestre_parte = (
+                f", no <strong><u>{semestre_texto}</u></strong>"
+                if semestre_texto
+                else ""
+            )
+
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, concluiu com \u00eaxito o(a) "
+                f"<strong><u>{serie}</u></strong>{semestre_parte} no segmento de "
+                f"<strong><u>Educa\u00e7\u00e3o de Jovens e Adultos (EJA)</u></strong> da "
+                f"E.M Jos\u00e9 Padin Mouta, estando apto(a) a ingressar no(na) "
+                f"<strong><u>{series_text}</u></strong>."
+            )
+        else:
+            match = re.search(r"(\d+)\u00ba\s*ano", str(serie))
+            next_year = int(match.group(1)) + 1 if match else None
+            series_text = f"{next_year}\u00ba ano" if next_year else "a s\u00e9rie subsequente"
+
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, concluiu com \u00eaxito o(a) "
+                f"<strong><u>{serie}</u></strong>, estando apto(a) a ingressar no(na) "
+                f"<strong><u>{series_text}</u></strong>."
+            )
+
+    elif tipo in ("Frequencia", "Frequ\u00eancia"):
+        titulo = "Declara\u00e7\u00e3o de Frequ\u00eancia"
+
+        if not dados_frequencia or not dados_frequencia.get("meses"):
+            return None
+
+        if is_eja:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, regularmente matriculado(a) "
+                f"no segmento de <strong><u>Educa\u00e7\u00e3o de Jovens e Adultos (EJA)</u></strong> "
+                f"da E.M Jos\u00e9 Padin Mouta, teve sua frequ\u00eancia apurada nos meses abaixo "
+                f"conforme quadro a seguir."
+            )
+        else:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, regularmente matriculado(a) "
+                f"no(a) <strong><u>{serie}</u></strong> da E.M Jos\u00e9 Padin Mouta, "
+                f"teve sua frequ\u00eancia apurada nos meses abaixo conforme quadro a seguir."
+            )
+
+        declaracao_text += _build_frequencia_tabela_html(dados_frequencia.get("meses", []))
+
+    else:
+        return None
+
+    row_data = row if row is not None else {}
+    valor_bolsa = str(row_data.get("BOLSA FAMILIA", "")).strip().upper()
+
+    if deve_historico or (valor_bolsa == "SIM" and tipo != "Escolaridade"):
+        tem_observacoes = True
+        declaracao_text += "<br><br><strong>Observa\u00e7\u00f5es:</strong><br>"
+        declaracao_text += (
+            '<label class="checkbox-label" '
+            "style='display:block;text-align:justify;font-size:14px;'>"
+        )
+
+        if deve_historico:
+            declaracao_text += '<span class="warning-icon">&#9888;</span> '
+            declaracao_text += (
+                "O aluno deve o hist\u00f3rico escolar da unidade anterior:<br><br>"
+            )
+            declaracao_text += _build_historico_unidade_html(unidade_anterior, escolas_df)
+            declaracao_text += (
+                "Ap\u00f3s sua entrega, o documento ser\u00e1 confeccionado em "
+                "at\u00e9 30 dias \u00fateis.<br><br>"
+            )
+
+        if valor_bolsa == "SIM" and tipo != "Escolaridade":
+            declaracao_text += (
+                '<img src="/static/logos/bolsa_familia.jpg" '
+                'alt="Bolsa Fam\u00edlia" '
+                'style="width:28px;vertical-align:middle;margin-right:5px;">'
+                "O aluno \u00e9 benefici\u00e1rio do Programa Bolsa Fam\u00edlia."
+            )
+
+        declaracao_text += "</label>"
+
+    body_classes = []
+    if tipo in ("Frequencia", "Frequ\u00eancia"):
+        body_classes.append("tipo-frequencia")
+    if tipo == "Transferencia" and tem_observacoes:
+        body_classes.append("transferencia-com-observacoes")
+
+    return {
+        "titulo": titulo,
+        "declaracao_text": declaracao_text,
+        "body_classes": body_classes,
+    }
+
+
 def build_declaracao_personalizada_context(dados):
     """
     Monta titulo e texto HTML das declaracoes personalizadas.

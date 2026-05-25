@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from services.declaracoes import (
+    build_declaracao_escolar_context,
     build_declaracao_personalizada_context,
     build_notas_tabela_html,
     contexto_segmento,
@@ -72,6 +73,125 @@ class DeclaracoesServiceTests(unittest.TestCase):
         self.assertIn("color:red", html)
         self.assertIn("8,00", html)
         self.assertIn("color:blue", html)
+
+    def test_build_declaracao_escolar_context_fundamental_escolaridade(self):
+        context = build_declaracao_escolar_context(
+            tipo="Escolaridade",
+            segmento="Fundamental",
+            nome="Aluno Fundamental",
+            ra="123",
+            ra_label="RA",
+            data_nasc="25/05/2026",
+            serie="5\u00ba ano A",
+            horario="13h00 as 17h00",
+            row={},
+        )
+
+        self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Escolaridade")
+        self.assertIn("Aluno Fundamental", context["declaracao_text"])
+        self.assertIn("hor\u00e1rio de aula", context["declaracao_text"])
+        self.assertEqual(context["body_classes"], [])
+
+    def test_build_declaracao_escolar_context_transferencia_observacoes(self):
+        escolas_df = pd.DataFrame(
+            [
+                ["", "SP", "Praia Grande", "ESCOLA ORIGEM", "123456"],
+            ]
+        )
+
+        context = build_declaracao_escolar_context(
+            tipo="Transferencia",
+            segmento="Fundamental",
+            nome="Aluno Transferencia",
+            ra="456",
+            ra_label="RA",
+            data_nasc="25/05/2026",
+            serie="4\u00ba ano B",
+            row={"BOLSA FAMILIA": "SIM"},
+            notas_tabela_html="<table><tr><td>Notas</td></tr></table>",
+            deve_historico=True,
+            unidade_anterior="  ESCOLA   ORIGEM ",
+            escolas_df=escolas_df,
+        )
+
+        self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Transfer\u00eancia")
+        self.assertIn("4\u00ba ano", context["declaracao_text"])
+        self.assertIn("Notas", context["declaracao_text"])
+        self.assertIn("ESCOLA ORIGEM", context["declaracao_text"])
+        self.assertIn("Bolsa Fam\u00edlia", context["declaracao_text"])
+        self.assertEqual(context["body_classes"], ["transferencia-com-observacoes"])
+
+    def test_build_declaracao_escolar_context_eja_conclusao(self):
+        context = build_declaracao_escolar_context(
+            tipo="Conclus\u00e3o",
+            segmento="EJA",
+            nome="Aluno EJA",
+            ra="RG-1",
+            ra_label="RG",
+            data_nasc="25/05/2026",
+            serie="8\u00aa S\u00c9RIE E.F",
+            semestre_texto="2\u00ba semestre",
+            row={},
+        )
+
+        self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Conclus\u00e3o")
+        self.assertIn("2\u00ba semestre", context["declaracao_text"])
+        self.assertIn("1\u00aa S\u00c9RIE E.M", context["declaracao_text"])
+
+    def test_build_declaracao_escolar_context_frequencia_and_invalid(self):
+        context = build_declaracao_escolar_context(
+            tipo="Frequ\u00eancia",
+            segmento="Fundamental",
+            nome="Aluno Frequencia",
+            ra="789",
+            ra_label="RA",
+            data_nasc="25/05/2026",
+            serie="3\u00ba ano C",
+            row={},
+            dados_frequencia={
+                "meses": [
+                    {
+                        "mes": 2,
+                        "dias_letivos": 20,
+                        "faltas": 1,
+                        "frequencia": 95,
+                        "preenchido": True,
+                    },
+                    {"descricao": "Mar\u00e7o", "preenchido": False},
+                ]
+            },
+        )
+
+        self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Frequ\u00eancia")
+        self.assertIn("Fevereiro", context["declaracao_text"])
+        self.assertIn("95,0%", context["declaracao_text"])
+        self.assertIn("Mar\u00e7o", context["declaracao_text"])
+        self.assertEqual(context["body_classes"], ["tipo-frequencia"])
+        self.assertIsNone(
+            build_declaracao_escolar_context(
+                tipo="Frequencia",
+                segmento="Fundamental",
+                nome="Aluno",
+                ra="1",
+                ra_label="RA",
+                data_nasc="25/05/2026",
+                serie="1\u00ba ano",
+                row={},
+                dados_frequencia={},
+            )
+        )
+        self.assertIsNone(
+            build_declaracao_escolar_context(
+                tipo="Desconhecida",
+                segmento="Fundamental",
+                nome="Aluno",
+                ra="1",
+                ra_label="RA",
+                data_nasc="25/05/2026",
+                serie="1\u00ba ano",
+                row={},
+            )
+        )
 
     def test_build_declaracao_personalizada_context_conclusao(self):
         context = build_declaracao_personalizada_context(
