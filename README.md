@@ -54,7 +54,9 @@ As dependencias estao em `requirements.txt`.
 |   |-- prazos.py                  # Regras de feriados e alertas de prazo
 |   `-- upload_sessions.py         # Salvamento de Excel e persistencia na sessao
 |-- utils/                         # Helpers reutilizaveis de Excel e uploads
+|   |-- dates.py                   # Parsing e formatacao de datas
 |   |-- excel.py                   # Escrita segura em celulas mescladas
+|   |-- text.py                    # Normalizacao de texto/cabecalhos
 |   `-- uploads.py                 # Validacao e nomes seguros de uploads
 |-- tests/                         # Testes unitarios/estaticos basicos
 |-- templates/                     # Telas Jinja2

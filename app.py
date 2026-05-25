@@ -33,7 +33,23 @@ from services.carteirinhas_log import (
 from services.fotos import get_student_photo_url, save_student_photo, student_has_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
 from services.upload_sessions import save_excel_upload_to_session
+from utils.dates import (
+    detect_te_date_from_obs_flexible,
+    extract_te_date_from_text as _extract_te_date_from_text,
+    parse_date_flexible,
+    parse_period_date as _parse_period_date,
+    parse_user_date as _parse_user_date,
+)
 from utils.excel import set_merged_cell_value
+from utils.text import (
+    build_colmap as _build_colmap,
+    find_df_col as _find_df_col,
+    is_missing_text as _is_missing_text,
+    is_missing_value as _is_missing_value,
+    norm_header_compact as _norm_header_compact,
+    pick_col as _pick_col,
+    safe_str as _safe_str,
+)
 from utils.uploads import (
     save_excel_upload,
     validate_excel_upload,
@@ -198,25 +214,6 @@ def load_workbook_model(file):
         return convert_xls_to_xlsx(BytesIO(content))
     else:
         raise ValueError("Formato de arquivo não suportado para o quadro modelo.")
-
-
-def data_extenso(dt):
-    """Retorna a data por extenso em português."""
-    meses = [
-        "janeiro",
-        "fevereiro",
-        "março",
-        "abril",
-        "maio",
-        "junho",
-        "julho",
-        "agosto",
-        "setembro",
-        "outubro",
-        "novembro",
-        "dezembro",
-    ]
-    return f"{dt.day} de {meses[dt.month - 1]} de {dt.year}"
 
 
 def is_valid_plano(val):
@@ -2685,11 +2682,9 @@ import re
 import uuid
 import copy
 import string
-import unicodedata
 from contextlib import contextmanager
 from datetime import datetime
 from io import BytesIO
-from typing import Optional, Iterable, Tuple, Dict
 
 import pandas as pd
 from flask import (
@@ -2777,67 +2772,6 @@ def _find_sheet_case_insensitive(wb, target_name: str):
 # ----------------------------------------------------------
 # Helpers comuns: normalização de cabeçalho e strings
 # ----------------------------------------------------------
-def _safe_str(v) -> str:
-    if v is None:
-        return ""
-    if isinstance(v, float) and pd.isna(v):
-        return ""
-    return str(v).strip()
-
-
-def _norm_header_compact(text: str) -> str:
-    """
-    Normaliza cabeçalho: remove acentos e tudo que não for A-Z0-9.
-    Fica robusto para variações: 'LOCAL TE', 'LOCAL_TE', 'local te', etc.
-    """
-    if text is None:
-        return ""
-    s = str(text).strip()
-    s = unicodedata.normalize("NFKD", s)
-    s = "".join(ch for ch in s if not unicodedata.combining(ch))
-    s = s.upper()
-    s = re.sub(r"[^A-Z0-9]+", "", s)
-    return s
-
-
-def _build_colmap(df: pd.DataFrame) -> dict:
-    """Mapeia cabeçalho normalizado -> nome real da coluna (primeira ocorrência)."""
-    m = {}
-    for col in df.columns:
-        k = _norm_header_compact(col)
-        if k and k not in m:
-            m[k] = col
-    return m
-
-
-def _pick_col(colmap: dict, *candidates: str):
-    """Retorna o nome real da coluna a partir de candidatos (por normalização compacta)."""
-    for cand in candidates:
-        k = _norm_header_compact(cand)
-        if k in colmap:
-            return colmap[k]
-    return None
-
-
-def _find_df_col(df: pd.DataFrame, candidates: Iterable[str]) -> Optional[str]:
-    """
-    Encontra uma coluna do DataFrame por lista de candidatos (nome),
-    comparando com normalização compacta.
-    """
-    if df is None or df.empty:
-        return None
-    colmap = _build_colmap(df)
-    return _pick_col(colmap, *list(candidates))
-
-
-def _is_missing_value(val) -> bool:
-    """Considera vazio/0/-/nan como ausente."""
-    s = _safe_str(val)
-    if not s:
-        return True
-    return s.lower() in {"0", "-", "nan", "none", "null"}
-
-
 @contextmanager
 def _temp_unprotect_sheet(ws):
     """Desabilita proteção da planilha temporariamente para escrita e restaura depois."""
@@ -3294,96 +3228,9 @@ import base64
 from io import BytesIO
 from datetime import datetime
 
-_RX_TE = re.compile(
-    r"(?i)(?<![A-Z0-9])TE\s*[-:\s–—]*\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?"
-)
 _RX_EJA = re.compile(
     r"(?i)(?<![A-Z0-9])(TE|MC|MCC)\s*[-:\s–—]*\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?"
 )
-
-def _is_missing_text(v) -> bool:
-    s = _safe_str(v)
-    if not s:
-        return True
-    return s.lower() in {"0", "-", "nan", "none", "null"}
-
-def _parse_user_date(date_str: str) -> Optional[datetime]:
-    s = _safe_str(date_str)
-    if not s:
-        return None
-    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%y"):
-        try:
-            return datetime.strptime(s, fmt)
-        except Exception:
-            pass
-    return None
-
-def _parse_period_date(date_str: str, label: str) -> datetime:
-    """
-    Mantém compatibilidade com input type=date (YYYY-MM-DD) e aceita dd/mm/aa|aaaa.
-    """
-    s = _safe_str(date_str)
-    if not s:
-        raise ValueError(f"Informe {label}.")
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y"):
-        try:
-            return datetime.strptime(s, fmt)
-        except Exception:
-            pass
-    raise ValueError(f"Formato de {label} inválido: '{date_str}'.")
-
-def _extract_te_date_from_text(text: str, period_start: datetime, period_end: datetime):
-    """
-    Extrai TE - dd/mm[/aa|aaaa] de um texto (OBS).
-    Ano ausente: tenta encaixar no período; se não der, assume ano corrente.
-    Retorna (dt, match_txt, year_inferred).
-    """
-    s = _safe_str(text)
-    if not s:
-        return None, None, False
-
-    m = _RX_TE.search(s)
-    if not m:
-        return None, None, False
-
-    day = int(m.group(1))
-    month = int(m.group(2))
-    year_raw = m.group(3)
-
-    year_inferred = False
-    if year_raw:
-        y = int(year_raw)
-        if y < 100:
-            y += 2000
-        years_to_try = [y]
-    else:
-        year_inferred = True
-        years_to_try = [period_start.year]
-        if period_end.year != period_start.year:
-            years_to_try.append(period_end.year)
-
-    for y in years_to_try:
-        try:
-            dt = datetime(y, month, day)
-        except Exception:
-            continue
-        if period_start <= dt <= period_end:
-            return dt, m.group(0), year_inferred
-
-    if not year_raw:
-        y = datetime.now().year
-        try:
-            return datetime(y, month, day), m.group(0), year_inferred
-        except Exception:
-            return None, m.group(0), year_inferred
-
-    for y in years_to_try:
-        try:
-            return datetime(y, month, day), m.group(0), year_inferred
-        except Exception:
-            continue
-
-    return None, m.group(0), year_inferred
 
 def _label_set(ws, addr: str, label: str, value: str):
     """
@@ -3833,99 +3680,6 @@ def quadro_transferencias():
 #  QUADRO – QUANTITATIVO MENSAL (Fundamental)
 #  (mantido: parse flexível do período + debug sheet oculta)
 # ==========================================================
-
-_RX_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_RX_BR_DATE = re.compile(r"^\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?\s*$")
-
-def parse_date_flexible(value: str, *, default_year: Optional[int] = None, field_label: str = "data") -> datetime:
-    """
-    Aceita:
-      - YYYY-MM-DD (input type=date)
-      - dd/mm/aaaa
-      - dd/mm/aa
-      - dd/mm (assume ano corrente, ou default_year se informado)
-    """
-    if value is None or str(value).strip() == "":
-        raise ValueError(f"Informe {field_label}.")
-
-    s = str(value).strip()
-
-    if _RX_ISO_DATE.match(s):
-        try:
-            return datetime.strptime(s, "%Y-%m-%d")
-        except Exception:
-            raise ValueError(f"{field_label.capitalize()} inválida: '{value}'.")
-
-    m = _RX_BR_DATE.match(s)
-    if not m:
-        raise ValueError(
-            f"{field_label.capitalize()} inválida: '{value}'. Use 16/01, 16/01/26, 16/01/2026 (ou selecione no calendário)."
-        )
-
-    day = int(m.group(1))
-    month = int(m.group(2))
-    y_str = m.group(3)
-
-    if not y_str:
-        year = int(default_year) if default_year is not None else datetime.now().year
-    else:
-        year = int(y_str)
-        if year < 100:
-            year += 2000
-
-    try:
-        return datetime(year, month, day)
-    except ValueError:
-        raise ValueError(f"{field_label.capitalize()} inválida: '{value}' (dia/mês não existe).")
-
-
-_RX_TE_DATE_FLEX = re.compile(
-    r"\bTE\b\s*[-:–—]?\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?\b",
-    re.IGNORECASE,
-)
-
-def detect_te_date_from_obs_flexible(
-    obs_text,
-    *,
-    default_year: Optional[int] = None,
-) -> Tuple[Optional[datetime], Optional[str], Optional[str], bool]:
-    """
-    Procura TE + data em OBS.
-    Aceita: TE - 16/01, TE - 16/01/26, TE - 16/01/2026.
-    Se faltar ano, assume ano corrente (ou default_year se fornecido).
-    Retorna: (dt, regra, trecho_match, year_inferred)
-    """
-    if obs_text is None:
-        return None, None, None, False
-
-    text = str(obs_text).strip()
-    if text == "":
-        return None, None, None, False
-
-    m = _RX_TE_DATE_FLEX.search(text)
-    if not m:
-        return None, None, None, False
-
-    day = int(m.group(1))
-    month = int(m.group(2))
-    y_str = m.group(3)
-
-    year_inferred = False
-    if not y_str:
-        year = int(default_year) if default_year is not None else datetime.now().year
-        year_inferred = True
-    else:
-        year = int(y_str)
-        if year < 100:
-            year += 2000
-
-    try:
-        dt = datetime(year, month, day)
-    except ValueError:
-        return None, "OBS:TE_DATE", m.group(0), year_inferred
-
-    return dt, "OBS:TE_DATE", m.group(0), year_inferred
-
 
 def _serie_key_from_value(serie_val: str) -> Optional[str]:
     """Extrai 2º/3º/4º/5º de valores como '4ºF', '5º D', etc."""
