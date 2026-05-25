@@ -25,9 +25,9 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from openpyxl import load_workbook, Workbook  # Usado para trabalhar com XLSX
 
 from config import configure_app
-from services.carteirinhas_log import (
-    get_printed_set as _get_printed_set,
-    mark_printed_rms as _mark_printed_rms,
+from services.carteirinhas import (
+    build_carteirinhas_context,
+    mark_carteirinhas_impressas as _mark_carteirinhas_impressas,
 )
 from services.declaracoes import (
     DECLARACAO_PRINT_CSS,
@@ -39,7 +39,7 @@ from services.declaracoes import (
     list_declaracao_alunos,
     load_declaracao_aluno_context,
 )
-from services.fotos import get_student_photo_url, save_student_photo, student_has_photo
+from services.fotos import save_student_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
 from services.quadros_atendimento import (
     ATENDIMENTO_CONFIG,
@@ -260,142 +260,9 @@ def is_valid_plano(val):
 
 
 # ==========================================================
-#  CARTEIRINHAS – GERAÇÃO DE HTML
-# ==========================================================
-
-def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False, somente_nao_impressas=False, ano=None):
-    ano = int(ano or datetime.now().year)
-    printed_set = _get_printed_set(ano)
-
-    # Lê a planilha do Fundamental
-    planilha = pd.read_excel(arquivo_excel, sheet_name="LISTA CORRIDA")
-
-    dados = planilha[["RM", "NOME", "DATA NASC.", "RA", "SAI SOZINHO?", "SÉRIE", "HORÁRIO"]].copy()
-    dados["RM"] = dados["RM"].fillna(0).astype(int)
-
-    # Filtra apenas alunos com RM válido
-    registros_validos = []
-    for _, row in dados.iterrows():
-        rm_str = str(row["RM"]).strip()
-        if not rm_str or rm_str == "0":
-            continue
-        registros_validos.append(row)
-
-    alunos_sem_fotos_list = []
-    alunos = []
-
-    for row in registros_validos:
-        rm_int = int(row["RM"])
-        nome = row["NOME"]
-        data_nasc = row["DATA NASC."]
-        serie = row["SÉRIE"]
-        horario = row["HORÁRIO"]
-
-        # Data de nascimento
-        if pd.notna(data_nasc):
-            try:
-                data_nasc = pd.to_datetime(data_nasc, errors="coerce")
-                if pd.notna(data_nasc):
-                    data_nasc_str = data_nasc.strftime("%d/%m/%Y")
-                else:
-                    data_nasc_str = "Desconhecida"
-            except Exception:
-                data_nasc_str = "Desconhecida"
-        else:
-            data_nasc_str = "Desconhecida"
-
-        ra = row["RA"]
-
-        # Sai sozinho?
-        sai_sozinho_raw = str(row["SAI SOZINHO?"]).strip().upper()
-        if sai_sozinho_raw in ("SIM", "S", "YES", "Y"):
-            classe_cor = "verde"
-            status_texto = "Sai sozinho"
-            status_icon = "&#10003;"
-        else:
-            classe_cor = "vermelho"
-            status_texto = "Não sai sozinho"
-            status_icon = "&#9888;"
-
-        # Foto
-        foto_url = get_student_photo_url(rm_int)
-
-        if not foto_url:
-            alunos_sem_fotos_list.append(
-                {
-                    "rm": rm_int,
-                    "nome": nome,
-                    "serie": serie,
-                }
-            )
-
-        # flag de impressão (lógica nova)
-        impresso = (rm_int in printed_set)
-
-        alunos.append(
-            {
-                "rm": rm_int,
-                "nome": nome,
-                "data_nasc": data_nasc_str,
-                "ra": ra,
-                "serie": serie,
-                "horario": horario,
-                "classe_cor": classe_cor,
-                "status_texto": status_texto,
-                "status_icon": status_icon,
-                "foto_url": foto_url,
-                "impresso": impresso,  # <<< NOVO
-            }
-        )
-
-    # --- FILTROS ---
-    alunos_para_exibir = alunos
-
-    # mantém seu filtro atual
-    if somente_com_foto:
-        alunos_para_exibir = [a for a in alunos_para_exibir if a.get("foto_url")]
-
-    # novo filtro: não impressas
-    if somente_nao_impressas:
-        alunos_para_exibir = [a for a in alunos_para_exibir if not a.get("impresso")]
-
-    # Paginação: 6 carteirinhas por página (mantém)
-    pages = []
-    for i in range(0, len(alunos_para_exibir), 6):
-        pages.append(alunos_para_exibir[i: i + 6])
-
-    total_sem_foto = len(alunos_sem_fotos_list)
-
-    return render_template(
-        "gerar_carteirinhas.html",
-        pages=pages,
-        alunos_sem_foto=alunos_sem_fotos_list,
-        total_sem_foto=total_sem_foto,
-        somente_com_foto=somente_com_foto,
-        somente_nao_impressas=somente_nao_impressas,  # <<< NOVO (se quiser mostrar no template)
-        ano=ano,                                      # <<< NOVO (útil p/ log por ano)
-    )
-
-
-# ==========================================================
 #  (NECESSÁRIO) CARTEIRINHAS – MARCAR COMO IMPRESSAS
 #  -> seu JS chama isso depois de imprimir (ou ao clicar em "Imprimir")
 # ==========================================================
-
-# OBS: se você já tem login_required, mantenha aqui também
-# @login_required
-def _normalize_rms(rms):
-    out = []
-    for x in (rms or []):
-        try:
-            v = int(str(x).strip())
-            if v > 0:
-                out.append(v)
-        except Exception:
-            pass
-    # unique preservando ordem
-    return list(dict.fromkeys(out))
-
 
 # Se você usa CSRFProtect (Flask-WTF), descomente a linha do csrf.exempt
 # from flask_wtf.csrf import CSRFProtect
@@ -406,22 +273,10 @@ def _normalize_rms(rms):
 # @csrf.exempt  # use isto se CSRF estiver bloqueando POST JSON
 def marcar_carteirinhas_impressas():
     payload = request.get_json(silent=True) or {}
-    rms = _normalize_rms(payload.get("rms", []))
-    ano = int(payload.get("ano") or datetime.now().year)
-
-    # REGRA-CHAVE: só marca como "impressa" se tiver foto de verdade
-    rms = [rm for rm in rms if student_has_photo(rm)]
-
-    added, total_printed = _mark_printed_rms(ano, rms)
-
-    return jsonify({
-        "ok": True,
-        "ano": ano,
-        "received": len(_normalize_rms(payload.get("rms", []))),  # recebido bruto
-        "considered_with_photo": len(rms),                        # após filtro foto
-        "added": added,
-        "total_printed": total_printed,
-    })
+    return jsonify(_mark_carteirinhas_impressas(
+        payload.get("rms", []),
+        ano=payload.get("ano"),
+    ))
 
 
 
@@ -671,13 +526,13 @@ def carteirinhas():
             return redirect(url_for("carteirinhas"))
 
         flash("Gerando carteirinhas. Aguarde...", "info")
-        html_result = gerar_html_carteirinhas(
+        context = build_carteirinhas_context(
             file_path,
             somente_com_foto=somente_com_foto,
             somente_nao_impressas=somente_nao_impressas,  # NOVO
             ano=datetime.now().year,                      # NOVO (para log por ano)
         )
-        return html_result
+        return render_template("gerar_carteirinhas.html", **context)
 
     # GET: passa o estado atual dos filtros para o template marcar os checkbox
     somente_com_foto = session.get("carteirinhas_somente_com_foto", False)

@@ -1,0 +1,579 @@
+/* Estilos da tela de carteirinhas. Extraido de templates/gerar_carteirinhas.html. */
+    @page {
+      size: A4 portrait;
+      margin: 0.6cm;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      margin: 0;
+      padding: 10px;
+      background-color: #f4f6f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ===== Spinner (sem depender de Bootstrap) ===== */
+    .spinner-border {
+      width: 1cm;
+      height: 1cm;
+      border: 0.14cm solid rgba(255,255,255,0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spinner-spin 0.9s linear infinite;
+      display: inline-block;
+      margin-bottom: 0.2cm;
+    }
+    @keyframes spinner-spin { to { transform: rotate(360deg); } }
+    .sr-only { display: none; }
+
+    #search-container { margin-top: 10px; }
+
+    #localizarAluno {
+      padding: 0.25cm;
+      font-size: 0.32cm;
+      width: 4.5cm;
+      border-radius: 0.25cm;
+      border: 0.05cm solid #b0bec5;
+    }
+
+    .carteirinhas-container {
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .page {
+      margin-bottom: 30px;
+      position: relative;
+    }
+
+    .page-number {
+      text-align: center;
+      font-size: 0.32cm;
+      font-weight: 600;
+      color: #455a64;
+      margin-bottom: 0.25cm;
+    }
+
+    /* ===== GRID ===== */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr); /* 2 por linha */
+      gap: 0.4cm; /* padrão na tela */
+      justify-items: center;
+    }
+
+    .borda-pontilhada {
+      border: 0.05cm dotted #b0bec5;
+      padding: 0.18cm;
+      position: relative;
+      border-radius: 0.35cm;
+      background-color: #ffffff;
+    }
+
+    .borda-pontilhada::after {
+      content: "✂️";
+      position: absolute;
+      top: -0.35cm;
+      right: -0.30cm;
+      font-size: 0.3cm;
+      color: #1976d2;
+    }
+
+    .carteirinha {
+      background-color: #ffffff;
+      border-radius: 0.4cm;
+      box-shadow: 0 0.1cm 0.25cm rgba(0,0,0,0.15);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      width: 11cm;
+      min-height: 8.0cm;
+      position: relative;
+      border: 0.06cm solid #1976d2;
+    }
+
+    /* FAIXA SUPERIOR DA ESCOLA */
+    .card-header-band {
+      position: relative;
+      height: 1.2cm;
+      background: linear-gradient(90deg, #283E51, #4B79A1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 0.4cm;
+      letter-spacing: 0.08cm;
+      text-transform: uppercase;
+    }
+
+    .card-body {
+      display: flex;
+      flex: 1;
+      padding: 0.7cm 0.55cm 0.6cm 0.55cm;
+      box-sizing: border-box;
+      align-items: stretch;
+      gap: 0.4cm;
+    }
+
+    /* FOTO */
+    .photo-wrapper {
+      width: 3.4cm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .foto {
+      width: 3.0cm;
+      height: 3.9cm;
+      border-radius: 0.4cm;
+      object-fit: cover;
+      border: 0.08cm solid #1976d2;
+      cursor: pointer;
+      background-color: #eceff1;
+    }
+
+    /* CARD DE INFORMAÇÕES */
+    .info-panel {
+      flex: 1;
+      background-color: #ffffff;
+      border-radius: 0.3cm;
+      padding: 0.3cm 0.4cm;
+      box-shadow: inset 0 0 0 0.02cm #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+
+    .info-name {
+      margin-bottom: 0.14cm;
+      border-bottom: 0.02cm solid #e0e0e0;
+      padding-bottom: 0.1cm;
+    }
+
+    .info-name-label {
+      font-size: 0.26cm;
+      font-weight: 700;
+      color: #1565c0;
+      letter-spacing: 0.04cm;
+      text-transform: uppercase;
+    }
+
+    .info-name-text {
+      font-size: 0.36cm;
+      font-weight: 700;
+      color: #263238;
+      text-transform: uppercase;
+      line-height: 1.15;
+    }
+
+    .info-row {
+      display: flex;
+      font-size: 0.30cm;
+      margin: 0.05cm 0;
+      padding: 0.04cm 0;
+      align-items: baseline;
+    }
+
+    .info-row + .info-row { border-top: 0.02cm solid #eef1f3; }
+
+    .info-label {
+      font-weight: 700;
+      color: #1565c0;
+      min-width: 2.2cm;
+      text-transform: uppercase;
+    }
+
+    .info-value {
+      flex: 1;
+      color: #37474f;
+      padding-left: 0.12cm;
+      word-wrap: break-word;
+    }
+
+    /* RODAPÉ DA CARTEIRINHA */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 0.7cm 0.5cm 0.7cm;
+      box-sizing: border-box;
+      gap: 0.3cm;
+    }
+
+    .status {
+      flex: 1;
+      padding: 0.24cm 0.45cm;
+      font-weight: 700;
+      border-radius: 999px;
+      color: #ffffff;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      letter-spacing: 0.06cm;
+      font-size: 0.30cm;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.35);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      white-space: nowrap;
+    }
+
+    .status span.icon {
+      font-size: 0.34cm;
+      margin-right: 0.14cm;
+    }
+
+    .status.verde {
+      background-color: #1B5E20;
+      border: 0.03cm solid #2E7D32;
+    }
+
+    .status.vermelho {
+      background-color: #B71C1C;
+      border: 0.03cm solid #D32F2F;
+    }
+
+    .year-pill {
+      font-weight: 700;
+      font-size: 0.38cm;
+      letter-spacing: 0.12cm;
+      color: #1565c0;
+      text-align: right;
+      min-width: 2.0cm;
+    }
+
+    #loading-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    #cards-success {
+      display: none;
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #d4edda;
+      color: #155724;
+      padding: 0.2cm;
+      border-radius: 0.2cm;
+      z-index: 10000;
+      box-shadow: 0 0.05cm 0.15cm rgba(0,0,0,0.3);
+    }
+
+    .no-print { }
+
+    /* ====== Impressão: MAIS ESPAÇO VERTICAL ENTRE AS LINHAS, SEM QUEBRAR 6 POR PÁGINA ====== */
+    @media print {
+      .no-print { display: none !important; }
+
+      body {
+        margin: 0;
+        padding: 0.12cm;
+        font-size: 16px;
+        background-color: #ffffff !important;
+      }
+
+      .page { page-break-after: always; margin-bottom: 0 !important; }
+
+      .page-number {
+        font-size: 0.26cm;
+        margin-bottom: 0.08cm;
+      }
+
+      .cards-grid {
+        gap: 0.92cm 0.75cm; /* vertical horizontal */
+      }
+
+      .borda-pontilhada { padding: 0.16cm; }
+
+      .carteirinha {
+        width: 10.35cm;
+        min-height: 7.65cm;
+      }
+
+      .card-header-band {
+        height: 1.12cm;
+        font-size: 0.38cm;
+      }
+
+      .card-body {
+        padding: 0.53cm 0.45cm 0.43cm 0.45cm;
+        gap: 0.32cm;
+      }
+
+      .photo-wrapper { width: 3.2cm; }
+
+      .foto {
+        width: 2.85cm;
+        height: 3.65cm;
+        border-width: 0.07cm;
+      }
+
+      .info-name-label { font-size: 0.25cm; }
+      .info-name-text  { font-size: 0.34cm; }
+      .info-row        { font-size: 0.29cm; }
+
+      .card-footer { padding: 0 0.55cm 0.38cm 0.55cm; }
+
+      .status { font-size: 0.29cm; padding: 0.22cm 0.42cm; }
+      .year-pill { font-size: 0.36cm; }
+
+      .carteirinha,
+      .status,
+      .card-header-band,
+      .year-pill {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      #relatorio-container { display: none !important; }
+    }
+
+    .imprimir-carteirinhas {
+      position: fixed;
+      bottom: 0.5cm;
+      right: 0.5cm;
+      background-color: #1976d2;
+      color: #fff;
+      padding: 0.2cm 0.5cm;
+      font-size: 0.3cm;
+      border-radius: 0.25cm;
+      cursor: pointer;
+      box-shadow: 0 0.1cm 0.2cm rgba(0,0,0,0.3);
+      border: none;
+    }
+    .imprimir-carteirinhas:hover { background-color: #0d47a1; }
+
+    .imprimir-pagina {
+      background-color: #ff5722;
+      color: #fff;
+      padding: 0.2cm 0.4cm;
+      font-size: 0.3cm;
+      border-radius: 0.25cm;
+      cursor: pointer;
+      margin: 0.2cm auto;
+      display: block;
+      border: none;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.25);
+    }
+    .imprimir-pagina:hover { background-color: #e64a19; }
+
+    .alunos-sem-fotos-btn {
+      background-color: #4B79A1;
+      color: #fff;
+      border: none;
+      padding: 0.2cm 0.5cm;
+      font-size: 0.3cm;
+      border-radius: 0.25cm;
+      cursor: pointer;
+      margin-bottom: 0.2cm;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.2);
+    }
+    .alunos-sem-fotos-btn:hover { background-color: #3a5d78; }
+
+    /* ====== Filtros (server-side) ====== */
+    .filtro-foto-form {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25cm;
+      margin-bottom: 0.2cm;
+      background: #ffffff;
+      border: 1px solid #cfd8dc;
+      padding: 0.18cm 0.28cm;
+      border-radius: 999px;
+      box-shadow: 0 0.05cm 0.15cm rgba(0,0,0,0.10);
+      flex-wrap: wrap;
+    }
+    .filtro-foto-form label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.18cm;
+      font-size: 0.30cm;
+      font-weight: 700;
+      color: #37474f;
+      cursor: pointer;
+      user-select: none;
+      text-transform: uppercase;
+      letter-spacing: 0.03cm;
+    }
+    .filtro-foto-form input[type="checkbox"] {
+      width: 0.42cm;
+      height: 0.42cm;
+      accent-color: #1976d2;
+      cursor: pointer;
+    }
+    .filtro-foto-pill {
+      font-size: 0.28cm;
+      font-weight: 700;
+      color: #1565c0;
+      white-space: nowrap;
+    }
+
+    /* ====== RELATÓRIO ALUNOS SEM FOTO (MODAL) ====== */
+    #relatorio-container {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+
+    #relatorio-container .relatorio-inner {
+      background: #f5f7fa;
+      border-radius: 0.4cm;
+      max-width: 24cm;
+      width: 100%;
+      max-height: 85vh;
+      box-shadow: 0 0.15cm 0.4cm rgba(0,0,0,0.35);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #cfd8dc;
+      position: relative;
+    }
+
+    .relatorio-header {
+      background: linear-gradient(90deg, #283E51, #4B79A1);
+      padding: 0.4cm 0.6cm;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4cm;
+    }
+
+    .relatorio-title-area h2 {
+      margin: 0;
+      font-size: 0.42cm;
+      letter-spacing: 0.08cm;
+      text-transform: uppercase;
+    }
+
+    .badge-pendentes {
+      display: inline-block;
+      margin-top: 0.08cm;
+      padding: 0.12cm 0.35cm;
+      border-radius: 999px;
+      background-color: rgba(255,255,255,0.15);
+      font-size: 0.28cm;
+    }
+
+    #filtro-relatorio {
+      border-radius: 999px;
+      border: none;
+      padding: 0.2cm 0.5cm;
+      font-size: 0.28cm;
+      width: 7cm;
+      outline: none;
+    }
+
+    #relatorio-container button.close-relatorio {
+      position: absolute;
+      top: 0.25cm;
+      right: 0.35cm;
+      border: none;
+      background: transparent;
+      color: #ffffff;
+      font-size: 0.45cm;
+      cursor: pointer;
+    }
+
+    .relatorio-tabela-wrapper {
+      padding: 0.3cm 0.6cm 0.45cm 0.6cm;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .relatorio-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.30cm;
+    }
+
+    .relatorio-table thead th {
+      text-align: left;
+      padding: 0.18cm 0.15cm;
+      color: #607d8b;
+      font-weight: 700;
+      border-bottom: 0.03cm solid #cfd8dc;
+      font-size: 0.29cm;
+    }
+
+    .relatorio-table tbody td {
+      padding: 0.16cm 0.15cm;
+      vertical-align: middle;
+      border-bottom: 0.02cm solid #eceff1;
+    }
+
+    .relatorio-table tbody tr.relatorio-row:nth-child(even) { background-color: #f3f6f9; }
+
+    .serie-divider td {
+      padding: 0.18cm 0.15cm;
+      font-weight: 700;
+      color: #455a64;
+      background-color: #e3f2fd;
+      border-bottom: 0.03cm solid #bbdefb;
+      text-transform: uppercase;
+      letter-spacing: 0.04cm;
+      font-size: 0.29cm;
+    }
+
+    .badge-status {
+      display: inline-block;
+      padding: 0.06cm 0.25cm;
+      border-radius: 999px;
+      font-size: 0.26cm;
+    }
+
+    .badge-status.pendente {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+
+    .relatorio-acoes { width: 4cm; }
+
+    .relatorio-acao-link,
+    .relatorio-acao-primary {
+      display: block;
+      width: 100%;
+      border-radius: 0.3cm;
+      border: none;
+      cursor: pointer;
+      font-size: 0.28cm;
+      padding: 0.12cm 0.25cm;
+      margin-bottom: 0.08cm;
+      text-align: center;
+    }
+
+    .relatorio-acao-link {
+      background: #eceff1;
+      color: #37474f;
+    }
+
+    .relatorio-acao-primary {
+      background: #1976d2;
+      color: #ffffff;
+    }
+
+    .relatorio-acao-link i,
+    .relatorio-acao-primary i { margin-right: 0.1cm; }
+
+    .card-highlight {
+      box-shadow: 0 0 0 0.15cm rgba(255, 193, 7, 0.9) !important;
+      transition: box-shadow 0.3s ease-in-out;
+    }

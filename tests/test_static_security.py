@@ -69,6 +69,19 @@ class StaticSecurityTests(unittest.TestCase):
         self.assertNotIn("{{", js)
         self.assertNotIn("{%", js)
 
+    def test_carteirinhas_assets_are_externalized(self):
+        template = read_text("templates/gerar_carteirinhas.html")
+        js = read_text("static/js/carteirinhas.js")
+
+        self.assertNotIn("<style>", template)
+        self.assertNotIn("<script>\n", template)
+        self.assertIn("css/carteirinhas.css", template)
+        self.assertIn("js/carteirinhas.js", template)
+        self.assertTrue((ROOT / "static" / "css" / "carteirinhas.css").exists())
+        self.assertTrue((ROOT / "static" / "js" / "carteirinhas.js").exists())
+        self.assertNotIn("{{", js)
+        self.assertNotIn("{%", js)
+
 
 if __name__ == "__main__":
     unittest.main()
