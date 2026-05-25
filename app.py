@@ -29,6 +29,21 @@ from services.carteirinhas_log import (
     get_printed_set as _get_printed_set,
     mark_printed_rms as _mark_printed_rms,
 )
+from services.declaracoes import (
+    DECLARACAO_PRINT_CSS,
+    build_notas_tabela_html,
+    contexto_segmento,
+    data_extenso_praia_grande,
+    format_date_br,
+    format_eja_rm,
+    format_rm,
+    format_serie_ano,
+    get_str as _decl_get_str,
+    normalizar_segmento_personalizado,
+    normalizar_semestre,
+    normalizar_tipo_declaracao,
+    parse_data_nascimento_personalizada,
+)
 from services.fotos import get_student_photo_url, save_student_photo, student_has_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
 from services.quadros_atendimento import (
@@ -459,18 +474,9 @@ def gerar_declaracao_escolar(
         planilha = pd.read_excel(effective_path, sheet_name="LISTA CORRIDA")
         planilha.columns = [c.strip().upper() for c in planilha.columns]
 
-        def format_rm(x):
-            try:
-                return str(int(float(x)))
-            except Exception:
-                return str(x)
-
         planilha["RM_str"] = planilha["RM"].apply(format_rm)
 
-        try:
-            rm_num = str(int(float(rm)))
-        except Exception:
-            rm_num = str(rm)
+        rm_num = format_rm(rm)
 
         aluno = planilha[planilha["RM_str"] == rm_num]
         if aluno.empty:
@@ -484,7 +490,7 @@ def gerar_declaracao_escolar(
 
         if isinstance(serie, str):
             # transforma "5ºA" em "5º ano A"
-            serie = re.sub(r"(\d+º)([A-Za-z])", r"\1 ano \2", serie)
+            serie = format_serie_ano(serie)
 
         data_nasc = row["DATA NASC."]
         ra = row["RA"]
@@ -497,135 +503,20 @@ def gerar_declaracao_escolar(
 
         ra_label = "RA"
 
-        if pd.notna(data_nasc):
-            try:
-                data_nasc = pd.to_datetime(data_nasc, errors="coerce")
-                if pd.notna(data_nasc):
-                    data_nasc = data_nasc.strftime("%d/%m/%Y")
-                else:
-                    data_nasc = "Desconhecida"
-            except Exception:
-                data_nasc = "Desconhecida"
-        else:
-            data_nasc = "Desconhecida"
+        data_nasc = format_date_br(data_nasc)
 
         # --------------------------------------------------
         # NOVO: busca as notas na aba NOTAS (apenas Transferência/Fundamental)
         # --------------------------------------------------
         if tipo == "Transferencia":
-            try:
-                notas_df = pd.read_excel(effective_path, sheet_name="NOTAS")
-                notas_df.columns = [str(c).strip().upper() for c in notas_df.columns]
-
-                # Descobre a coluna de RM (idealmente é "RM")
-                rm_col = None
-                for c in notas_df.columns:
-                    if str(c).strip().upper() == "RM":
-                        rm_col = c
-                        break
-                if rm_col is None and len(notas_df.columns) >= 3:
-                    # fallback: coluna C (índice 2)
-                    rm_col = notas_df.columns[2]
-
-                if rm_col is not None:
-                    notas_df["RM_str"] = notas_df[rm_col].apply(format_rm)
-                    notas_aluno = notas_df[notas_df["RM_str"] == rm_num]
-
-                    if not notas_aluno.empty:
-                        notas_row = notas_aluno.iloc[0]
-
-                        # devolve (texto, cor) – <5 vermelho, >=5 azul, SEMPRE com 2 casas decimais
-                        def _fmt_nota(v):
-                            if pd.isna(v):
-                                return "—", None
-                            s = str(v).strip()
-                            if s == "":
-                                return "—", None
-                            try:
-                                f = float(s.replace(",", "."))
-                            except Exception:
-                                # não conseguiu converter em número → sem cor especial
-                                return s, None
-
-                            # define cor
-                            cor = "red" if f < 5 else "blue"
-
-                            # formata SEMPRE com 2 casas decimais
-                            texto = f"{f:.2f}".replace(".", ",")
-
-                            return texto, cor
-
-                        materias = [
-                            ("Língua Portuguesa", "LP_1T", "LP_2T", "LP_3T"),
-                            ("História", "HIST_1T", "HIST_2T", "HIST_3T"),
-                            ("Geografia", "GEO_1T", "GEO_2T", "GEO_3T"),
-                            ("Matemática", "MAT_1T", "MAT_2T", "MAT_3T"),
-                            ("Ciências", "CIEN_1T", "CIEN_2T", "CIEN_3T"),
-                            ("Educação Física", "EDFIS_1T", "EDFIS_2T", "EDFIS_3T"),
-                            ("Arte", "ARTE_1T", "ARTE_2T", "ARTE_3T"),
-                        ]
-
-                        linhas_notas = ""
-
-                        for nome_disc, c1, c2, c3 in materias:
-                            n1_txt, n1_cor = _fmt_nota(notas_row.get(c1))
-                            n2_txt, n2_cor = _fmt_nota(notas_row.get(c2))
-                            n3_txt, n3_cor = _fmt_nota(notas_row.get(c3))
-
-                            style_n1 = "border:1px solid #444;padding:3px 6px;text-align:center;"
-                            style_n2 = "border:1px solid #444;padding:3px 6px;text-align:center;"
-                            style_n3 = "border:1px solid #444;padding:3px 6px;text-align:center;"
-
-                            if n1_cor:
-                                style_n1 += f"color:{n1_cor};"
-                            if n2_cor:
-                                style_n2 += f"color:{n2_cor};"
-                            if n3_cor:
-                                style_n3 += f"color:{n3_cor};"
-
-                            linhas_notas += (
-                                "<tr>"
-                                f"<td style='border:1px solid #444;padding:3px 6px;text-align:left;'>{nome_disc}</td>"
-                                f"<td style='{style_n1}'>{n1_txt}</td>"
-                                f"<td style='{style_n2}'>{n2_txt}</td>"
-                                f"<td style='{style_n3}'>{n3_txt}</td>"
-                                "</tr>"
-                            )
-
-                        if linhas_notas:
-                            notas_tabela_html = (
-                                "<br>"
-                                "<span style='font-size:12px;'>"
-                                "<strong>As notas do aluno, por componente curricular, são:</strong>"
-                                "</span>"
-                                "<br>"
-                                "<table style='width:85%;max-width:700px;margin:4px auto 0 auto;"
-                                "border-collapse:collapse;font-size:11px;'>"
-                                "<thead>"
-                                "<tr>"
-                                "<th style='border:1px solid #444;padding:3px 6px;text-align:left;'>Componente curricular</th>"
-                                "<th style='border:1px solid #444;padding:3px 6px;text-align:center;'>1º trim.</th>"
-                                "<th style='border:1px solid #444;padding:3px 6px;text-align:center;'>2º trim.</th>"
-                                "<th style='border:1px solid #444;padding:3px 6px;text-align:center;'>3º trim.</th>"
-                                "</tr>"
-                                "</thead>"
-                                "<tbody>"
-                                f"{linhas_notas}"
-                                "</tbody>"
-                                "</table>"
-                            )
-            except Exception as e:
-                print(f"[ERRO] Falha ao carregar notas do aluno (Transferência Fundamental): {e}")
-                notas_tabela_html = ""
+            notas_tabela_html = build_notas_tabela_html(effective_path, rm_num)
     else:
         # ---------- EJA ----------
         df = pd.read_excel(effective_path, sheet_name=0, header=None, skiprows=1)
         df.columns = [str(c).strip().upper() for c in df.columns]
 
         # RM (coluna 2)
-        df["RM_str"] = df.iloc[:, 2].apply(
-            lambda x: str(int(x)) if pd.notna(x) and float(x) != 0 else ""
-        )
+        df["RM_str"] = df.iloc[:, 2].apply(format_eja_rm)
         # Nome (coluna 3)
         df["NOME"] = df.iloc[:, 3]
         # Nascimento (coluna 6)
@@ -645,10 +536,7 @@ def gerar_declaracao_escolar(
         # Série (coluna 0)
         df["SÉRIE"] = df.iloc[:, 0]
 
-        try:
-            rm_num = str(int(float(rm)))
-        except Exception:
-            rm_num = str(rm)
+        rm_num = format_rm(rm)
 
         aluno = df[df["RM_str"] == rm_num]
         if aluno.empty:
@@ -666,7 +554,7 @@ def gerar_declaracao_escolar(
         nome = row["NOME"]
         serie = row["SÉRIE"]
         if isinstance(serie, str):
-            serie = re.sub(r"(\d+º)([A-Za-z])", r"\1 ano \2", serie)
+            serie = format_serie_ano(serie)
 
         data_nasc = row["NASC."]
         ra = row["RA"]
@@ -680,52 +568,13 @@ def gerar_declaracao_escolar(
         else:
             ra_label = "RA"
 
-        if pd.notna(data_nasc):
-            try:
-                data_nasc = pd.to_datetime(data_nasc, errors="coerce")
-                data_nasc = (
-                    data_nasc.strftime("%d/%m/%Y") if pd.notna(data_nasc) else "Desconhecida"
-                )
-            except Exception:
-                data_nasc = "Desconhecida"
-        else:
-            data_nasc = "Desconhecida"
+        data_nasc = format_date_br(data_nasc)
 
     # ------------------------------------------------------
     # 2) DATA POR EXTENSO
     # ------------------------------------------------------
-    now = datetime.now()
-    meses = {
-        1: "janeiro",
-        2: "fevereiro",
-        3: "março",
-        4: "abril",
-        5: "maio",
-        6: "junho",
-        7: "julho",
-        8: "agosto",
-        9: "setembro",
-        10: "outubro",
-        11: "novembro",
-        12: "dezembro",
-    }
-    mes_nome = meses[now.month].capitalize()
-    data_extenso_str = f"Praia Grande, {now.day:02d} de {mes_nome} de {now.year}"
-
-    additional_css = """
-.print-button {
-  background-color: #283E51;
-  color: #fff;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-top: 20px;
-}
-.print-button:hover {
-  background-color: #1d2d3a;
-}
-"""
+    data_extenso_str = data_extenso_praia_grande()
+    additional_css = DECLARACAO_PRINT_CSS
 
     # ------------------------------------------------------
     # 3) MONTAGEM DO TEXTO DA DECLARAÇÃO
@@ -1113,12 +962,6 @@ def gerar_lote_escolaridade_5ano(file_path, file_path2=None):
     planilha = pd.read_excel(effective_path, sheet_name="LISTA CORRIDA")
     planilha.columns = [c.strip().upper() for c in planilha.columns]
 
-    def format_rm(x):
-        try:
-            return str(int(float(x)))
-        except Exception:
-            return str(x)
-
     planilha["RM_str"] = planilha["RM"].apply(format_rm)
 
     registros = []
@@ -1139,18 +982,7 @@ def gerar_lote_escolaridade_5ano(file_path, file_path2=None):
         ra = str(row.get("RA", "")).strip()
 
         data_nasc_val = row.get("DATA NASC.")
-        if pd.notna(data_nasc_val):
-            try:
-                data_nasc_dt = pd.to_datetime(data_nasc_val, errors="coerce")
-                data_nasc = (
-                    data_nasc_dt.strftime("%d/%m/%Y")
-                    if pd.notna(data_nasc_dt)
-                    else "Desconhecida"
-                )
-            except Exception:
-                data_nasc = "Desconhecida"
-        else:
-            data_nasc = "Desconhecida"
+        data_nasc = format_date_br(data_nasc_val)
 
         horario = str(row.get("HORÁRIO", "")).strip()
         if not horario:
@@ -1158,7 +990,7 @@ def gerar_lote_escolaridade_5ano(file_path, file_path2=None):
 
         serie_fmt = serie_raw
         try:
-            serie_fmt = re.sub(r"(\d+º)\s*([A-Za-z])", r"\1 ano \2", serie_fmt)
+            serie_fmt = format_serie_ano(serie_fmt)
         except Exception:
             pass
 
@@ -1184,23 +1016,7 @@ def gerar_lote_escolaridade_5ano(file_path, file_path2=None):
             }
         )
 
-    now = datetime.now()
-    meses = {
-        1: "janeiro",
-        2: "fevereiro",
-        3: "março",
-        4: "abril",
-        5: "maio",
-        6: "junho",
-        7: "julho",
-        8: "agosto",
-        9: "setembro",
-        10: "outubro",
-        11: "novembro",
-        12: "dezembro",
-    }
-    mes_nome = meses[now.month].capitalize()
-    data_extenso_str = f"Praia Grande, {now.day:02d} de {mes_nome} de {now.year}"
+    data_extenso_str = data_extenso_praia_grande()
     titulo = "Declaração de Escolaridade"
 
     return registros, data_extenso_str, titulo
@@ -1216,57 +1032,20 @@ def gerar_declaracao_personalizada(dados):
     ou Não Comparecimento - NCOM).
     """
 
-    def _get_str(key, default=""):
-        return (dados.get(key) or default).strip()
-
-    def _normalizar_semestre(*keys):
-        for k in keys:
-            v = dados.get(k)
-            if v is None:
-                continue
-            s = str(v).strip()
-            if s:
-                return s
-        return ""
-
-    nome = _get_str("nome_aluno")
-    ra = _get_str("ra")
-    data_nasc_raw = _get_str("data_nascimento")
-
-    seg_raw = dados.get("segmento") or dados.get("segmento_personalizado") or "Fundamental"
-    seg_norm = str(seg_raw).strip().lower()
-    if seg_norm in ("fundamental", "fund", "ef", "ensino fundamental"):
-        segmento = "Fundamental"
-    else:
-        segmento = "EJA"
-
-    data_nasc = "Desconhecida"
-    if data_nasc_raw:
-        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-            try:
-                dt = datetime.strptime(data_nasc_raw, fmt)
-                data_nasc = dt.strftime("%d/%m/%Y")
-                break
-            except Exception:
-                continue
-
-    if segmento == "Fundamental":
-        segmento_label = "Ensino Fundamental"
-        prep_segmento = "do"
-    else:
-        segmento_label = "Educação de Jovens e Adultos (EJA)"
-        prep_segmento = "da"
-
-    tipo_decl_raw = dados.get("tipo_declaracao") or dados.get("tipo_declaracao_personalizada")
-    tipo_decl = (tipo_decl_raw or "").strip().lower()
+    nome = _decl_get_str(dados, "nome_aluno")
+    ra = _decl_get_str(dados, "ra")
+    data_nasc = parse_data_nascimento_personalizada(_decl_get_str(dados, "data_nascimento"))
+    segmento = normalizar_segmento_personalizado(dados)
+    segmento_label, prep_segmento = contexto_segmento(segmento)
+    tipo_decl = normalizar_tipo_declaracao(dados)
 
     declaracao_text = ""
     titulo = ""
 
     if tipo_decl in ("conclusao", "conclusão"):
         titulo = "Declaração de Conclusão"
-        ano_serie = _get_str("ano_serie_concluida")
-        ano_conclusao = _get_str("ano_conclusao")
+        ano_serie = _decl_get_str(dados, "ano_serie_concluida")
+        ano_conclusao = _decl_get_str(dados, "ano_conclusao")
 
         deve_hist_val_raw = dados.get("deve_historico_unidade")
         deve_hist_str = str(deve_hist_val_raw or "").strip().lower()
@@ -1283,7 +1062,8 @@ def gerar_declaracao_personalizada(dados):
                 f"<strong><u>{ano_conclusao}</u></strong>, nesta unidade escolar."
             )
         else:
-            semestre_conclusao = _normalizar_semestre(
+            semestre_conclusao = normalizar_semestre(
+                dados,
                 "semestre_conclusao",
                 "semestre_conclusao_opcao",
                 "semestre_matricula",
@@ -1318,9 +1098,10 @@ def gerar_declaracao_personalizada(dados):
 
     elif tipo_decl in ("matriculacancelada", "matricula cancelada", "matricula_cancelada"):
         titulo = "Declaração de Matrícula Cancelada"
-        ano_serie = _get_str("ano_serie_matricula")
-        ano_matricula = _get_str("ano_matricula")
-        semestre_matricula = _normalizar_semestre(
+        ano_serie = _decl_get_str(dados, "ano_serie_matricula")
+        ano_matricula = _decl_get_str(dados, "ano_matricula")
+        semestre_matricula = normalizar_semestre(
+            dados,
             "semestre_matricula",
             "semestre_matricula_opcao",
         )
@@ -1358,9 +1139,10 @@ def gerar_declaracao_personalizada(dados):
 
     elif tipo_decl == "ncom":
         titulo = "Declaração de Não Comparecimento (NCOM)"
-        ano_serie = _get_str("ano_serie_vaga")
-        ano_ref = _get_str("ano_referencia_ncom")
-        semestre_ref = _normalizar_semestre(
+        ano_serie = _decl_get_str(dados, "ano_serie_vaga")
+        ano_ref = _decl_get_str(dados, "ano_referencia_ncom")
+        semestre_ref = normalizar_semestre(
+            dados,
             "semestre_referencia_ncom",
             "semestre_referencia",
         )
@@ -1404,38 +1186,8 @@ def gerar_declaracao_personalizada(dados):
     else:
         return None
 
-    now = datetime.now()
-    meses = {
-        1: "janeiro",
-        2: "fevereiro",
-        3: "março",
-        4: "abril",
-        5: "maio",
-        6: "junho",
-        7: "julho",
-        8: "agosto",
-        9: "setembro",
-        10: "outubro",
-        11: "novembro",
-        12: "dezembro",
-    }
-    mes = meses[now.month].capitalize()
-    data_extenso_str = f"Praia Grande, {now.day:02d} de {mes} de {now.year}"
-
-    additional_css = """
-.print-button {
-  background-color: #283E51;
-  color: #fff;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-top: 20px;
-}
-.print-button:hover {
-  background-color: #1d2d3a;
-}
-"""
+    data_extenso_str = data_extenso_praia_grande()
+    additional_css = DECLARACAO_PRINT_CSS
 
     return render_template(
         "declaracao_print.html",
@@ -1635,12 +1387,6 @@ def declaracao_conclusao_5ano():
     planilha = pd.read_excel(file_path, sheet_name="LISTA CORRIDA")
     planilha.columns = [c.strip().upper() for c in planilha.columns]
 
-    def format_rm(x):
-        try:
-            return str(int(float(x)))
-        except Exception:
-            return str(x)
-
     planilha["RM_str"] = planilha["RM"].apply(format_rm)
 
     registros = []
@@ -1661,18 +1407,7 @@ def declaracao_conclusao_5ano():
         ra = str(row.get("RA", "")).strip()
 
         data_nasc_val = row.get("DATA NASC.")
-        if pd.notna(data_nasc_val):
-            try:
-                data_nasc_dt = pd.to_datetime(data_nasc_val, errors="coerce")
-                data_nasc = (
-                    data_nasc_dt.strftime("%d/%m/%Y")
-                    if pd.notna(data_nasc_dt)
-                    else "Desconhecida"
-                )
-            except Exception:
-                data_nasc = "Desconhecida"
-        else:
-            data_nasc = "Desconhecida"
+        data_nasc = format_date_br(data_nasc_val)
 
         horario = str(row.get("HORÁRIO", "")).strip()
         if not horario:
@@ -1680,7 +1415,7 @@ def declaracao_conclusao_5ano():
 
         serie_fmt = serie_raw
         try:
-            serie_fmt = re.sub(r"(\d+º)\s*([A-Za-z])", r"\1 ano \2", serie_fmt)
+            serie_fmt = format_serie_ano(serie_fmt)
         except Exception:
             pass
 
@@ -2095,12 +1830,6 @@ def declaracao_tipo():
 
             planilha = pd.read_excel(file_path, sheet_name="LISTA CORRIDA")
 
-            def format_rm(x):
-                try:
-                    return str(int(float(x)))
-                except Exception:
-                    return str(x)
-
             planilha["RM_str"] = planilha["RM"].apply(format_rm)
             alunos_df = (
                 planilha[planilha["RM_str"] != "0"][["RM_str", "NOME"]].drop_duplicates()
@@ -2120,9 +1849,7 @@ def declaracao_tipo():
             session["declaracao_excel"] = file_path
 
             df = pd.read_excel(file_path, sheet_name=0, header=None, skiprows=1)
-            df["RM_str"] = df.iloc[:, 2].apply(
-                lambda x: str(int(x)) if pd.notna(x) and float(x) != 0 else ""
-            )
+            df["RM_str"] = df.iloc[:, 2].apply(format_eja_rm)
             df["NOME"] = df.iloc[:, 3]
             alunos_df = df[df["RM_str"] != ""][["RM_str", "NOME"]].drop_duplicates()
 

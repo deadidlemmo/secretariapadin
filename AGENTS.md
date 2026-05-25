@@ -61,6 +61,7 @@ Se precisar criar arquivos de teste, use nomes claramente ficticios e remova-os 
 - A Lista Piloto Fundamental geralmente usa a aba `LISTA CORRIDA`.
 - O Quadro de Atendimento Mensal tambem usa a aba `Total de Alunos`.
 - O HTML/CSS final das declaracoes unitarias fica em `templates/declaracao_print.html`; mantenha textos/regras separados do layout quando possivel.
+- Helpers de dados, datas, RM e tabela de notas das declaracoes ficam em `services/declaracoes.py`.
 - Fotos de alunos ficam em `static/fotos/` e sao buscadas por RM.
 - Modelos de quadro sao arquivos Excel em `modelos/`.
 - O sistema calcula prazos usando `modelos/feriados.json` e timezone de Sao Paulo quando disponivel.
