@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -7,6 +8,8 @@ import pandas as pd
 
 from services.declaracoes import (
     build_declaracao_escolar_context,
+    build_lote_conclusao_5ano_context,
+    build_lote_escolaridade_5ano_context,
     build_declaracao_personalizada_context,
     build_notas_tabela_html,
     contexto_segmento,
@@ -15,10 +18,14 @@ from services.declaracoes import (
     format_eja_rm,
     format_rm,
     format_serie_ano,
+    list_declaracao_alunos,
+    load_declaracao_aluno_context,
     normalizar_segmento_personalizado,
     normalizar_semestre,
     normalizar_tipo_declaracao,
     parse_data_nascimento_personalizada,
+    read_lista_corrida_fundamental,
+    read_lista_eja_declaracoes,
 )
 
 
@@ -73,6 +80,159 @@ class DeclaracoesServiceTests(unittest.TestCase):
         self.assertIn("color:red", html)
         self.assertIn("8,00", html)
         self.assertIn("color:blue", html)
+
+    def test_load_declaracao_aluno_context_fundamental_from_lista_corrida(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "lista_fundamental.xlsx")
+            lista = pd.DataFrame(
+                [
+                    {
+                        "RM": 123,
+                        "NOME": "Aluno Fundamental",
+                        "S\u00c9RIE": "5\u00baA",
+                        "DATA NASC.": "2020-01-02",
+                        "RA": "RA123",
+                        "HOR\u00c1RIO": "13h00",
+                        "BOLSA FAMILIA": "NAO",
+                    }
+                ]
+            )
+            notas = pd.DataFrame([{"RM": 123, "LP_1T": 8, "LP_2T": 9, "LP_3T": 10}])
+            with pd.ExcelWriter(path, engine="openpyxl") as writer:
+                lista.to_excel(writer, sheet_name="LISTA CORRIDA", index=False)
+                notas.to_excel(writer, sheet_name="NOTAS", index=False)
+
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", FutureWarning)
+                planilha = read_lista_corrida_fundamental(path)
+                context = load_declaracao_aluno_context(
+                    path,
+                    "123",
+                    "Fundamental",
+                    "Transferencia",
+                )
+                alunos = list_declaracao_alunos(path, "Fundamental")
+
+        future_warnings = [
+            warning for warning in caught if issubclass(warning.category, FutureWarning)
+        ]
+        self.assertEqual(future_warnings, [])
+        self.assertEqual(planilha.iloc[0]["RM_str"], "123")
+        self.assertEqual(context["nome"], "Aluno Fundamental")
+        self.assertEqual(context["serie"], "5\u00ba ano A")
+        self.assertEqual(context["data_nasc"], "02/01/2020")
+        self.assertIn("As notas do aluno", context["notas_tabela_html"])
+        self.assertEqual(alunos, [{"rm": "123", "nome": "Aluno Fundamental"}])
+
+    def test_load_declaracao_aluno_context_eja_from_lista(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "lista_eja.xlsx")
+            ignored_header = [None] * 30
+            aluno = [""] * 30
+            aluno[0] = "8\u00aa S\u00c9RIE E.F"
+            aluno[2] = 456
+            aluno[3] = "Aluno EJA"
+            aluno[6] = "2020-02-03"
+            aluno[7] = 0
+            aluno[8] = "RG456"
+            aluno[29] = "2\u00ba semestre"
+            pd.DataFrame([ignored_header, aluno]).to_excel(
+                path,
+                index=False,
+                header=False,
+            )
+
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", FutureWarning)
+                df = read_lista_eja_declaracoes(path)
+                context = load_declaracao_aluno_context(path, "456", "EJA", "Conclus\u00e3o")
+                alunos = list_declaracao_alunos(path, "EJA")
+
+        future_warnings = [
+            warning for warning in caught if issubclass(warning.category, FutureWarning)
+        ]
+        self.assertEqual(future_warnings, [])
+        self.assertEqual(df.iloc[0]["RM_str"], "456")
+        self.assertEqual(context["nome"], "Aluno EJA")
+        self.assertEqual(context["ra"], "RG456")
+        self.assertEqual(context["ra_label"], "RG")
+        self.assertEqual(context["data_nasc"], "03/02/2020")
+        self.assertEqual(context["semestre_texto"], "2\u00ba semestre")
+        self.assertEqual(alunos, [{"rm": "456", "nome": "Aluno EJA"}])
+
+    def test_build_lote_escolaridade_5ano_context_filters_and_formats(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "lista_fundamental.xlsx")
+            lista = pd.DataFrame(
+                [
+                    {
+                        "RM": 123,
+                        "NOME": "Aluno Quinto",
+                        "S\u00c9RIE": "5\u00baA",
+                        "DATA NASC.": "2020-01-02",
+                        "RA": "RA123",
+                        "HOR\u00c1RIO": "13h00",
+                        "BOLSA FAMILIA": "NAO",
+                    },
+                    {
+                        "RM": 456,
+                        "NOME": "Aluno Quarto",
+                        "S\u00c9RIE": "4\u00baA",
+                        "DATA NASC.": "2020-01-02",
+                        "RA": "RA456",
+                        "HOR\u00c1RIO": "",
+                        "BOLSA FAMILIA": "NAO",
+                    },
+                ]
+            )
+            with pd.ExcelWriter(path, engine="openpyxl") as writer:
+                lista.to_excel(writer, sheet_name="LISTA CORRIDA", index=False)
+
+            context = build_lote_escolaridade_5ano_context(
+                path,
+                now=datetime(2026, 5, 25),
+            )
+
+        self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Escolaridade")
+        self.assertEqual(context["data_extenso"], "Praia Grande, 25 de Maio de 2026")
+        self.assertEqual(len(context["registros"]), 1)
+        registro = context["registros"][0]
+        self.assertEqual(registro["nome"], "Aluno Quinto")
+        self.assertEqual(registro["serie_fmt"], "5\u00ba ano A")
+        self.assertIn("hor\u00e1rio de aula", registro["texto"])
+        self.assertIn("13h00", registro["texto"])
+
+    def test_build_lote_conclusao_5ano_context_duas_vias_and_bolsa_familia(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "lista_fundamental.xlsx")
+            lista = pd.DataFrame(
+                [
+                    {
+                        "RM": 123,
+                        "NOME": "Aluno Conclusao",
+                        "S\u00c9RIE": "5\u00baA",
+                        "DATA NASC.": "2020-01-02",
+                        "RA": "RA123",
+                        "HOR\u00c1RIO": "13h00",
+                        "BOLSA FAMILIA": "SIM",
+                    }
+                ]
+            )
+            with pd.ExcelWriter(path, engine="openpyxl") as writer:
+                lista.to_excel(writer, sheet_name="LISTA CORRIDA", index=False)
+
+            context = build_lote_conclusao_5ano_context(
+                path,
+                "Praia Grande, 22 de dezembro de 2026",
+                bolsa_familia_src="/static/teste.jpg",
+            )
+
+        self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Conclus\u00e3o")
+        self.assertEqual(context["total"], 2)
+        self.assertEqual([registro["via"] for registro in context["registros"]], [1, 2])
+        self.assertEqual(context["registros"][0]["series_text"], "6\u00ba ano")
+        self.assertIn("Bolsa Fam\u00edlia", context["registros"][0]["texto"])
+        self.assertIn('/static/teste.jpg', context["registros"][0]["texto"])
 
     def test_build_declaracao_escolar_context_fundamental_escolaridade(self):
         context = build_declaracao_escolar_context(

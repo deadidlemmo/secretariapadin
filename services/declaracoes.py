@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from numbers import Number
 
 import pandas as pd
 
@@ -76,6 +77,292 @@ def format_serie_ano(value) -> str:
     if isinstance(value, str):
         return re.sub(r"(\d+\u00ba)\s*([A-Za-z])", r"\1 ano \2", value)
     return value
+
+
+def read_lista_corrida_fundamental(file_path):
+    planilha = pd.read_excel(file_path, sheet_name="LISTA CORRIDA").copy()
+    planilha.columns = [str(column).strip().upper() for column in planilha.columns]
+    planilha.loc[:, "RM_str"] = planilha["RM"].apply(format_rm)
+    return planilha
+
+
+def _get_eja_ra(row):
+    try:
+        value = row.iloc[7]
+        if pd.isna(value) or float(value) == 0:
+            return row.iloc[8]
+        return value
+    except Exception:
+        return row.iloc[7]
+
+
+def read_lista_eja_declaracoes(file_path):
+    df = pd.read_excel(file_path, sheet_name=0, header=None, skiprows=1).copy()
+    df.columns = [str(column).strip().upper() for column in df.columns]
+    df.loc[:, "RM_str"] = df.iloc[:, 2].apply(format_eja_rm)
+    df.loc[:, "NOME"] = df.iloc[:, 3]
+    df.loc[:, "NASC."] = df.iloc[:, 6]
+    df.loc[:, "RA"] = df.apply(_get_eja_ra, axis=1)
+    df.loc[:, "S\u00c9RIE"] = df.iloc[:, 0]
+    return df
+
+
+def list_declaracao_alunos(file_path, segmento):
+    if segmento == "EJA":
+        df = read_lista_eja_declaracoes(file_path)
+        alunos_df = df.loc[df["RM_str"] != "", ["RM_str", "NOME"]].drop_duplicates()
+    else:
+        df = read_lista_corrida_fundamental(file_path)
+        alunos_df = df.loc[df["RM_str"] != "0", ["RM_str", "NOME"]].drop_duplicates()
+
+    return [
+        {"rm": row["RM_str"], "nome": row["NOME"]}
+        for _, row in alunos_df.iterrows()
+    ]
+
+
+def load_declaracao_aluno_context(file_path, rm, segmento, tipo):
+    rm_num = format_rm(rm)
+
+    if segmento != "EJA":
+        planilha = read_lista_corrida_fundamental(file_path)
+        aluno = planilha.loc[planilha["RM_str"] == rm_num]
+        if aluno.empty:
+            return None
+
+        row = aluno.iloc[0]
+        serie = row["S\u00c9RIE"]
+        if isinstance(serie, str):
+            serie = format_serie_ano(serie)
+
+        horario = row.get("HOR\u00c1RIO", "Desconhecido")
+        if pd.isna(horario) or not str(horario).strip():
+            horario = "Desconhecido"
+        else:
+            horario = str(horario).strip()
+
+        notas_tabela_html = ""
+        if tipo == "Transferencia":
+            notas_tabela_html = build_notas_tabela_html(file_path, rm_num)
+
+        return {
+            "row": row,
+            "rm_num": rm_num,
+            "nome": row["NOME"],
+            "serie": serie,
+            "data_nasc": format_date_br(row["DATA NASC."]),
+            "ra": row["RA"],
+            "ra_label": "RA",
+            "horario": horario,
+            "semestre_texto": "",
+            "notas_tabela_html": notas_tabela_html,
+        }
+
+    df = read_lista_eja_declaracoes(file_path)
+    aluno = df.loc[df["RM_str"] == rm_num]
+    if aluno.empty:
+        return None
+
+    row = aluno.iloc[0]
+    if len(row) > 29:
+        semestre = row.iloc[29]
+        semestre_texto = str(semestre).strip() if pd.notna(semestre) else ""
+    else:
+        semestre_texto = ""
+
+    serie = row["S\u00c9RIE"]
+    if isinstance(serie, str):
+        serie = format_serie_ano(serie)
+
+    original_ra = row.iloc[7]
+    if pd.isna(original_ra) or (
+        isinstance(original_ra, Number) and float(original_ra) == 0
+    ):
+        ra_label = "RG"
+    else:
+        ra_label = "RA"
+
+    return {
+        "row": row,
+        "rm_num": rm_num,
+        "nome": row["NOME"],
+        "serie": serie,
+        "data_nasc": format_date_br(row["NASC."]),
+        "ra": row["RA"],
+        "ra_label": ra_label,
+        "horario": "Desconhecido",
+        "semestre_texto": semestre_texto,
+        "notas_tabela_html": "",
+    }
+
+
+def _is_quinto_ano(value) -> bool:
+    serie_raw = str(value or "").strip()
+    return "5\u00ba" in serie_raw or "5\u00b0" in serie_raw
+
+
+def _format_quinto_ano_serie(value) -> str:
+    serie_fmt = str(value or "").strip()
+    try:
+        return format_serie_ano(serie_fmt)
+    except Exception:
+        return serie_fmt
+
+
+def _base_quinto_ano_record(row):
+    rm_str = str(row.get("RM_str", "")).strip()
+    if rm_str in ("", "0"):
+        return None
+
+    serie_raw = str(row.get("S\u00c9RIE", "")).strip()
+    if not serie_raw or not _is_quinto_ano(serie_raw):
+        return None
+
+    horario = str(row.get("HOR\u00c1RIO", "")).strip()
+    if not horario:
+        horario = "Desconhecido"
+
+    return {
+        "nome": str(row.get("NOME", "")).strip(),
+        "ra": str(row.get("RA", "")).strip(),
+        "data_nasc": format_date_br(row.get("DATA NASC.")),
+        "serie_fmt": _format_quinto_ano_serie(serie_raw),
+        "horario": horario,
+        "valor_bolsa": str(row.get("BOLSA FAMILIA", "")).strip().upper(),
+    }
+
+
+def build_lote_escolaridade_5ano_context(file_path, file_path2=None, now=None):
+    """
+    Monta os dados das declaracoes em lote de escolaridade do 5o ano.
+    """
+    effective_path = file_path2 if file_path2 is not None else file_path
+    if not effective_path:
+        raise ValueError(
+            "Caminho do arquivo Excel n\u00e3o informado para o lote de escolaridade 5\u00ba ano."
+        )
+
+    planilha = read_lista_corrida_fundamental(effective_path)
+    registros = []
+
+    for _, row in planilha.iterrows():
+        record = _base_quinto_ano_record(row)
+        if record is None:
+            continue
+
+        texto = (
+            f"Declaro, para os devidos fins, que o(a) aluno(a) "
+            f"<strong><u>{record['nome']}</u></strong>, portador(a) do RA "
+            f"<strong><u>{record['ra']}</u></strong>, nascido(a) em "
+            f"<strong><u>{record['data_nasc']}</u></strong>, "
+            f"encontra-se regularmente matriculado(a) na "
+            f"E.M Jos\u00e9 Padin Mouta, cursando atualmente o(a) "
+            f"<strong><u>{record['serie_fmt']}</u></strong> no hor\u00e1rio de aula: "
+            f"<strong><u>{record['horario']}</u></strong>."
+        )
+
+        registros.append(
+            {
+                "nome": record["nome"],
+                "ra": record["ra"],
+                "data_nasc": record["data_nasc"],
+                "serie_fmt": record["serie_fmt"],
+                "horario": record["horario"],
+                "texto": texto,
+            }
+        )
+
+    return {
+        "registros": registros,
+        "data_extenso": data_extenso_praia_grande(now),
+        "titulo": "Declara\u00e7\u00e3o de Escolaridade",
+    }
+
+
+def _next_series_text_from_serie(serie_fmt) -> str:
+    series_text = "a s\u00e9rie subsequente"
+    match = re.search(r"(\d+)\u00ba", str(serie_fmt))
+    if match:
+        try:
+            next_year = int(match.group(1)) + 1
+            series_text = f"{next_year}\u00ba ano"
+        except Exception:
+            pass
+    return series_text
+
+
+def _build_conclusao_5ano_text(record, bolsa_familia_src):
+    declaracao_text = (
+        f"Declaro, para os devidos fins, que o(a) aluno(a) "
+        f"<strong><u>{record['nome']}</u></strong>, "
+        f"portador(a) do RA <strong><u>{record['ra']}</u></strong>, nascido(a) em "
+        f"<strong><u>{record['data_nasc']}</u></strong>, concluiu com \u00eaxito o "
+        f"<strong><u>{record['serie_fmt']}</u></strong>, estando apto(a) a ingressar no "
+        f"<strong><u>{record['series_text']}</u></strong>."
+    )
+
+    if record["valor_bolsa"] == "SIM":
+        declaracao_text += "<br><br><strong>Observa\u00e7\u00f5es:</strong><br>"
+        declaracao_text += (
+            '<label class="checkbox-label" '
+            'style="display: block; text-align: justify; font-size:14px;">'
+        )
+        declaracao_text += (
+            f'<img src="{bolsa_familia_src}" '
+            'alt="Bolsa Fam\u00edlia" '
+            'style="width:28px; vertical-align:middle; margin-right:5px;">'
+            "O aluno \u00e9 benefici\u00e1rio do Programa Bolsa Fam\u00edlia."
+        )
+        declaracao_text += "</label>"
+
+    return declaracao_text
+
+
+def build_lote_conclusao_5ano_context(
+    file_path,
+    data_extenso,
+    bolsa_familia_src="/static/logos/bolsa_familia.jpg",
+):
+    """
+    Monta os dados das declaracoes em lote de conclusao do 5o ano.
+    """
+    planilha = read_lista_corrida_fundamental(file_path)
+    registros = []
+
+    for _, row in planilha.iterrows():
+        record = _base_quinto_ano_record(row)
+        if record is None:
+            continue
+
+        record["series_text"] = _next_series_text_from_serie(record["serie_fmt"])
+        record["texto"] = _build_conclusao_5ano_text(record, bolsa_familia_src)
+        registros.append(
+            {
+                "nome": record["nome"],
+                "ra": record["ra"],
+                "data_nasc": record["data_nasc"],
+                "serie_fmt": record["serie_fmt"],
+                "series_text": record["series_text"],
+                "texto": record["texto"],
+            }
+        )
+
+    registros_duas_vias = []
+    for reg in registros:
+        reg1 = reg.copy()
+        reg1["via"] = 1
+        registros_duas_vias.append(reg1)
+
+        reg2 = reg.copy()
+        reg2["via"] = 2
+        registros_duas_vias.append(reg2)
+
+    return {
+        "registros": registros_duas_vias,
+        "data_extenso": data_extenso,
+        "titulo": "Declara\u00e7\u00e3o de Conclus\u00e3o",
+        "total": len(registros_duas_vias),
+    }
 
 
 def data_extenso_praia_grande(now=None) -> str:
