@@ -23,7 +23,6 @@ import xlrd  # Para ler arquivos .xls, se necessário
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook, Workbook  # Usado para trabalhar com XLSX
-from openpyxl.utils import get_column_letter  # Para obter a coluna em letra
 
 from config import configure_app
 from services.carteirinhas_log import (
@@ -32,13 +31,19 @@ from services.carteirinhas_log import (
 )
 from services.fotos import get_student_photo_url, save_student_photo, student_has_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
+from services.quadros_inclusao import (
+    add_quant_inclusao_alerts_sheet as _add_quant_inclusao_alerts_sheet,
+    build_multi_prof_alerts as _build_quant_multi_prof_alerts,
+    build_plan_without_inclusion_alerts as _build_quant_plan_without_inclusion_alerts,
+    build_template_map as _build_quant_template_map,
+    collect_counts_from_lista_corrida as _collect_quant_counts_from_lista_corrida,
+)
 from services.quadros_transferencias import (
     RX_EJA_TRANSFER as _RX_EJA,
     add_transfer_alerts_sheet as _add_transfer_alerts_sheet,
     label_set as _label_set,
     normalize_tipo_te as _normalize_tipo_te,
     push_missing_info_alert as _push_missing_info_alert,
-    replace_workbook_sheet as _replace_workbook_sheet,
     serie_key_from_value as _serie_key_from_value,
 )
 from services.upload_sessions import save_excel_upload_to_session
@@ -3227,7 +3232,6 @@ def quadro_atendimento_mensal():
 #  QUADRO – TRANSFERÊNCIAS (FIX H/I/J + ALERTAS DE FALTA DE INFORMAÇÃO)
 # ==========================================================
 
-from collections import defaultdict
 import re
 import os
 import uuid
@@ -3962,7 +3966,6 @@ import json
 import base64
 import uuid
 from io import BytesIO
-from collections import defaultdict
 from datetime import datetime
 
 from flask import (
@@ -3980,318 +3983,6 @@ from openpyxl import load_workbook
 # - app = Flask(__name__)
 # - app.config["UPLOAD_FOLDER"]
 # no seu arquivo principal.
-
-
-def _collapse_spaces(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "")).strip()
-
-
-def _normalize_rm(v) -> str:
-    """
-    Normaliza RM para string comparável e SEGURA para deduplicação.
-    Regras importantes:
-      - RM vazio/None => ""
-      - RM 0 / "0" / "0000" / "0.0" => "" (NÃO conta)
-      - Remove caracteres não numéricos e remove zeros à esquerda
-        (ex.: "00012" -> "12")
-      - Float não-inteiro (ex.: 12.5) => "" (inválido)
-    """
-    if v is None:
-        return ""
-
-    if isinstance(v, int):
-        if v == 0:
-            return ""
-        return str(v).strip()
-
-    if isinstance(v, float):
-        if not v.is_integer():
-            return ""
-        iv = int(v)
-        if iv == 0:
-            return ""
-        return str(iv).strip()
-
-    s = _collapse_spaces(str(v))
-    if not s:
-        return ""
-
-    if s.casefold() in {"nan", "none"}:
-        return ""
-
-    digits = re.sub(r"\D+", "", s)
-    if not digits:
-        return ""
-
-    digits = digits.lstrip("0")
-    if not digits:
-        return ""
-
-    return digits
-
-
-def _normalize_turma(v) -> str:
-    """
-    Normaliza turma para padrão: '2ºA', '3ºC' etc.
-    Aceita entradas comuns: '2ºA', '2-A', '2 A', '2a', '2ªA' etc.
-    """
-    if v is None:
-        return ""
-
-    s = _collapse_spaces(str(v))
-    if not s:
-        return ""
-
-    s = s.replace("ª", "").replace("º", "").replace("°", "")
-    s = s.replace("-", "").replace("/", "").replace("\\", "")
-    s = s.replace(" ", "")
-    s = s.upper()
-
-    m = re.match(r"^(\d{1,2})([A-Z])$", s)
-    if not m:
-        return ""
-
-    num = int(m.group(1))
-    letra = m.group(2)
-    return f"{num}º{letra}"
-
-
-def _is_sim(v) -> bool:
-    """Coluna N: deve ser exatamente 'Sim' (tolerante a caixa/trim)."""
-    s = _collapse_spaces("" if v is None else str(v))
-    return s.casefold() == "sim"
-
-
-def _has_ma(v) -> bool:
-    """
-    Coluna H: a linha só deve ser contada se houver o código MA
-    (Matrícula Ativa).
-
-    Aceita formatos como:
-      - 'MA'
-      - ' MA '
-      - 'MA/alguma coisa'
-      - 'alguma coisa - MA'
-      - 'MA TE'
-    Não confunde com palavras como 'MARIA'.
-    """
-    if v is None:
-        return False
-
-    s = _collapse_spaces(str(v)).upper()
-    if not s:
-        return False
-
-    tokens = re.findall(r"[A-Z0-9]+", s)
-    return "MA" in tokens
-
-
-def _is_valid_prof(v) -> bool:
-    """Coluna P: profissional válido (ignora vazio, 0, -, nan, none)."""
-    if v is None:
-        return False
-
-    s = _collapse_spaces(str(v))
-    if not s:
-        return False
-
-    if s in {"0", "-"}:
-        return False
-
-    if s.casefold() in {"nan", "none"}:
-        return False
-
-    return True
-
-
-def _prof_key(v: str) -> str:
-    """Chave de deduplicação: strip, colapsa espaços e compara case-insensitive."""
-    return _collapse_spaces(v).casefold()
-
-
-def _build_template_map(ws_model):
-    """
-    Mapeia automaticamente o MODELO:
-      - Encontra turmas nos rótulos (colunas B, F, J) como '2-A', '3-C', '5-F'...
-      - Para cada turma, calcula as células de quantidade:
-          Inclusão:        D/H/L na linha do rótulo
-          Plano de Ação:   D/H/L na linha do rótulo+1
-          Profissionais:   D/H/L na linha do rótulo+2
-
-    Retorna:
-      dict {
-        '2ºA': {'inc_qtd': 'D13', 'plano_qtd': 'D14', 'prof_qtd': 'D15'},
-        ...
-      }
-    """
-    label_to_qty = {2: 4, 6: 8, 10: 12}  # B->D, F->H, J->L
-    turma_cells = {}
-
-    max_row = ws_model.max_row
-    for label_col, qty_col in label_to_qty.items():
-        for r in range(1, max_row + 1):
-            v = ws_model.cell(r, label_col).value
-            if not isinstance(v, str):
-                continue
-
-            raw = _collapse_spaces(v)
-            if not re.match(r"^\d{1,2}\s*-\s*[A-Za-z]$", raw):
-                continue
-
-            turma_norm = _normalize_turma(raw)
-            if not turma_norm:
-                continue
-
-            inc_row = r
-            plano_row = r + 1
-            prof_row = r + 2
-
-            turma_cells[turma_norm] = {
-                "inc_qtd": ws_model.cell(inc_row, qty_col).coordinate,
-                "plano_qtd": ws_model.cell(plano_row, qty_col).coordinate,
-                "prof_qtd": ws_model.cell(prof_row, qty_col).coordinate,
-            }
-
-    return turma_cells
-
-
-def _collect_counts_from_lista_corrida(ws_lista, valid_turmas):
-    """
-    Lê LISTA CORRIDA e retorna:
-      - inc_counts[turma] = qtd alunos inclusão (N == 'Sim'), dedupe por RM
-      - plano_counts[turma] = qtd alunos com plano (P válido), dedupe por RM
-      - profs_by_turma[turma] = dict key-> {'display': str, 'alunos': [(rm, nome), ...]}
-      - plan_without_inclusion_by_turma[turma] = lista de alunos com P válido,
-        mas sem Inclusão na N
-
-    Colunas (0-index):
-      A turma     = 0
-      C RM        = 2
-      D nome      = 3
-      H situação  = 7   -> deve conter MA
-      N inclusão  = 13
-      P prof      = 15
-
-    Observações críticas:
-      - RM vazio/0 NÃO é contabilizado.
-      - Só contabiliza se a coluna H contiver MA.
-      - Plano só conta se o aluno também for Inclusão.
-      - Se houver P válido sem Inclusão, o aluno NÃO conta no plano,
-        mas entra na lista de alerta.
-    """
-    inc_rms = defaultdict(set)
-    plano_rms = defaultdict(set)
-    profs_by_turma = defaultdict(lambda: defaultdict(lambda: {"display": "", "alunos": []}))
-
-    # alertas: plano preenchido sem inclusão
-    plan_without_inclusion_by_turma = defaultdict(list)
-    plan_without_inclusion_seen = defaultdict(set)
-
-    for row in ws_lista.iter_rows(min_row=2, values_only=True):
-        if not row:
-            continue
-
-        turma = _normalize_turma(row[0] if len(row) > 0 else None)
-        if not turma or (valid_turmas and turma not in valid_turmas):
-            continue
-
-        rm = _normalize_rm(row[2] if len(row) > 2 else None)
-        if not rm:
-            continue
-
-        status_val = row[7] if len(row) > 7 else None
-        if not _has_ma(status_val):
-            continue
-
-        nome = _collapse_spaces(str(row[3])) if len(row) > 3 and row[3] is not None else ""
-
-        incl_val = row[13] if len(row) > 13 else None
-        is_inclusao = _is_sim(incl_val)
-
-        if is_inclusao:
-            inc_rms[turma].add(rm)
-
-        prof_val = row[15] if len(row) > 15 else None
-        has_prof = _is_valid_prof(prof_val)
-
-        # Caso inválido: tem plano/profissional, mas não está marcado como inclusão
-        if has_prof and not is_inclusao:
-            if rm not in plan_without_inclusion_seen[turma]:
-                plan_without_inclusion_seen[turma].add(rm)
-                plan_without_inclusion_by_turma[turma].append({
-                    "rm": rm,
-                    "nome": nome,
-                    "profissional": _collapse_spaces(str(prof_val)),
-                })
-
-        # Plano só conta se também for inclusão
-        if is_inclusao and has_prof:
-            plano_rms[turma].add(rm)
-
-            display = _collapse_spaces(str(prof_val))
-            key = _prof_key(display)
-            bucket = profs_by_turma[turma][key]
-
-            if not bucket["display"]:
-                bucket["display"] = display
-
-            bucket["alunos"].append((rm, nome))
-
-    inc_counts = {t: len(rms) for t, rms in inc_rms.items()}
-    plano_counts = {t: len(rms) for t, rms in plano_rms.items()}
-
-    return inc_counts, plano_counts, profs_by_turma, plan_without_inclusion_by_turma
-
-
-def _add_quant_inclusao_alerts_sheet(wb, multi_prof_alerts, plan_without_inclusion_alerts):
-    if not multi_prof_alerts and not plan_without_inclusion_alerts:
-        return
-
-    ws_alert = _replace_workbook_sheet(wb, "ALERTAS")
-    ws_alert.append(["Categoria", "Turma", "Detalhe", "RM", "Nome"])
-
-    for alert in multi_prof_alerts:
-        turma = alert.get("turma", "-")
-        profissionais = ", ".join(alert.get("profissionais", []))
-        ws_alert.append([
-            "Múltiplos profissionais",
-            turma,
-            f"{alert.get('qtd_profissionais', 0)} profissionais: {profissionais}",
-            "",
-            "",
-        ])
-        for block in alert.get("auditoria", []):
-            profissional = block.get("profissional", "-")
-            for aluno in block.get("amostra_alunos", []):
-                ws_alert.append([
-                    "Amostra por profissional",
-                    turma,
-                    profissional,
-                    aluno.get("rm", ""),
-                    aluno.get("nome", ""),
-                ])
-
-    for alert in plan_without_inclusion_alerts:
-        turma = alert.get("turma", "-")
-        ws_alert.append([
-            "Plano sem inclusão",
-            turma,
-            f"{alert.get('qtd_casos', 0)} caso(s)",
-            "",
-            "",
-        ])
-        for aluno in alert.get("alunos", []):
-            ws_alert.append([
-                "Plano sem inclusão",
-                turma,
-                aluno.get("profissional", "-"),
-                aluno.get("rm", ""),
-                aluno.get("nome", ""),
-            ])
-
-    widths = [26, 14, 42, 14, 36]
-    for idx, width in enumerate(widths, start=1):
-        ws_alert.column_dimensions[get_column_letter(idx)].width = width
 
 
 @app.route("/quantinclusao", methods=["GET", "POST"])
@@ -4339,7 +4030,7 @@ def quantinclusao():
             flash(f"Erro ao abrir o modelo de inclusão: {str(e)}", "error")
             return redirect(url_for("quantinclusao"))
 
-        template_map = _build_template_map(ws_model)
+        template_map = _build_quant_template_map(ws_model)
         valid_turmas = set(template_map.keys())
 
         (
@@ -4347,7 +4038,7 @@ def quantinclusao():
             plano_counts,
             profs_by_turma,
             plan_without_inclusion_by_turma,
-        ) = _collect_counts_from_lista_corrida(ws_lista_reg, valid_turmas)
+        ) = _collect_quant_counts_from_lista_corrida(ws_lista_reg, valid_turmas)
 
         # Preenche as 3 linhas por turma: Inclusão / Plano / Profissionais
         for turma, cells in template_map.items():
@@ -4381,56 +4072,11 @@ def quantinclusao():
         ws_model["C8"] = responsavel.strip()
         ws_model["K8"] = now.strftime("%d/%m/%Y")
 
-        # ==========================================================
-        # ALERTA 1: Turmas com 2+ profissionais distintos
-        # ==========================================================
-        alerts = []
-
-        def _turma_sort_key(x: str):
-            try:
-                n = int(x.split("º")[0])
-                l = x.split("º")[1]
-                return (n, l)
-            except Exception:
-                return (999, x)
-
-        for turma in sorted(valid_turmas, key=_turma_sort_key):
-            prof_dict = profs_by_turma.get(turma, {})
-            if len(prof_dict) >= 2:
-                prof_names = sorted(
-                    [prof_dict[k]["display"] for k in prof_dict.keys()],
-                    key=lambda s: s.casefold(),
-                )
-
-                audit = []
-                for k in sorted(prof_dict.keys(), key=lambda s: prof_dict[s]["display"].casefold()):
-                    alunos = prof_dict[k]["alunos"][:10]
-                    audit.append({
-                        "profissional": prof_dict[k]["display"],
-                        "amostra_alunos": [{"rm": rm, "nome": nome} for rm, nome in alunos],
-                    })
-
-                alerts.append({
-                    "turma": turma,
-                    "qtd_profissionais": len(prof_dict),
-                    "profissionais": prof_names,
-                    "auditoria": audit,
-                })
-
-        # ==========================================================
-        # ALERTA 2: Plano preenchido sem Inclusão
-        # ==========================================================
-        plan_without_inclusion_alerts = []
-        for turma in sorted(valid_turmas, key=_turma_sort_key):
-            casos = plan_without_inclusion_by_turma.get(turma, [])
-            if not casos:
-                continue
-
-            plan_without_inclusion_alerts.append({
-                "turma": turma,
-                "qtd_casos": len(casos),
-                "alunos": casos[:20],  # limite p/ UI/header
-            })
+        alerts = _build_quant_multi_prof_alerts(profs_by_turma, valid_turmas)
+        plan_without_inclusion_alerts = _build_quant_plan_without_inclusion_alerts(
+            plan_without_inclusion_by_turma,
+            valid_turmas,
+        )
 
         _add_quant_inclusao_alerts_sheet(wb_model, alerts, plan_without_inclusion_alerts)
 

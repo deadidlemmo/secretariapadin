@@ -52,6 +52,7 @@ As dependencias estao em `requirements.txt`.
 |   |-- carteirinhas_log.py        # Log SQLite das carteirinhas impressas
 |   |-- fotos.py                   # Busca e salvamento de fotos por RM
 |   |-- prazos.py                  # Regras de feriados e alertas de prazo
+|   |-- quadros_inclusao.py        # Helpers do quadro quantitativo de inclusao
 |   |-- quadros_transferencias.py  # Helpers de transferencia e quantitativo mensal
 |   `-- upload_sessions.py         # Salvamento de Excel e persistencia na sessao
 |-- utils/                         # Helpers reutilizaveis de Excel e uploads
