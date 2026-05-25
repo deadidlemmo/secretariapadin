@@ -10,11 +10,9 @@ from flask import (
     current_app,
     send_file,
 )
-import copy
 import os
 import re
 import locale
-from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
 from io import BytesIO
@@ -59,26 +57,22 @@ from services.quadros_inclusao import (
     build_template_map as _build_quant_template_map,
     collect_counts_from_lista_corrida as _collect_quant_counts_from_lista_corrida,
 )
+from services.quadros_quantitativo_mensal import (
+    QuantitativoMensalError,
+    build_quantitativo_mensal_file,
+    get_default_mes_ano,
+)
 from services.quadros_transferencias import (
     TransferenciasError,
     build_transferencias_file,
-    normalize_tipo_te as _normalize_tipo_te,
-    serie_key_from_value as _serie_key_from_value,
 )
 from services.upload_sessions import save_excel_upload_to_session
 from utils.dates import (
-    detect_te_date_from_obs_flexible,
     parse_date_flexible,
     parse_period_date as _parse_period_date,
     parse_user_date as _parse_user_date,
 )
 from utils.excel import set_merged_cell_value
-from utils.text import (
-    find_df_col as _find_df_col,
-    is_missing_value as _is_missing_value,
-    norm_header_compact as _norm_header_compact,
-    safe_str as _safe_str,
-)
 from utils.uploads import (
     save_excel_upload,
     validate_excel_upload,
@@ -1139,20 +1133,6 @@ def _find_sheet_case_insensitive(wb, target_name: str):
     return None
 
 
-# ----------------------------------------------------------
-# Helpers comuns: normalização de cabeçalho e strings
-# ----------------------------------------------------------
-@contextmanager
-def _temp_unprotect_sheet(ws):
-    """Desabilita proteção da planilha temporariamente para escrita e restaura depois."""
-    original = copy.copy(ws.protection)
-    try:
-        ws.protection.sheet = False
-        yield
-    finally:
-        ws.protection = original
-
-
 # ==========================================================
 #  QUADROS – MENU PRINCIPAL
 # ==========================================================
@@ -1416,31 +1396,6 @@ def quadro_transferencias():
 #  (mantido: parse flexível do período + debug sheet oculta)
 # ==========================================================
 
-def _recreate_debug_sheet_hidden(wb, title: str = "DEBUG_TE"):
-    """Cria/zera uma aba de debug (oculta) no workbook."""
-    if title in wb.sheetnames:
-        wb.remove(wb[title])
-    ws_dbg = wb.create_sheet(title)
-    ws_dbg.sheet_state = "hidden"
-    ws_dbg.append(
-        [
-            "LINHA_ARQUIVO",
-            "RM",
-            "NOME",
-            "SERIE",
-            "OBS_ORIGINAL",
-            "TE_DATA_EXTRAIDA",
-            "ANO_INFERIDO",
-            "TRECHO_MATCH",
-            "STATUS",
-            "MOTIVO",
-            "TIPO_TE_RAW",
-            "TIPO_TE_NORMALIZADO",
-        ]
-    )
-    return ws_dbg
-
-
 @app.route("/quadros/quantitativo_mensal", methods=["GET", "POST"])
 @login_required
 def quadro_quantitativo_mensal():
@@ -1468,12 +1423,7 @@ def quadro_quantitativo_mensal():
             return redirect(url_for("quadro_quantitativo_mensal"))
 
         if not mes_ano or not str(mes_ano).strip():
-            meses = {
-                1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
-                5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
-                9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
-            }
-            mes_ano = f"{meses[datetime.now().month]}/{datetime.now().year}"
+            mes_ano = get_default_mes_ano()
         mes_ano = str(mes_ano).strip()
 
         fundamental_file = request.files.get("lista_fundamental")
@@ -1497,246 +1447,41 @@ def quadro_quantitativo_mensal():
                 flash("Arquivo da Lista Piloto Fundamental não encontrado.", "error")
                 return redirect(url_for("quadro_quantitativo_mensal"))
 
-        try:
-            df = pd.read_excel(fundamental_path, sheet_name="LISTA CORRIDA")
-        except Exception as e:
-            flash(f"Erro ao ler a Lista Piloto Fundamental: {str(e)}", "error")
-            return redirect(url_for("quadro_quantitativo_mensal"))
-
-        col_rm = _find_df_col(df, ["RM"])
-        col_nome = _find_df_col(df, ["NOME"])
-        col_serie = _find_df_col(df, ["SÉRIE", "SERIE"])
-        col_obs = _find_df_col(df, ["OBS"])
-        col_tipo_te = _find_df_col(df, ["TIPO TE", "TIPO_TE", "TIPO  TE"])
-
-        if not col_serie or not col_obs:
-            flash("Não foi possível localizar as colunas essenciais (SÉRIE e/ou OBS) na LISTA CORRIDA.", "error")
-            return redirect(url_for("quadro_quantitativo_mensal"))
-
         model_path = os.path.join("modelos", "Quadro Quantitativo Mensal - Modelo.xlsx")
-        if not os.path.exists(model_path):
-            flash("Modelo de Quadro Quantitativo Mensal não encontrado.", "error")
-            return redirect(url_for("quadro_quantitativo_mensal"))
+        ano_letivo = int(current_app.config.get("SCHOOL_YEAR", datetime.now().year))
 
         try:
-            with open(model_path, "rb") as f:
-                wb = load_workbook(f, data_only=False)
-        except Exception as e:
-            flash(f"Erro ao ler o modelo: {str(e)}", "error")
-            return redirect(url_for("quadro_quantitativo_mensal"))
-
-        ws = wb.active
-
-        mapping = {
-            "2º": {
-                "Dentro da Rede": "K14",
-                "Rede Estadual": "K15",
-                "Litoral": "K16",
-                "Mudança de Municipio": "K16",
-                "São Paulo": "K17",
-                "ABCD": "K18",
-                "Interior": "K19",
-                "Outros Estados": "K20",
-                "Particular": "K21",
-                "País": "K22",
-                "Sem Informação": "K23",
-            },
-            "3º": {
-                "Dentro da Rede": "L14",
-                "Rede Estadual": "L15",
-                "Litoral": "L16",
-                "Mudança de Municipio": "L16",
-                "São Paulo": "L17",
-                "ABCD": "L18",
-                "Interior": "L19",
-                "Outros Estados": "L20",
-                "Particular": "L21",
-                "País": "L22",
-                "Sem Informação": "L23",
-            },
-            "4º": {
-                "Dentro da Rede": "M14",
-                "Rede Estadual": "M15",
-                "Litoral": "M16",
-                "Mudança de Municipio": "M16",
-                "São Paulo": "M17",
-                "ABCD": "M18",
-                "Interior": "M19",
-                "Outros Estados": "M20",
-                "Particular": "M21",
-                "País": "M22",
-                "Sem Informação": "M23",
-            },
-            "5º": {
-                "Dentro da Rede": "N14",
-                "Rede Estadual": "N15",
-                "Litoral": "N16",
-                "Mudança de Municipio": "N16",
-                "São Paulo": "N17",
-                "ABCD": "N18",
-                "Interior": "N19",
-                "Outros Estados": "N20",
-                "Particular": "N21",
-                "País": "N22",
-                "Sem Informação": "N23",
-            },
-        }
-
-        # Zera determinísticamente todas as células-alvo
-        for tipos in mapping.values():
-            for cell_addr in tipos.values():
-                set_merged_cell_value(ws, cell_addr, 0)
-
-        ws_dbg = _recreate_debug_sheet_hidden(wb, "DEBUG_TE")
-
-        counted = 0
-        discarded = 0
-
-        for i, row in df.iterrows():
-            linha_arquivo = int(i) + 2
-
-            rm = row.get(col_rm) if col_rm else None
-            nome = row.get(col_nome) if col_nome else None
-            serie_val = row.get(col_serie, "")
-            obs_val = row.get(col_obs, "")
-
-            if _is_missing_value(obs_val):
-                continue
-
-            te_dt, rule, match_txt, year_inferred = detect_te_date_from_obs_flexible(
-                obs_val,
+            result = build_quantitativo_mensal_file(
+                fundamental_path=fundamental_path,
+                model_path=model_path,
+                period_start=period_start,
+                period_end=period_end,
+                responsavel=responsavel,
+                mes_ano=mes_ano,
                 default_year=default_year,
+                ano_letivo=ano_letivo,
             )
-
-            if not match_txt:
-                continue
-
-            if not te_dt:
-                discarded += 1
-                ws_dbg.append(
-                    [
-                        linha_arquivo,
-                        "" if rm is None else str(rm),
-                        "" if nome is None else str(nome),
-                        "" if serie_val is None else str(serie_val),
-                        str(obs_val).strip(),
-                        "",
-                        "SIM" if year_inferred else "NAO",
-                        match_txt,
-                        "SKIPPED",
-                        "Data TE inválida em OBS",
-                        "" if col_tipo_te is None else _safe_str(row.get(col_tipo_te)),
-                        "" if col_tipo_te is None else _normalize_tipo_te(row.get(col_tipo_te)),
-                    ]
-                )
-                continue
-
-            if not (period_start <= te_dt <= period_end):
-                discarded += 1
-                ws_dbg.append(
-                    [
-                        linha_arquivo,
-                        "" if rm is None else str(rm),
-                        "" if nome is None else str(nome),
-                        "" if serie_val is None else str(serie_val),
-                        str(obs_val).strip(),
-                        te_dt.strftime("%d/%m/%Y"),
-                        "SIM" if year_inferred else "NAO",
-                        match_txt,
-                        "SKIPPED",
-                        "Fora do período informado",
-                        "" if col_tipo_te is None else _safe_str(row.get(col_tipo_te)),
-                        "" if col_tipo_te is None else _normalize_tipo_te(row.get(col_tipo_te)),
-                    ]
-                )
-                continue
-
-            serie_key = _serie_key_from_value(serie_val)
-            if not serie_key or serie_key not in mapping:
-                discarded += 1
-                ws_dbg.append(
-                    [
-                        linha_arquivo,
-                        "" if rm is None else str(rm),
-                        "" if nome is None else str(nome),
-                        "" if serie_val is None else str(serie_val),
-                        str(obs_val).strip(),
-                        te_dt.strftime("%d/%m/%Y"),
-                        "SIM" if year_inferred else "NAO",
-                        match_txt,
-                        "SKIPPED",
-                        "Série fora de 2º–5º ou ilegível",
-                        "" if col_tipo_te is None else _safe_str(row.get(col_tipo_te)),
-                        "" if col_tipo_te is None else _normalize_tipo_te(row.get(col_tipo_te)),
-                    ]
-                )
-                continue
-
-            tipo_raw = row.get(col_tipo_te, None) if col_tipo_te else None
-            tipo_te = _normalize_tipo_te(tipo_raw)
-            if tipo_te not in mapping[serie_key]:
-                tipo_te = "Sem Informação"
-
-            cell_addr = mapping[serie_key][tipo_te]
-            current_val = ws[cell_addr].value
-            current_val = current_val if isinstance(current_val, (int, float)) else 0
-            set_merged_cell_value(ws, cell_addr, current_val + 1)
-
-            counted += 1
-            ws_dbg.append(
-                [
-                    linha_arquivo,
-                    "" if rm is None else str(rm),
-                    "" if nome is None else str(nome),
-                    "" if serie_val is None else str(serie_val),
-                    str(obs_val).strip(),
-                    te_dt.strftime("%d/%m/%Y"),
-                    "SIM" if year_inferred else "NAO",
-                    match_txt,
-                    "COUNTED",
-                    "",
-                    "" if tipo_raw is None else str(tipo_raw),
-                    tipo_te,
-                ]
-            )
-
-        set_merged_cell_value(ws, "B3", str(responsavel).strip())
-        set_merged_cell_value(ws, "D3", f"{period_start.strftime('%d/%m/%Y')} a {period_end.strftime('%d/%m/%Y')}")
-
-        with _temp_unprotect_sheet(ws):
-            set_merged_cell_value(ws, "A6", "E.M José Padin Mouta")
-            set_merged_cell_value(ws, "A8", mes_ano)
-            ano_letivo = int(current_app.config.get("SCHOOL_YEAR", datetime.now().year))
-            set_merged_cell_value(ws, "A10", f"QUADRO GERAL DE TRANSFERENCIAS EXPEDIDAS - {ano_letivo}")
+        except QuantitativoMensalError as e:
+            flash(str(e), "error")
+            return redirect(url_for("quadro_quantitativo_mensal"))
 
         current_app.logger.info(
             "[QUADRO_QUANTITATIVO] periodo=%s..%s | counted=%s | discarded=%s | ano_padrao_sem_ano=%s",
             period_start.strftime("%d/%m/%Y"),
             period_end.strftime("%d/%m/%Y"),
-            counted,
-            discarded,
-            default_year,
+            result.counted,
+            result.discarded,
+            result.default_year,
         )
 
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        filename = f"Quadro_Quantitativo_Fundamental_{period_start.strftime('%d%m')}_{period_end.strftime('%d%m')}.xlsx"
         return send_file(
-            output,
+            result.output,
             as_attachment=True,
-            download_name=filename,
+            download_name=result.filename,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-    meses = {
-        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
-        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
-        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
-    }
-    default_mes_ano = f"{meses[datetime.now().month]}/{datetime.now().year}"
-    return render_template("quadro_quantitativo_mensal.html", default_mes_ano=default_mes_ano)
+    return render_template("quadro_quantitativo_mensal.html", default_mes_ano=get_default_mes_ano())
 
 # ==========================================================
 #  QUADRO QUANTITATIVO DE INCLUSÃO – REGULAR (EJA DESCONSIDERADA)
