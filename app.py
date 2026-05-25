@@ -11,7 +11,6 @@ from flask import (
     send_file,
 )
 import os
-import re
 import locale
 from datetime import datetime
 from functools import wraps
@@ -41,21 +40,13 @@ from services.fotos import save_student_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
 from services.quadros_atendimento import (
     ATENDIMENTO_CONFIG,
-    extract_by_cols as _extract_atendimento_by_cols,
-    extract_by_fallback_block as _extract_atendimento_by_fallback_block,
-    fill_eja_block as _fill_atendimento_eja_block,
+    AtendimentoMensalError,
+    build_atendimento_mensal_file,
     normalize_mes_ref as _normalize_atendimento_mes_ref,
-    write_block as _write_atendimento_block,
-    write_header as _write_atendimento_header,
-    write_turno_totals as _write_atendimento_turno_totals,
-    zero_eja_block as _zero_atendimento_eja_block,
 )
 from services.quadros_inclusao import (
-    add_quant_inclusao_alerts_sheet as _add_quant_inclusao_alerts_sheet,
-    build_multi_prof_alerts as _build_quant_multi_prof_alerts,
-    build_plan_without_inclusion_alerts as _build_quant_plan_without_inclusion_alerts,
-    build_template_map as _build_quant_template_map,
-    collect_counts_from_lista_corrida as _collect_quant_counts_from_lista_corrida,
+    QuantInclusaoError,
+    build_quant_inclusao_file,
 )
 from services.quadros_quantitativo_mensal import (
     QuantitativoMensalError,
@@ -1121,18 +1112,6 @@ def _save_upload_to_session(file_storage, session_key: str, prefix: str) -> str:
     )
 
 
-def _find_sheet_case_insensitive(wb, target_name: str):
-    """
-    Busca uma aba ignorando maiúsculas/minúsculas e espaços.
-    Retorna o nome real encontrado ou None.
-    """
-    target = (target_name or "").strip().lower()
-    for name in wb.sheetnames:
-        if (name or "").strip().lower() == target:
-            return name
-    return None
-
-
 # ==========================================================
 #  QUADROS – MENU PRINCIPAL
 # ==========================================================
@@ -1160,7 +1139,6 @@ def quadros_inclusao():
 @login_required
 def quadro_atendimento_mensal():
     if request.method == 'POST':
-        debug_log = []
         enable_eja = _is_eja_enabled()
 
         responsavel = (request.form.get("responsavel") or "").strip()
@@ -1187,74 +1165,25 @@ def quadro_atendimento_mensal():
             return redirect(url_for('quadro_atendimento_mensal'))
 
         model_path = os.path.join("modelos", "Quadro de Atendimento Mensal - Modelo.xlsx")
-        if not os.path.exists(model_path):
-            flash("Modelo Atendimento Mensal não encontrado.", "error")
-            return redirect(url_for('quadro_atendimento_mensal'))
+        eja_path = session.get('lista_eja') if enable_eja else None
 
         try:
-            with open(model_path, "rb") as f:
-                wb_modelo = load_workbook(f, data_only=False)
-        except Exception as e:
-            flash(f"Erro ao ler o modelo de atendimento mensal: {str(e)}", "error")
+            result = build_atendimento_mensal_file(
+                fundamental_path=file_path,
+                model_path=model_path,
+                responsavel=responsavel,
+                rf=rf,
+                mes_ref=mes_ref,
+                enable_eja=enable_eja,
+                eja_path=eja_path,
+            )
+        except AtendimentoMensalError as e:
+            flash(str(e), "error")
             return redirect(url_for('quadro_atendimento_mensal'))
 
-        ws_modelo = wb_modelo.worksheets[1] if len(wb_modelo.worksheets) > 1 else wb_modelo.active
-
-        _write_atendimento_header(ws_modelo, responsavel, rf, mes_ref, debug_log)
-
-        try:
-            wb_lista = load_workbook(file_path, data_only=True, read_only=True)
-        except Exception:
-            flash("Erro ao ler o arquivo da Lista Piloto FUNDAMENTAL.", "error")
-            return redirect(url_for('quadro_atendimento_mensal'))
-
-        sheet_name = _find_sheet_case_insensitive(wb_lista, "Total de Alunos")
-        if not sheet_name:
-            flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto FUNDAMENTAL.", "error")
-            return redirect(url_for('quadro_atendimento_mensal'))
-
-        ws_total = wb_lista[sheet_name]
-
-        # 1º ano: SEMPRE ZERADO (Masc + Fem + Total)
-        _write_atendimento_block(ws_modelo, "1º", {}, debug_log)
-
-        # séries 2º..5º
-        for serie_label in ["2º", "3º", "4º", "5º"]:
-            data = _extract_atendimento_by_cols(ws_total, serie_label, debug_log)
-            if not data:
-                debug_log.append(f"[{serie_label}] prioridade 1 (C/D) não encontrou turmas; tentando fallback...")
-                data = _extract_atendimento_by_fallback_block(ws_total, serie_label, debug_log)
-            _write_atendimento_block(ws_modelo, serie_label, data, debug_log)
-
-        # totais manhã / tarde
-        _write_atendimento_turno_totals(ws_modelo, ws_total, debug_log)
-
-        # EJA: mantém comportamento atual
-        if not enable_eja:
-            _zero_atendimento_eja_block(ws_modelo)
-            debug_log.append("[EJA] desativada: bloco EJA zerado.")
-        else:
-            eja_path = session.get('lista_eja')
-            if not eja_path or not os.path.exists(eja_path):
-                _zero_atendimento_eja_block(ws_modelo)
-                debug_log.append("[EJA] habilitada, mas sem arquivo: bloco EJA zerado.")
-            else:
-                try:
-                    wb_eja = load_workbook(eja_path, data_only=True, read_only=True)
-                except Exception as e:
-                    flash(f"Erro ao ler a Lista Piloto EJA: {str(e)}. Gerando sem EJA.", "warning")
-                    _zero_atendimento_eja_block(ws_modelo)
-                    debug_log.append(f"[EJA] erro ao ler: {e}. Bloco EJA zerado.")
-                else:
-                    sheet_name_eja = _find_sheet_case_insensitive(wb_eja, "Total de Alunos")
-                    if not sheet_name_eja:
-                        flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto EJA. Gerando sem EJA.", "warning")
-                        _zero_atendimento_eja_block(ws_modelo)
-                        debug_log.append("[EJA] aba Total de Alunos não encontrada. Bloco EJA zerado.")
-                    else:
-                        ws_total_eja = wb_eja[sheet_name_eja]
-                        _fill_atendimento_eja_block(ws_modelo, ws_total_eja)
-                        debug_log.append("[EJA] preenchida com sucesso.")
+        debug_log = result.debug_log
+        for warning in result.warnings:
+            flash(warning, "warning")
 
         if ATENDIMENTO_CONFIG["ENABLE_DEBUG_LOG"]:
             try:
@@ -1263,15 +1192,10 @@ def quadro_atendimento_mensal():
                 print("=== DEBUG ATENDIMENTO MENSAL ===")
                 print("\n".join(debug_log))
 
-        output = BytesIO()
-        wb_modelo.save(output)
-        output.seek(0)
-
-        filename = f"Quadro de Atendimento Mensal - {datetime.now().strftime('%d%m')}.xlsx"
         return send_file(
-            output,
+            result.output,
             as_attachment=True,
-            download_name=filename,
+            download_name=result.filename,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
@@ -1536,90 +1460,32 @@ def quantinclusao():
             prefix="regular",
         )
 
-        try:
-            wb_reg = load_workbook(reg_path, data_only=True, read_only=True)
-            ws_lista_reg = wb_reg["LISTA CORRIDA"]
-        except Exception as e:
-            flash(f"Erro ao ler o arquivo: {str(e)}", "error")
-            return redirect(url_for("quantinclusao"))
-
         model_path = os.path.join("modelos", "Quadro Quantitativo de Inclusão - Modelo.xlsx")
         try:
-            wb_model = load_workbook(model_path, data_only=False)
-            ws_model = wb_model.active
-        except Exception as e:
-            flash(f"Erro ao abrir o modelo de inclusão: {str(e)}", "error")
+            result = build_quant_inclusao_file(
+                reg_path,
+                model_path,
+                responsavel.strip(),
+            )
+        except QuantInclusaoError as e:
+            flash(str(e), "error")
             return redirect(url_for("quantinclusao"))
 
-        template_map = _build_quant_template_map(ws_model)
-        valid_turmas = set(template_map.keys())
-
-        (
-            inc_counts,
-            plano_counts,
-            profs_by_turma,
-            plan_without_inclusion_by_turma,
-        ) = _collect_quant_counts_from_lista_corrida(ws_lista_reg, valid_turmas)
-
-        # Preenche as 3 linhas por turma: Inclusão / Plano / Profissionais
-        for turma, cells in template_map.items():
-            inc = inc_counts.get(turma, 0)
-            plano = plano_counts.get(turma, 0)
-            profs = len(profs_by_turma.get(turma, {}))
-
-            ws_model[cells["inc_qtd"]] = inc
-            ws_model[cells["plano_qtd"]] = plano
-            ws_model[cells["prof_qtd"]] = profs
-
-        # Cabeçalho
-        meses = {
-            1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
-            5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
-            9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO",
-        }
-        now = datetime.now()
-        mes_ano = f"{meses[now.month]}/{now.year}"
-
-        try:
-            b4 = ws_model["B4"].value or ""
-            b4s = str(b4)
-            if re.search(r"MÊS\s*/\s*\d{4}", b4s, flags=re.IGNORECASE):
-                ws_model["B4"] = re.sub(r"MÊS\s*/\s*\d{4}", mes_ano, b4s, flags=re.IGNORECASE)
-            else:
-                ws_model["B4"] = b4s if mes_ano in b4s else f"{b4s} - {mes_ano}".strip(" -")
-        except Exception:
-            pass
-
-        ws_model["C8"] = responsavel.strip()
-        ws_model["K8"] = now.strftime("%d/%m/%Y")
-
-        alerts = _build_quant_multi_prof_alerts(profs_by_turma, valid_turmas)
-        plan_without_inclusion_alerts = _build_quant_plan_without_inclusion_alerts(
-            plan_without_inclusion_by_turma,
-            valid_turmas,
-        )
-
-        _add_quant_inclusao_alerts_sheet(wb_model, alerts, plan_without_inclusion_alerts)
-
-        # Gera arquivo
-        output = BytesIO()
-        wb_model.save(output)
-        output.seek(0)
-
-        filename = f"Quadro_Quantitativo_de_Inclusao_{now.strftime('%d%m%Y')}.xlsx"
         resp = send_file(
-            output,
+            result.output,
             as_attachment=True,
-            download_name=filename,
+            download_name=result.filename,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
         # Dados pessoais ficam na aba ALERTAS do Excel, não em headers HTTP.
-        if alerts:
-            resp.headers["X-QuantInclusao-Alerts-Count"] = str(len(alerts))
+        if result.alerts:
+            resp.headers["X-QuantInclusao-Alerts-Count"] = str(len(result.alerts))
 
-        if plan_without_inclusion_alerts:
-            resp.headers["X-QuantInclusao-PlanWithoutInclusion-Count"] = str(len(plan_without_inclusion_alerts))
+        if result.plan_without_inclusion_alerts:
+            resp.headers["X-QuantInclusao-PlanWithoutInclusion-Count"] = str(
+                len(result.plan_without_inclusion_alerts)
+            )
 
         return resp
 

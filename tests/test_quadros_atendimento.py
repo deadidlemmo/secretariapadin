@@ -1,9 +1,11 @@
 import unittest
 from datetime import datetime
+from tempfile import TemporaryDirectory
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from services.quadros_atendimento import (
+    build_atendimento_mensal_file,
     extract_by_cols,
     extract_by_fallback_block,
     fill_eja_block,
@@ -118,6 +120,87 @@ class QuadrosAtendimentoServiceTests(unittest.TestCase):
         self.assertEqual(ws_model["M19"].value, 22)
         self.assertEqual(ws_model["R32"].value, 99)
         self.assertEqual(ws_model["R24"].value, "-")
+
+    def test_build_atendimento_mensal_file_generates_workbook(self):
+        with TemporaryDirectory() as tmpdir:
+            model_path = f"{tmpdir}/modelo.xlsx"
+            lista_path = f"{tmpdir}/lista.xlsx"
+
+            wb_model = Workbook()
+            wb_model.save(model_path)
+
+            wb_lista = Workbook()
+            ws_total = wb_lista.active
+            ws_total.title = "Total de Alunos"
+            ws_total["G1"] = "MATRICULAS"
+            ws_total.cell(row=2, column=3).value = "2\u00ba"
+            ws_total.cell(row=2, column=4).value = "A"
+            ws_total.cell(row=2, column=7).value = 10
+            ws_total.cell(row=2, column=8).value = 11
+            ws_total.cell(row=38, column=9).value = 120
+            ws_total.cell(row=40, column=9).value = 130
+            wb_lista.save(lista_path)
+
+            result = build_atendimento_mensal_file(
+                fundamental_path=lista_path,
+                model_path=model_path,
+                responsavel="Responsavel",
+                rf="123",
+                mes_ref="05/2026",
+                enable_eja=False,
+                now=datetime(2026, 5, 25),
+            )
+
+            self.assertEqual(result.filename, "Quadro de Atendimento Mensal - 2505.xlsx")
+            self.assertEqual(result.warnings, [])
+            self.assertTrue(any("[EJA] desativada" in item for item in result.debug_log))
+
+            generated = load_workbook(result.output, data_only=False)
+            ws = generated.active
+            self.assertEqual(ws["B5"].value, "E.M Jos\u00e9 Padin Mouta")
+            self.assertEqual(ws["C6"].value, "Responsavel")
+            self.assertEqual(ws["B7"].value, "123")
+            self.assertEqual(ws["A13"].value, "05/2026")
+            self.assertEqual(ws["B37"].value, 10)
+            self.assertEqual(ws["C37"].value, 11)
+            self.assertEqual(ws["R20"].value, 120)
+            self.assertEqual(ws["R28"].value, 130)
+            self.assertEqual(ws["L19"].value, 0)
+
+    def test_build_atendimento_mensal_file_warns_when_eja_sheet_missing(self):
+        with TemporaryDirectory() as tmpdir:
+            model_path = f"{tmpdir}/modelo.xlsx"
+            lista_path = f"{tmpdir}/lista.xlsx"
+            eja_path = f"{tmpdir}/eja.xlsx"
+
+            Workbook().save(model_path)
+
+            wb_lista = Workbook()
+            ws_total = wb_lista.active
+            ws_total.title = "Total de Alunos"
+            ws_total.cell(row=38, column=9).value = 120
+            ws_total.cell(row=40, column=9).value = 130
+            wb_lista.save(lista_path)
+
+            wb_eja = Workbook()
+            wb_eja.active.title = "Outra Aba"
+            wb_eja.save(eja_path)
+
+            result = build_atendimento_mensal_file(
+                fundamental_path=lista_path,
+                model_path=model_path,
+                responsavel="Responsavel",
+                rf="123",
+                mes_ref="05/2026",
+                enable_eja=True,
+                eja_path=eja_path,
+                now=datetime(2026, 5, 25),
+            )
+
+            self.assertEqual(len(result.warnings), 1)
+            self.assertIn("Total de Alunos", result.warnings[0])
+            generated = load_workbook(result.output, data_only=False)
+            self.assertEqual(generated.active["L19"].value, 0)
 
 
 if __name__ == "__main__":

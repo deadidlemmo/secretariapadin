@@ -1,7 +1,39 @@
 import re
 from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime
+from io import BytesIO
 
+from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
+
+
+MESES_UPPER_BR = {
+    1: "JANEIRO",
+    2: "FEVEREIRO",
+    3: "MARÇO",
+    4: "ABRIL",
+    5: "MAIO",
+    6: "JUNHO",
+    7: "JULHO",
+    8: "AGOSTO",
+    9: "SETEMBRO",
+    10: "OUTUBRO",
+    11: "NOVEMBRO",
+    12: "DEZEMBRO",
+}
+
+
+class QuantInclusaoError(ValueError):
+    pass
+
+
+@dataclass
+class QuantInclusaoBuildResult:
+    output: BytesIO
+    filename: str
+    alerts: list
+    plan_without_inclusion_alerts: list
 
 
 def collapse_spaces(text: str) -> str:
@@ -310,3 +342,99 @@ def add_quant_inclusao_alerts_sheet(wb, multi_prof_alerts, plan_without_inclusio
     widths = [26, 14, 42, 14, 36]
     for index, width in enumerate(widths, start=1):
         ws_alert.column_dimensions[get_column_letter(index)].width = width
+
+
+def get_quant_inclusao_mes_ano(now=None):
+    now = now or datetime.now()
+    return f"{MESES_UPPER_BR[now.month]}/{now.year}"
+
+
+def apply_quant_inclusao_header(ws_model, responsavel, now=None):
+    now = now or datetime.now()
+    mes_ano = get_quant_inclusao_mes_ano(now)
+
+    try:
+        b4 = ws_model["B4"].value or ""
+        b4s = str(b4)
+        if re.search(r"MÊS\s*/\s*\d{4}", b4s, flags=re.IGNORECASE):
+            ws_model["B4"] = re.sub(r"MÊS\s*/\s*\d{4}", mes_ano, b4s, flags=re.IGNORECASE)
+        else:
+            ws_model["B4"] = b4s if mes_ano in b4s else f"{b4s} - {mes_ano}".strip(" -")
+    except Exception:
+        pass
+
+    ws_model["C8"] = responsavel.strip()
+    ws_model["K8"] = now.strftime("%d/%m/%Y")
+
+
+def fill_quant_inclusao_workbook(wb_model, ws_lista_reg, responsavel, now=None):
+    ws_model = wb_model.active
+    template_map = build_template_map(ws_model)
+    valid_turmas = set(template_map.keys())
+
+    (
+        inc_counts,
+        plano_counts,
+        profs_by_turma,
+        plan_without_inclusion_by_turma,
+    ) = collect_counts_from_lista_corrida(ws_lista_reg, valid_turmas)
+
+    for turma, cells in template_map.items():
+        inc = inc_counts.get(turma, 0)
+        plano = plano_counts.get(turma, 0)
+        profs = len(profs_by_turma.get(turma, {}))
+
+        ws_model[cells["inc_qtd"]] = inc
+        ws_model[cells["plano_qtd"]] = plano
+        ws_model[cells["prof_qtd"]] = profs
+
+    now = now or datetime.now()
+    apply_quant_inclusao_header(ws_model, responsavel, now)
+
+    alerts = build_multi_prof_alerts(profs_by_turma, valid_turmas)
+    plan_without_inclusion_alerts = build_plan_without_inclusion_alerts(
+        plan_without_inclusion_by_turma,
+        valid_turmas,
+    )
+
+    add_quant_inclusao_alerts_sheet(wb_model, alerts, plan_without_inclusion_alerts)
+
+    return alerts, plan_without_inclusion_alerts
+
+
+def build_quant_inclusao_file(lista_path, model_path, responsavel, now=None):
+    wb_reg = None
+    try:
+        wb_reg = load_workbook(lista_path, data_only=True, read_only=True)
+        ws_lista_reg = wb_reg["LISTA CORRIDA"]
+    except Exception as exc:
+        raise QuantInclusaoError(f"Erro ao ler o arquivo: {exc}") from exc
+
+    try:
+        wb_model = load_workbook(model_path, data_only=False)
+    except Exception as exc:
+        raise QuantInclusaoError(f"Erro ao abrir o modelo de inclusão: {exc}") from exc
+
+    now = now or datetime.now()
+    try:
+        alerts, plan_without_inclusion_alerts = fill_quant_inclusao_workbook(
+            wb_model,
+            ws_lista_reg,
+            responsavel,
+            now,
+        )
+    finally:
+        if wb_reg is not None:
+            wb_reg.close()
+
+    output = BytesIO()
+    wb_model.save(output)
+    output.seek(0)
+
+    filename = f"Quadro_Quantitativo_de_Inclusao_{now.strftime('%d%m%Y')}.xlsx"
+    return QuantInclusaoBuildResult(
+        output=output,
+        filename=filename,
+        alerts=alerts,
+        plan_without_inclusion_alerts=plan_without_inclusion_alerts,
+    )

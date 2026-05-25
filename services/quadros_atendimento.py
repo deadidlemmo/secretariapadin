@@ -1,7 +1,11 @@
 import re
 import string
+import os
+from dataclasses import dataclass
 from datetime import datetime
+from io import BytesIO
 
+from openpyxl import load_workbook
 from utils.excel import set_merged_cell_value
 
 
@@ -46,6 +50,18 @@ EJA_ZERO_CELLS = [
     "M35", "M36", "M37",
     "R32",
 ]
+
+
+class AtendimentoMensalError(ValueError):
+    pass
+
+
+@dataclass
+class AtendimentoMensalBuildResult:
+    output: BytesIO
+    filename: str
+    debug_log: list
+    warnings: list
 
 
 def normalize_mes_ref(value, now=None) -> str:
@@ -287,3 +303,115 @@ def fill_eja_block(ws_modelo, ws_total_eja):
 
     set_merged_cell_value(ws_modelo, "R32", ws_total_eja.cell(row=20, column=7).value)
     set_merged_cell_value(ws_modelo, "R24", "-")
+
+
+def find_sheet_case_insensitive(wb, target_name: str):
+    target = (target_name or "").strip().lower()
+    for name in wb.sheetnames:
+        if (name or "").strip().lower() == target:
+            return name
+    return None
+
+
+def build_atendimento_mensal_file(
+    *,
+    fundamental_path,
+    model_path,
+    responsavel,
+    rf,
+    mes_ref,
+    enable_eja=False,
+    eja_path=None,
+    now=None,
+):
+    debug_log = []
+    warnings = []
+    now = now or datetime.now()
+
+    if not os.path.exists(model_path):
+        raise AtendimentoMensalError("Modelo Atendimento Mensal não encontrado.")
+
+    try:
+        with open(model_path, "rb") as model_file:
+            wb_modelo = load_workbook(model_file, data_only=False)
+    except Exception as exc:
+        raise AtendimentoMensalError(f"Erro ao ler o modelo de atendimento mensal: {exc}") from exc
+
+    ws_modelo = wb_modelo.worksheets[1] if len(wb_modelo.worksheets) > 1 else wb_modelo.active
+    write_header(ws_modelo, responsavel, rf, mes_ref, debug_log)
+
+    wb_lista = None
+    try:
+        try:
+            wb_lista = load_workbook(fundamental_path, data_only=True, read_only=True)
+        except Exception as exc:
+            raise AtendimentoMensalError("Erro ao ler o arquivo da Lista Piloto FUNDAMENTAL.") from exc
+
+        sheet_name = find_sheet_case_insensitive(wb_lista, "Total de Alunos")
+        if not sheet_name:
+            raise AtendimentoMensalError("A aba 'Total de Alunos' não foi encontrada na Lista Piloto FUNDAMENTAL.")
+
+        ws_total = wb_lista[sheet_name]
+
+        write_block(ws_modelo, "1º", {}, debug_log)
+
+        for serie_label in ["2º", "3º", "4º", "5º"]:
+            data = extract_by_cols(ws_total, serie_label, debug_log)
+            if not data:
+                debug_log.append(f"[{serie_label}] prioridade 1 (C/D) não encontrou turmas; tentando fallback...")
+                data = extract_by_fallback_block(ws_total, serie_label, debug_log)
+            write_block(ws_modelo, serie_label, data, debug_log)
+
+        write_turno_totals(ws_modelo, ws_total, debug_log)
+
+        if not enable_eja:
+            zero_eja_block(ws_modelo)
+            debug_log.append("[EJA] desativada: bloco EJA zerado.")
+        else:
+            _fill_or_zero_eja(ws_modelo, eja_path, debug_log, warnings)
+    finally:
+        if wb_lista is not None:
+            wb_lista.close()
+
+    output = BytesIO()
+    wb_modelo.save(output)
+    output.seek(0)
+
+    return AtendimentoMensalBuildResult(
+        output=output,
+        filename=f"Quadro de Atendimento Mensal - {now.strftime('%d%m')}.xlsx",
+        debug_log=debug_log,
+        warnings=warnings,
+    )
+
+
+def _fill_or_zero_eja(ws_modelo, eja_path, debug_log, warnings):
+    if not eja_path or not os.path.exists(eja_path):
+        zero_eja_block(ws_modelo)
+        debug_log.append("[EJA] habilitada, mas sem arquivo: bloco EJA zerado.")
+        return
+
+    wb_eja = None
+    try:
+        try:
+            wb_eja = load_workbook(eja_path, data_only=True, read_only=True)
+        except Exception as exc:
+            warning = f"Erro ao ler a Lista Piloto EJA: {exc}. Gerando sem EJA."
+            warnings.append(warning)
+            zero_eja_block(ws_modelo)
+            debug_log.append(f"[EJA] erro ao ler: {exc}. Bloco EJA zerado.")
+            return
+
+        sheet_name_eja = find_sheet_case_insensitive(wb_eja, "Total de Alunos")
+        if not sheet_name_eja:
+            warnings.append("A aba 'Total de Alunos' não foi encontrada na Lista Piloto EJA. Gerando sem EJA.")
+            zero_eja_block(ws_modelo)
+            debug_log.append("[EJA] aba Total de Alunos não encontrada. Bloco EJA zerado.")
+            return
+
+        ws_total_eja = wb_eja[sheet_name_eja]
+        fill_eja_block(ws_modelo, ws_total_eja)
+        debug_log.append("[EJA] preenchida com sucesso.")
+    finally:
+        if wb_eja is not None:
+            wb_eja.close()
