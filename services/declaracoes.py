@@ -434,6 +434,224 @@ MESES_FREQUENCIA_BR = {
     12: "Dezembro",
 }
 
+FREQUENCIA_FORM_MESES = [
+    ("jan", "Janeiro"),
+    ("fev", "Fevereiro"),
+    ("mar", "Mar\u00e7o"),
+    ("abr", "Abril"),
+    ("mai", "Maio"),
+    ("jun", "Junho"),
+    ("jul", "Julho"),
+    ("ago", "Agosto"),
+    ("set", "Setembro"),
+    ("out", "Outubro"),
+    ("nov", "Novembro"),
+    ("dez", "Dezembro"),
+]
+
+
+class DeclaracaoFormError(ValueError):
+    def __init__(self, message, segmento=None):
+        super().__init__(message)
+        self.segmento = segmento
+
+
+def normalizar_tipo_escolar_form(tipo) -> str:
+    text = (tipo or "").strip()
+    lower = text.lower()
+    if lower in ("transferencia", "transfer\u00eancia"):
+        return "Transferencia"
+    if lower in ("conclusao", "conclus\u00e3o"):
+        return "Conclus\u00e3o"
+    if lower in ("frequencia", "frequ\u00eancia"):
+        return "Frequencia"
+    return text
+
+
+def build_declaracao_personalizada_payload(form) -> dict:
+    segmento_pers = form.get("segmento_personalizado")
+    if segmento_pers not in ("Fundamental", "EJA"):
+        raise DeclaracaoFormError(
+            "Selecione o segmento (Ensino Fundamental ou EJA) na declara\u00e7\u00e3o personalizada.",
+            segmento="Personalizado",
+        )
+
+    nome_aluno = (form.get("nome_aluno") or "").strip()
+    data_nascimento = form.get("data_nascimento")
+    ra = (form.get("ra") or "").strip()
+    tipo_pers = form.get("tipo_declaracao_personalizada")
+
+    if (
+        not nome_aluno
+        or not data_nascimento
+        or not ra
+        or tipo_pers not in ("Conclusao", "MatriculaCancelada", "NCOM")
+    ):
+        raise DeclaracaoFormError(
+            "Preencha todos os dados obrigat\u00f3rios da declara\u00e7\u00e3o personalizada.",
+            segmento="Personalizado",
+        )
+
+    dados_personalizados = {
+        "segmento": segmento_pers,
+        "nome_aluno": nome_aluno,
+        "data_nascimento": data_nascimento,
+        "ra": ra,
+        "tipo_declaracao": tipo_pers,
+    }
+
+    if tipo_pers == "Conclusao":
+        ano_serie_concluida = (form.get("ano_serie_concluida") or "").strip()
+        ano_conclusao = (form.get("ano_conclusao") or "").strip()
+        deve_hist_unidade = form.get("deve_historico_unidade")
+        semestre_conclusao = (form.get("semestre_conclusao") or "").strip()
+
+        campos_invalidos = (
+            not ano_serie_concluida
+            or not ano_conclusao
+            or deve_hist_unidade not in ("Sim", "N\u00e3o")
+        )
+
+        if segmento_pers == "EJA" and not semestre_conclusao:
+            campos_invalidos = True
+
+        if campos_invalidos:
+            raise DeclaracaoFormError(
+                "Preencha todos os campos da declara\u00e7\u00e3o personalizada de conclus\u00e3o "
+                "(para EJA \u00e9 obrigat\u00f3rio informar o semestre).",
+                segmento="Personalizado",
+            )
+
+        dados_personalizados.update(
+            {
+                "ano_serie_concluida": ano_serie_concluida,
+                "ano_conclusao": ano_conclusao,
+                "deve_historico_unidade": (deve_hist_unidade == "Sim"),
+                "semestre_conclusao": semestre_conclusao,
+            }
+        )
+
+    elif tipo_pers == "MatriculaCancelada":
+        ano_serie_matricula = (form.get("ano_serie_matricula") or "").strip()
+        ano_matricula = (form.get("ano_matricula") or "").strip()
+        semestre_matricula = (form.get("semestre_matricula") or "").strip()
+
+        if not ano_serie_matricula or not ano_matricula or not semestre_matricula:
+            raise DeclaracaoFormError(
+                "Preencha todos os campos da declara\u00e7\u00e3o de matr\u00edcula cancelada.",
+                segmento="Personalizado",
+            )
+
+        dados_personalizados.update(
+            {
+                "ano_serie_matricula": ano_serie_matricula,
+                "ano_matricula": ano_matricula,
+                "semestre_matricula": semestre_matricula,
+            }
+        )
+
+    elif tipo_pers == "NCOM":
+        ano_serie_vaga = (form.get("ano_serie_vaga") or "").strip()
+        ano_referencia_ncom = (form.get("ano_referencia_ncom") or "").strip()
+        semestre_referencia_ncom = (form.get("semestre_referencia_ncom") or "").strip()
+
+        if not ano_serie_vaga or not ano_referencia_ncom:
+            raise DeclaracaoFormError(
+                "Preencha todos os campos obrigat\u00f3rios da declara\u00e7\u00e3o de "
+                "N\u00e3o Comparecimento (NCOM).",
+                segmento="Personalizado",
+            )
+
+        dados_personalizados.update(
+            {
+                "ano_serie_vaga": ano_serie_vaga,
+                "ano_referencia_ncom": ano_referencia_ncom,
+                "semestre_referencia_ncom": semestre_referencia_ncom,
+            }
+        )
+
+    return dados_personalizados
+
+
+def resolve_historico_fields(tipo, deve_historico_str, unidade_select="", unidade_manual=""):
+    unidade_anterior = (unidade_select or "").strip() or (unidade_manual or "").strip()
+
+    if tipo not in ("Transferencia", "Conclus\u00e3o"):
+        return False, ""
+
+    if deve_historico_str not in ("sim", "nao"):
+        raise DeclaracaoFormError("Por favor, responda se o aluno deve o hist\u00f3rico escolar.")
+
+    if deve_historico_str == "sim" and not unidade_anterior:
+        raise DeclaracaoFormError(
+            "Informe a unidade escolar anterior para a qual o aluno deve o hist\u00f3rico."
+        )
+
+    return deve_historico_str == "sim", unidade_anterior
+
+
+def build_dados_frequencia_form(form) -> dict:
+    dados_frequencia = {"meses": []}
+    algum_valido = False
+
+    for mes_id, mes_nome in FREQUENCIA_FORM_MESES:
+        dias_raw = (form.get(f"freq_{mes_id}_dias") or "").strip()
+        faltas_raw = (form.get(f"freq_{mes_id}_faltas") or "").strip()
+
+        if not dias_raw and not faltas_raw:
+            dados_frequencia["meses"].append(
+                {
+                    "id": mes_id,
+                    "nome": mes_nome,
+                    "dias_letivos": None,
+                    "faltas": None,
+                    "frequencia": None,
+                    "preenchido": False,
+                }
+            )
+            continue
+
+        try:
+            dias = float(dias_raw.replace(",", ".")) if dias_raw else None
+            faltas = float(faltas_raw.replace(",", ".")) if faltas_raw else None
+        except ValueError:
+            raise DeclaracaoFormError(
+                "Verifique os valores de dias letivos e faltas informados na frequ\u00eancia."
+            )
+
+        if dias is None or faltas is None:
+            raise DeclaracaoFormError(
+                "Para cada m\u00eas de frequ\u00eancia preenchido, informe tanto os dias "
+                "letivos quanto as faltas."
+            )
+
+        if dias <= 0 or faltas < 0 or faltas > dias:
+            raise DeclaracaoFormError(
+                "Os valores de dias letivos e faltas s\u00e3o inv\u00e1lidos em um ou mais meses. "
+                "Verifique e tente novamente."
+            )
+
+        freq_percent = ((dias - faltas) / dias) * 100.0
+        algum_valido = True
+
+        dados_frequencia["meses"].append(
+            {
+                "id": mes_id,
+                "nome": mes_nome,
+                "dias_letivos": dias,
+                "faltas": faltas,
+                "frequencia": round(freq_percent, 1),
+                "preenchido": True,
+            }
+        )
+
+    if not algum_valido:
+        raise DeclaracaoFormError(
+            "Informe ao menos um m\u00eas de frequ\u00eancia com dias letivos e faltas v\u00e1lidos."
+        )
+
+    return dados_frequencia
+
 
 def _format_frequency_number(value) -> str:
     try:

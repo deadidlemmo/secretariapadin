@@ -28,13 +28,18 @@ from services.carteirinhas import (
 )
 from services.declaracoes import (
     DECLARACAO_PRINT_CSS,
+    DeclaracaoFormError,
     build_declaracao_escolar_context,
+    build_declaracao_personalizada_payload,
+    build_dados_frequencia_form,
     build_lote_conclusao_5ano_context,
     build_lote_escolaridade_5ano_context,
     build_declaracao_personalizada_context,
     data_extenso_praia_grande,
     list_declaracao_alunos,
     load_declaracao_aluno_context,
+    normalizar_tipo_escolar_form,
+    resolve_historico_fields,
 )
 from services.fotos import save_student_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
@@ -583,112 +588,11 @@ def declaracao_tipo():
         # FLUXO: DECLARAÇÃO PERSONALIZADA
         # -------------------------------
         if modo_declaracao == "personalizada":
-            segmento_pers = request.form.get("segmento_personalizado")
-            if segmento_pers not in ("Fundamental", "EJA"):
-                flash(
-                    "Selecione o segmento (Ensino Fundamental ou EJA) na declaração personalizada.",
-                    "error",
-                )
-                return redirect(url_for("declaracao_tipo", segmento="Personalizado"))
-
-            nome_aluno = (request.form.get("nome_aluno") or "").strip()
-            data_nascimento = request.form.get("data_nascimento")
-            ra = (request.form.get("ra") or "").strip()
-            tipo_pers = request.form.get("tipo_declaracao_personalizada")
-
-            if (
-                not nome_aluno
-                or not data_nascimento
-                or not ra
-                or tipo_pers not in ("Conclusao", "MatriculaCancelada", "NCOM")
-            ):
-                flash(
-                    "Preencha todos os dados obrigatórios da declaração personalizada.",
-                    "error",
-                )
-                return redirect(url_for("declaracao_tipo", segmento="Personalizado"))
-
-            dados_personalizados = {
-                "segmento": segmento_pers,
-                "nome_aluno": nome_aluno,
-                "data_nascimento": data_nascimento,
-                "ra": ra,
-                "tipo_declaracao": tipo_pers,
-            }
-
-            if tipo_pers == "Conclusao":
-                ano_serie_concluida = (request.form.get("ano_serie_concluida") or "").strip()
-                ano_conclusao = (request.form.get("ano_conclusao") or "").strip()
-                deve_hist_unidade = request.form.get("deve_historico_unidade")
-                semestre_conclusao = (request.form.get("semestre_conclusao") or "").strip()
-
-                campos_invalidos = (
-                    not ano_serie_concluida
-                    or not ano_conclusao
-                    or deve_hist_unidade not in ("Sim", "Não")
-                )
-
-                if segmento_pers == "EJA" and not semestre_conclusao:
-                    campos_invalidos = True
-
-                if campos_invalidos:
-                    flash(
-                        "Preencha todos os campos da declaração personalizada de conclusão "
-                        "(para EJA é obrigatório informar o semestre).",
-                        "error",
-                    )
-                    return redirect(url_for("declaracao_tipo", segmento="Personalizado"))
-
-                dados_personalizados.update(
-                    {
-                        "ano_serie_concluida": ano_serie_concluida,
-                        "ano_conclusao": ano_conclusao,
-                        "deve_historico_unidade": (deve_hist_unidade == "Sim"),
-                        "semestre_conclusao": semestre_conclusao,
-                    }
-                )
-
-            elif tipo_pers == "MatriculaCancelada":
-                ano_serie_matricula = (request.form.get("ano_serie_matricula") or "").strip()
-                ano_matricula = (request.form.get("ano_matricula") or "").strip()
-                semestre_matricula = (request.form.get("semestre_matricula") or "").strip()
-
-                if not ano_serie_matricula or not ano_matricula or not semestre_matricula:
-                    flash(
-                        "Preencha todos os campos da declaração de matrícula cancelada.",
-                        "error",
-                    )
-                    return redirect(url_for("declaracao_tipo", segmento="Personalizado"))
-
-                dados_personalizados.update(
-                    {
-                        "ano_serie_matricula": ano_serie_matricula,
-                        "ano_matricula": ano_matricula,
-                        "semestre_matricula": semestre_matricula,
-                    }
-                )
-
-            elif tipo_pers == "NCOM":
-                ano_serie_vaga = (request.form.get("ano_serie_vaga") or "").strip()
-                ano_referencia_ncom = (request.form.get("ano_referencia_ncom") or "").strip()
-                semestre_referencia_ncom = (
-                    request.form.get("semestre_referencia_ncom") or ""
-                ).strip()
-
-                if not ano_serie_vaga or not ano_referencia_ncom:
-                    flash(
-                        "Preencha todos os campos obrigatórios da declaração de Não Comparecimento (NCOM).",
-                        "error",
-                    )
-                    return redirect(url_for("declaracao_tipo", segmento="Personalizado"))
-
-                dados_personalizados.update(
-                    {
-                        "ano_serie_vaga": ano_serie_vaga,
-                        "ano_referencia_ncom": ano_referencia_ncom,
-                        "semestre_referencia_ncom": semestre_referencia_ncom,
-                    }
-                )
+            try:
+                dados_personalizados = build_declaracao_personalizada_payload(request.form)
+            except DeclaracaoFormError as e:
+                flash(str(e), "error")
+                return redirect(url_for("declaracao_tipo", segmento=e.segmento or "Personalizado"))
 
             declaracao_html = gerar_declaracao_personalizada(dados_personalizados)
 
@@ -710,15 +614,7 @@ def declaracao_tipo():
             return redirect(url_for("declaracao_tipo"))
 
         rm = (request.form.get("rm") or "").strip()
-        tipo = (request.form.get("tipo") or "").strip()
-
-        tipo_lower = tipo.lower()
-        if tipo_lower in ("transferencia", "transferência"):
-            tipo = "Transferencia"
-        elif tipo_lower in ("conclusao", "conclusão"):
-            tipo = "Conclusão"
-        elif tipo_lower in ("frequencia", "frequência"):
-            tipo = "Frequencia"
+        tipo = normalizar_tipo_escolar_form(request.form.get("tipo"))
 
         deve_historico_str = request.form.get("deve_historico")
 
@@ -771,105 +667,24 @@ def declaracao_tipo():
             flash("Escolha o aluno e o tipo de declaração.", "error")
             return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        if tipo in ("Transferencia", "Conclusão"):
-            if deve_historico_str not in ("sim", "nao"):
-                flash("Por favor, responda se o aluno deve o histórico escolar.", "error")
-                return redirect(url_for("declaracao_tipo", segmento=segmento))
-
-            if deve_historico_str == "sim" and not unidade_anterior:
-                flash(
-                    "Informe a unidade escolar anterior para a qual o aluno deve o histórico.",
-                    "error",
-                )
-                return redirect(url_for("declaracao_tipo", segmento=segmento))
-
-            deve_historico = deve_historico_str == "sim"
-        else:
-            deve_historico = False
-            unidade_anterior = ""
+        try:
+            deve_historico, unidade_anterior = resolve_historico_fields(
+                tipo,
+                deve_historico_str,
+                unidade_select,
+                unidade_manual,
+            )
+        except DeclaracaoFormError as e:
+            flash(str(e), "error")
+            return redirect(url_for("declaracao_tipo", segmento=segmento))
 
         dados_frequencia = None
 
         if tipo == "Frequencia":
-            meses = [
-                ("jan", "Janeiro"),
-                ("fev", "Fevereiro"),
-                ("mar", "Março"),
-                ("abr", "Abril"),
-                ("mai", "Maio"),
-                ("jun", "Junho"),
-                ("jul", "Julho"),
-                ("ago", "Agosto"),
-                ("set", "Setembro"),
-                ("out", "Outubro"),
-                ("nov", "Novembro"),
-                ("dez", "Dezembro"),
-            ]
-
-            dados_frequencia = {"meses": []}
-            algum_valido = False
-
-            for mes_id, mes_nome in meses:
-                dias_raw = (request.form.get(f"freq_{mes_id}_dias") or "").strip()
-                faltas_raw = (request.form.get(f"freq_{mes_id}_faltas") or "").strip()
-
-                if not dias_raw and not faltas_raw:
-                    dados_frequencia["meses"].append(
-                        {
-                            "id": mes_id,
-                            "nome": mes_nome,
-                            "dias_letivos": None,
-                            "faltas": None,
-                            "frequencia": None,
-                            "preenchido": False,
-                        }
-                    )
-                    continue
-
-                try:
-                    dias = float(dias_raw.replace(",", ".")) if dias_raw else None
-                    faltas = float(faltas_raw.replace(",", ".")) if faltas_raw else None
-                except ValueError:
-                    flash(
-                        "Verifique os valores de dias letivos e faltas informados na frequência.",
-                        "error",
-                    )
-                    return redirect(url_for("declaracao_tipo", segmento=segmento))
-
-                if dias is None or faltas is None:
-                    flash(
-                        "Para cada mês de frequência preenchido, informe tanto os dias letivos quanto as faltas.",
-                        "error",
-                    )
-                    return redirect(url_for("declaracao_tipo", segmento=segmento))
-
-                if dias <= 0 or faltas < 0 or faltas > dias:
-                    flash(
-                        "Os valores de dias letivos e faltas são inválidos em um ou mais meses. "
-                        "Verifique e tente novamente.",
-                        "error",
-                    )
-                    return redirect(url_for("declaracao_tipo", segmento=segmento))
-
-                freq_percent = ((dias - faltas) / dias) * 100.0
-                algum_valido = True
-
-                dados_frequencia["meses"].append(
-                    {
-                        "id": mes_id,
-                        "nome": mes_nome,
-                        "dias_letivos": dias,
-                        "faltas": faltas,
-                        "frequencia": round(freq_percent, 1),
-                        "preenchido": True,
-                    }
-                )
-
-            if not algum_valido:
-                flash(
-                    "Informe ao menos um mês de frequência com dias letivos e faltas válidos.",
-                    "error",
-                )
+            try:
+                dados_frequencia = build_dados_frequencia_form(request.form)
+            except DeclaracaoFormError as e:
+                flash(str(e), "error")
                 return redirect(url_for("declaracao_tipo", segmento=segmento))
 
         declaracao_html = gerar_declaracao_escolar(

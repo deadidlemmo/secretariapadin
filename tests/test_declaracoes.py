@@ -7,10 +7,13 @@ from pathlib import Path
 import pandas as pd
 
 from services.declaracoes import (
+    DeclaracaoFormError,
+    build_declaracao_personalizada_payload,
     build_declaracao_escolar_context,
     build_lote_conclusao_5ano_context,
     build_lote_escolaridade_5ano_context,
     build_declaracao_personalizada_context,
+    build_dados_frequencia_form,
     build_notas_tabela_html,
     contexto_segmento,
     data_extenso_praia_grande,
@@ -23,9 +26,11 @@ from services.declaracoes import (
     normalizar_segmento_personalizado,
     normalizar_semestre,
     normalizar_tipo_declaracao,
+    normalizar_tipo_escolar_form,
     parse_data_nascimento_personalizada,
     read_lista_corrida_fundamental,
     read_lista_eja_declaracoes,
+    resolve_historico_fields,
 )
 
 
@@ -56,6 +61,70 @@ class DeclaracoesServiceTests(unittest.TestCase):
         self.assertEqual(parse_data_nascimento_personalizada("2026-05-25"), "25/05/2026")
         self.assertEqual(parse_data_nascimento_personalizada("25/05/2026"), "25/05/2026")
         self.assertEqual(parse_data_nascimento_personalizada(""), "Desconhecida")
+
+    def test_declaracao_form_helpers_personalizada_payload(self):
+        payload = build_declaracao_personalizada_payload(
+            {
+                "segmento_personalizado": "EJA",
+                "nome_aluno": "Aluno EJA",
+                "data_nascimento": "2026-05-25",
+                "ra": "123",
+                "tipo_declaracao_personalizada": "Conclusao",
+                "ano_serie_concluida": "8\u00aa S\u00c9RIE E.F",
+                "ano_conclusao": "2026",
+                "deve_historico_unidade": "N\u00e3o",
+                "semestre_conclusao": "2\u00ba semestre",
+            }
+        )
+
+        self.assertEqual(payload["segmento"], "EJA")
+        self.assertFalse(payload["deve_historico_unidade"])
+        self.assertEqual(payload["semestre_conclusao"], "2\u00ba semestre")
+
+        with self.assertRaises(DeclaracaoFormError):
+            build_declaracao_personalizada_payload(
+                {
+                    "segmento_personalizado": "EJA",
+                    "nome_aluno": "Aluno EJA",
+                    "data_nascimento": "2026-05-25",
+                    "ra": "123",
+                    "tipo_declaracao_personalizada": "Conclusao",
+                    "ano_serie_concluida": "8\u00aa S\u00c9RIE E.F",
+                    "ano_conclusao": "2026",
+                    "deve_historico_unidade": "N\u00e3o",
+                }
+            )
+
+    def test_declaracao_form_helpers_tipo_historico_e_frequencia(self):
+        self.assertEqual(normalizar_tipo_escolar_form("transfer\u00eancia"), "Transferencia")
+        self.assertEqual(normalizar_tipo_escolar_form("Conclusao"), "Conclus\u00e3o")
+        self.assertEqual(normalizar_tipo_escolar_form("frequ\u00eancia"), "Frequencia")
+
+        deve, unidade = resolve_historico_fields(
+            "Transferencia",
+            "sim",
+            unidade_select=" Escola A ",
+            unidade_manual="",
+        )
+        self.assertTrue(deve)
+        self.assertEqual(unidade, "Escola A")
+
+        deve, unidade = resolve_historico_fields("Escolaridade", None, "", "Escola B")
+        self.assertFalse(deve)
+        self.assertEqual(unidade, "")
+
+        frequencia = build_dados_frequencia_form(
+            {
+                "freq_jan_dias": "20",
+                "freq_jan_faltas": "2",
+            }
+        )
+        self.assertEqual(frequencia["meses"][0]["frequencia"], 90.0)
+        self.assertTrue(frequencia["meses"][0]["preenchido"])
+        self.assertFalse(frequencia["meses"][1]["preenchido"])
+
+        with self.assertRaises(DeclaracaoFormError):
+            build_dados_frequencia_form({"freq_jan_dias": "20"})
 
     def test_build_notas_tabela_html_formats_values_and_colors(self):
         with tempfile.TemporaryDirectory() as tmpdir:
