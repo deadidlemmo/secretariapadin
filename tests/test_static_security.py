@@ -82,6 +82,21 @@ class StaticSecurityTests(unittest.TestCase):
         self.assertNotIn("{{", js)
         self.assertNotIn("{%", js)
 
+    def test_quadro_transferencias_assets_are_externalized(self):
+        template = read_text("templates/quadro_transferencias.html")
+        js = read_text("static/js/quadro_transferencias.js")
+
+        self.assertNotIn("{% block extra_styles %}", template)
+        self.assertNotIn("<style>", template)
+        self.assertNotIn("<script>\n", template)
+        self.assertNotIn("style=", template)
+        self.assertIn("css/quadro_transferencias.css", template)
+        self.assertIn("js/quadro_transferencias.js", template)
+        self.assertTrue((ROOT / "static" / "css" / "quadro_transferencias.css").exists())
+        self.assertTrue((ROOT / "static" / "js" / "quadro_transferencias.js").exists())
+        self.assertNotIn("{{", js)
+        self.assertNotIn("{%", js)
+
 
 if __name__ == "__main__":
     unittest.main()
