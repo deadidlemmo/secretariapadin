@@ -82,6 +82,15 @@ class StaticSecurityTests(unittest.TestCase):
         self.assertNotIn("{{", js)
         self.assertNotIn("{%", js)
 
+    def test_global_theme_is_loaded(self):
+        base = read_text("templates/base.html")
+        confere = read_text("templates/index.html")
+
+        self.assertIn("css/app_theme.css", base)
+        self.assertIn("css/app_theme.css", confere)
+        self.assertIn("confere-page", confere)
+        self.assertTrue((ROOT / "static" / "css" / "app_theme.css").exists())
+
     def test_quadro_transferencias_assets_are_externalized(self):
         template = read_text("templates/quadro_transferencias.html")
         js = read_text("static/js/quadro_transferencias.js")

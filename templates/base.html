@@ -453,6 +453,7 @@
       {# CSS adicional específico de cada página (apenas declarações CSS, sem <style>) #}
       {% block extra_styles %}{% endblock %}
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app_theme.css') }}">
   </head>
 
   <body>

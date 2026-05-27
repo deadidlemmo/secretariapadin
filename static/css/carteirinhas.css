@@ -577,3 +577,135 @@
       box-shadow: 0 0 0 0.15cm rgba(255, 193, 7, 0.9) !important;
       transition: box-shadow 0.3s ease-in-out;
     }
+
+    @media screen {
+      body#carteirinhas-page {
+        background: linear-gradient(135deg, #e7f3ef 0%, #f7faf8 48%, #eff3f9 100%);
+        color: #20352f;
+        padding: 18px;
+      }
+
+      #carteirinhas-page .carteirinhas-container {
+        max-width: 1220px;
+      }
+
+      #carteirinhas-page .carteirinhas-container > .no-print {
+        position: sticky;
+        top: 10px;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 12px;
+        margin-bottom: 14px !important;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #d9e4df;
+        border-top: 4px solid #1f6f5f;
+        border-radius: 8px;
+        box-shadow: 0 16px 34px rgba(30, 53, 47, 0.14);
+        backdrop-filter: blur(12px);
+      }
+
+      #search-container.no-print {
+        width: 100%;
+        margin: 0 0 18px;
+        display: flex;
+        justify-content: center;
+      }
+
+      #localizarAluno {
+        width: min(100%, 420px);
+        border-radius: 8px;
+        border-color: #b8cbc3;
+        box-shadow: 0 8px 18px rgba(30, 53, 47, 0.06);
+        outline: none;
+      }
+
+      #localizarAluno:focus {
+        border-color: #1f6f5f;
+        box-shadow: 0 0 0 0.08cm rgba(31, 111, 95, 0.16);
+      }
+
+      .alunos-sem-fotos-btn,
+      .imprimir-carteirinhas,
+      .imprimir-pagina,
+      .relatorio-acao-link,
+      .relatorio-acao-primary {
+        border-radius: 8px;
+        font-weight: 700;
+        letter-spacing: 0;
+        box-shadow: 0 10px 20px rgba(30, 53, 47, 0.12);
+      }
+
+      .alunos-sem-fotos-btn,
+      .imprimir-carteirinhas,
+      .relatorio-acao-primary {
+        background: linear-gradient(135deg, #174f45, #1f6f5f);
+      }
+
+      .alunos-sem-fotos-btn:hover,
+      .imprimir-carteirinhas:hover,
+      .relatorio-acao-primary:hover {
+        background: linear-gradient(135deg, #123f37, #1c6556);
+      }
+
+      .imprimir-pagina {
+        background: #c77c35;
+      }
+
+      .imprimir-pagina:hover {
+        background: #a96427;
+      }
+
+      .filtro-foto-form {
+        border-radius: 8px;
+        border-color: #d9e4df;
+        box-shadow: none;
+      }
+
+      .filtro-foto-form input[type="checkbox"] {
+        accent-color: #1f6f5f;
+      }
+
+      .filtro-foto-pill {
+        color: #174f45;
+      }
+
+      #cards-success {
+        background: #edf8f1;
+        color: #2f7d56;
+        border: 1px solid #b8dfc8;
+        border-radius: 8px;
+      }
+
+      #relatorio-container {
+        background: rgba(20, 35, 31, 0.55);
+      }
+
+      #relatorio-container .relatorio-inner {
+        background: #ffffff;
+        border-radius: 8px;
+        border-color: #d9e4df;
+        box-shadow: 0 24px 60px rgba(20, 35, 31, 0.25);
+      }
+
+      .relatorio-header {
+        background: linear-gradient(135deg, #174f45, #1f6f5f);
+      }
+
+      #filtro-relatorio {
+        border-radius: 8px;
+      }
+
+      .serie-divider td {
+        background-color: #e7f3ef;
+        border-bottom-color: #b8cbc3;
+        color: #174f45;
+      }
+
+      .relatorio-acao-link {
+        background: #f5f8f6;
+        color: #20352f;
+      }
+    }
