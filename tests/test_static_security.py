@@ -69,6 +69,33 @@ class StaticSecurityTests(unittest.TestCase):
         self.assertNotIn("{{", js)
         self.assertNotIn("{%", js)
 
+    def test_declaracao_tipo_preserves_form_contracts(self):
+        template = read_text("templates/declaracao_tipo.html")
+
+        for endpoint in ["declaracao_tipo", "escolas_search"]:
+            self.assertIn(f"url_for('{endpoint}'", template)
+        for expected in [
+            'id="declaracao-page"',
+            'data-segmento=',
+            'data-tem-lista=',
+            'id="form-declaracao"',
+            'id="form-declaracao-personalizada"',
+            'name="segmento_escolhido"',
+            'id="rm"',
+            'name="rm"',
+            'id="tipo"',
+            'name="tipo"',
+            'name="excel_file"',
+            'name="modo_declaracao"',
+            'name="tipo_declaracao_personalizada"',
+            'name="nome_aluno"',
+        ]:
+            self.assertIn(expected, template)
+        self.assertIn("declaracao-page-header", template)
+        self.assertIn("segmento-card-arrow", template)
+        self.assertIn("declaracao-upload-zone", template)
+        self.assertIn("status-alert-content", template)
+
     def test_carteirinhas_assets_are_externalized(self):
         template = read_text("templates/gerar_carteirinhas.html")
         js = read_text("static/js/carteirinhas.js")
@@ -85,11 +112,54 @@ class StaticSecurityTests(unittest.TestCase):
     def test_global_theme_is_loaded(self):
         base = read_text("templates/base.html")
         confere = read_text("templates/index.html")
+        carteirinhas = read_text("templates/gerar_carteirinhas.html")
+        theme_js = read_text("static/js/theme.js")
 
         self.assertIn("css/app_theme.css", base)
         self.assertIn("css/app_theme.css", confere)
+        self.assertIn("js/theme.js", base)
+        self.assertIn("js/theme.js", confere)
+        self.assertIn("js/theme.js", carteirinhas)
+        self.assertIn("data-theme-toggle", base)
+        self.assertIn("data-theme-toggle", confere)
+        self.assertIn("data-theme-toggle", carteirinhas)
         self.assertIn("confere-page", confere)
         self.assertTrue((ROOT / "static" / "css" / "app_theme.css").exists())
+        self.assertTrue((ROOT / "static" / "js" / "theme.js").exists())
+        self.assertNotIn("{{", theme_js)
+        self.assertNotIn("{%", theme_js)
+
+    def test_login_uses_global_header_layout(self):
+        base = read_text("templates/base.html")
+        template = read_text("templates/login.html")
+
+        self.assertIn('id="app-header"', base)
+        self.assertIn("Sistema da Secretaria Escolar", base)
+        self.assertIn("E.M. José Padin Mouta", base)
+        self.assertIn("auth-page", template)
+        self.assertIn("auth-card", template)
+        self.assertNotIn("auth-header", template)
+
+    def test_upload_listas_preserves_file_fields(self):
+        template = read_text("templates/upload_listas.html")
+
+        self.assertIn('id="lista_fundamental"', template)
+        self.assertIn('name="lista_fundamental"', template)
+        self.assertIn("required", template)
+        self.assertIn('id="lista_eja"', template)
+        self.assertIn('name="lista_eja"', template)
+        self.assertIn("upload-drop-zone", template)
+        self.assertIn('data-input-id="lista_fundamental"', template)
+        self.assertIn('data-input-id="lista_eja"', template)
+
+    def test_dashboard_preserves_navigation_links(self):
+        template = read_text("templates/dashboard.html")
+
+        for endpoint in ["declaracao_tipo", "carteirinhas", "quadros", "logout_route"]:
+            self.assertIn(f"url_for('{endpoint}')", template)
+        self.assertIn("https://conferealunos.onrender.com/", template)
+        self.assertIn("dashboard-page", template)
+        self.assertIn("option-card", template)
 
     def test_quadro_transferencias_assets_are_externalized(self):
         template = read_text("templates/quadro_transferencias.html")

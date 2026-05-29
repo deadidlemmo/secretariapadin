@@ -3,80 +3,267 @@
 {% block title %}Upload de Listas Piloto{% endblock %}
 
 {% block extra_styles %}
-  .container-upload {
+  .container-upload.upload-page {
     position: relative;
     z-index: 1;
-    background: rgba(255, 255, 255, 0.98);
-    padding: 32px 28px;
-    border-radius: 16px;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
     width: 100%;
-    max-width: 640px;
-    color: #283E51;
+    max-width: 760px;
+    padding: 34px 34px 32px;
   }
 
-  .container-upload h2 {
-    font-size: 1.3rem;
-    font-weight: 600;
-    margin-bottom: 8px;
+  .upload-page-header {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
     text-align: center;
+    margin-bottom: 22px;
   }
 
-  .container-upload .page-description {
-    font-size: 0.9rem;
-    color: #5d6c7a;
-    text-align: center;
-    margin-bottom: 20px;
+  .upload-page-icon {
+    width: 54px;
+    height: 54px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--app-radius);
+    background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
+    color: #ffffff;
+    box-shadow: 0 14px 28px rgba(31, 111, 95, 0.18);
   }
 
-  .container-upload .section-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #374a5a;
-    margin-bottom: 6px;
+  .container-upload.upload-page h2 {
+    font-size: 1.44rem;
+    font-weight: 900;
+    margin: 0;
+  }
+
+  .container-upload.upload-page .page-description {
+    max-width: 62ch;
+    font-size: 0.94rem;
+    line-height: 1.55;
+    margin: 0;
   }
 
   .upload-steps {
-    font-size: 0.8rem;
-    color: #4a5563;
-    background: #f4f6fb;
-    border-radius: 10px;
-    padding: 10px 12px;
-    margin-bottom: 18px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0 0 22px;
+    padding: 0;
+    list-style: none;
+    background: transparent;
+    border: 0;
   }
 
-  .upload-steps strong {
-    color: #283E51;
+  .upload-steps li {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    min-height: 72px;
+    padding: 12px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    background: color-mix(in srgb, var(--app-surface-muted) 82%, transparent);
   }
 
-  .custom-file-label::after {
-    content: "Procurar";
+  .upload-step-number {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--app-radius);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-dark);
+    font-weight: 900;
+    font-size: 0.82rem;
   }
 
-  /* Zona de drag & drop */
-  .drop-zone {
-    border: 2px dashed #cbd5e0;
-    border-radius: 10px;
-    padding: 14px 14px 10px 14px;
-    background-color: #f8fafc;
+  .upload-steps p {
+    margin: 0;
+    color: var(--app-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .upload-fields {
+    display: grid;
+    gap: 18px;
+  }
+
+  .upload-field {
+    display: grid;
+    gap: 10px;
+  }
+
+  .upload-field-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .upload-field-heading h3 {
+    margin: 2px 0 0;
+    color: var(--app-text);
+    font-size: 0.96rem;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .upload-field-kicker,
+  .upload-format-pill {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    border-radius: var(--app-radius);
+    font-size: 0.72rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .upload-field-kicker {
+    color: var(--app-primary-dark);
+    text-transform: uppercase;
+  }
+
+  .upload-format-pill {
+    padding: 7px 9px;
+    background: var(--app-primary-soft);
+    border: 1px solid var(--app-border);
+    color: var(--app-primary-dark);
+    white-space: nowrap;
+  }
+
+  .container-upload .upload-drop-zone {
+    position: relative;
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    min-height: 132px;
+    padding: 20px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 8%, transparent), transparent 56%),
+      var(--app-upload-gradient);
     cursor: pointer;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
+    overflow: hidden;
+    transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
   }
 
-  .drop-zone:hover {
-    border-color: #4B79A1;
-    background-color: #f1f6ff;
+  .container-upload .upload-drop-zone::after {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border: 1px dashed var(--app-border-strong);
+    border-radius: calc(var(--app-radius) - 2px);
+    pointer-events: none;
+    opacity: 0.88;
   }
 
-  .drop-zone.dragover {
-    border-color: #4B79A1;
-    background-color: #e4efff;
+  .container-upload .upload-drop-zone:hover,
+  .container-upload .upload-drop-zone.dragover {
+    transform: translateY(-1px);
+    border-color: var(--app-primary);
+    box-shadow: var(--app-shadow-soft);
+  }
+
+  .upload-drop-icon,
+  .upload-drop-copy,
+  .upload-browse {
+    position: relative;
+    z-index: 1;
+  }
+
+  .upload-drop-icon {
+    width: 52px;
+    height: 52px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--app-radius);
+    background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
+    color: #ffffff;
+    box-shadow: 0 12px 24px rgba(31, 111, 95, 0.18);
+  }
+
+  .upload-drop-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .upload-drop-title {
+    color: var(--app-text);
+    font-size: 0.96rem;
+    font-weight: 900;
+    line-height: 1.25;
   }
 
   .drop-hint {
-    font-size: 0.8rem;
-    color: #6b7280;
+    color: var(--app-muted);
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .upload-file-name {
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
     margin-top: 6px;
+    padding: 5px 9px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    background: var(--app-surface);
+    color: var(--app-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .upload-drop-zone.has-file .upload-file-name {
+    border-color: color-mix(in srgb, var(--app-success) 45%, var(--app-border));
+    background: color-mix(in srgb, var(--app-success) 12%, var(--app-surface));
+    color: var(--app-text);
+  }
+
+  .upload-browse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 108px;
+    min-height: 42px;
+    padding: 0 14px;
+    border-radius: var(--app-radius);
+    background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
+    color: #ffffff;
+    font-size: 0.86rem;
+    font-weight: 900;
+    box-shadow: 0 10px 20px rgba(31, 111, 95, 0.16);
+  }
+
+  .upload-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .upload-submit-row {
+    margin-top: 24px;
+  }
+
+  #upload-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 50px;
+    font-size: 0.96rem;
   }
 
   /* Overlay de carregamento */
@@ -118,22 +305,90 @@
       transform: rotate(360deg);
     }
   }
+
+  html[data-theme="dark"] .upload-field-kicker {
+    color: #8ce3cd;
+  }
+
+  html[data-theme="dark"] .upload-format-pill,
+  html[data-theme="dark"] .upload-step-number {
+    background: #20302b;
+    border-color: #3b514a;
+    color: #d9f2ea;
+  }
+
+  html[data-theme="dark"] .container-upload .upload-drop-zone {
+    background:
+      linear-gradient(135deg, rgba(98, 208, 181, 0.10), transparent 56%),
+      var(--app-upload-gradient);
+  }
+
+  html[data-theme="dark"] .upload-browse {
+    background: linear-gradient(135deg, #1e7f6d, #2aa68f);
+    color: #ffffff;
+  }
+
+  @media (max-width: 760px) {
+    .container-upload.upload-page {
+      padding: 26px 18px 24px;
+    }
+
+    .upload-steps {
+      grid-template-columns: 1fr;
+    }
+
+    .container-upload .upload-drop-zone {
+      grid-template-columns: 46px minmax(0, 1fr);
+      min-height: 148px;
+      padding: 18px;
+    }
+
+    .upload-drop-icon {
+      width: 44px;
+      height: 44px;
+    }
+
+    .upload-browse {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+
+    .upload-field-heading {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
 {% endblock %}
 
 {% block content %}
-  <div class="container-upload">
-    <h2>Upload de Listas Piloto</h2>
-    <p class="page-description">
-      Envie a planilha oficial da Lista Piloto do Ensino Fundamental para liberar o uso do sistema.
-      A Lista Piloto da EJA é opcional e pode ser enviada quando necessário.
-    </p>
-
-    <div class="upload-steps">
-      <strong>Como fazer:</strong><br>
-      1. Arraste o arquivo ou clique na área de seleção da Lista Piloto do Ensino Fundamental.<br>
-      2. (Opcional) Arraste o arquivo ou clique na área de seleção da Lista Piloto da EJA.<br>
-      3. Clique em <strong>Carregar listas</strong> e aguarde o processamento.
+  <div class="container-upload upload-page">
+    <div class="upload-page-header">
+      <div class="upload-page-icon">
+        <i class="fas fa-file-arrow-up" aria-hidden="true"></i>
+      </div>
+      <div>
+        <h2>Upload de Listas Piloto</h2>
+        <p class="page-description">
+          Envie a planilha oficial do Ensino Fundamental para liberar o uso do sistema.
+          A lista da EJA é opcional e pode ser enviada quando necessário.
+        </p>
+      </div>
     </div>
+
+    <ol class="upload-steps" aria-label="Etapas para carregar as listas piloto">
+      <li>
+        <span class="upload-step-number">1</span>
+        <p>Selecione a Lista Piloto do Ensino Fundamental.</p>
+      </li>
+      <li>
+        <span class="upload-step-number">2</span>
+        <p>Inclua a Lista Piloto da EJA quando houver.</p>
+      </li>
+      <li>
+        <span class="upload-step-number">3</span>
+        <p>Carregue as listas e aguarde o processamento.</p>
+      </li>
+    </ol>
 
     {# mensagens de sucesso/erro do flash() #}
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -150,58 +405,77 @@
     {% endwith %}
 
     <form id="upload-form" method="POST" enctype="multipart/form-data">
-      <div class="form-group">
-        <div class="section-title">Lista Piloto do Ensino Fundamental</div>
-        <div class="drop-zone" data-input-id="lista_fundamental">
-          <div class="custom-file">
+      <div class="upload-fields">
+        <section class="upload-field" aria-labelledby="lista-fundamental-title">
+          <div class="upload-field-heading">
+            <div>
+              <span class="upload-field-kicker">Obrigatória</span>
+              <h3 id="lista-fundamental-title">Lista Piloto do Ensino Fundamental</h3>
+            </div>
+            <span class="upload-format-pill">.xlsx .xls .xlsm</span>
+          </div>
+
+          <label class="drop-zone upload-drop-zone" data-input-id="lista_fundamental" for="lista_fundamental">
             <input
               type="file"
-              class="custom-file-input"
+              class="custom-file-input upload-file-input"
               id="lista_fundamental"
               name="lista_fundamental"
               accept=".xlsx,.xls,.xlsm"
               required
             >
-            <label class="custom-file-label" for="lista_fundamental">
-              Selecione a Lista Piloto - Ensino Fundamental
-            </label>
-          </div>
-          <div class="drop-hint">
-            Arraste e solte a planilha aqui ou clique para procurar.
-          </div>
-        </div>
-        <small class="form-text text-muted">
-          Formatos aceitos: .xlsx, .xls, .xlsm
-        </small>
-      </div>
+            <span class="upload-drop-icon">
+              <i class="fas fa-file-excel" aria-hidden="true"></i>
+            </span>
+            <span class="upload-drop-copy">
+              <span class="upload-drop-title">Arraste a planilha aqui</span>
+              <span class="drop-hint">ou clique para procurar no computador.</span>
+              <span class="upload-file-name" data-default="Nenhum arquivo selecionado">
+                Nenhum arquivo selecionado
+              </span>
+            </span>
+            <span class="upload-browse">Procurar</span>
+          </label>
+        </section>
 
-      <div class="form-group mt-3">
-        <div class="section-title">Lista Piloto da EJA (opcional)</div>
-        <div class="drop-zone" data-input-id="lista_eja">
-          <div class="custom-file">
+        <section class="upload-field" aria-labelledby="lista-eja-title">
+          <div class="upload-field-heading">
+            <div>
+              <span class="upload-field-kicker">Opcional</span>
+              <h3 id="lista-eja-title">Lista Piloto da EJA</h3>
+            </div>
+            <span class="upload-format-pill">.xlsx .xls .xlsm</span>
+          </div>
+
+          <label class="drop-zone upload-drop-zone" data-input-id="lista_eja" for="lista_eja">
             <input
               type="file"
-              class="custom-file-input"
+              class="custom-file-input upload-file-input"
               id="lista_eja"
               name="lista_eja"
               accept=".xlsx,.xls,.xlsm"
             >
-            <label class="custom-file-label" for="lista_eja">
-              Selecione a Lista Piloto - EJA (opcional)
-            </label>
-          </div>
-          <div class="drop-hint">
-            Arraste e solte a planilha aqui ou clique para procurar.
-          </div>
-        </div>
-        <small class="form-text text-muted">
-          Formatos aceitos: .xlsx, .xls, .xlsm
-        </small>
+            <span class="upload-drop-icon">
+              <i class="fas fa-file-excel" aria-hidden="true"></i>
+            </span>
+            <span class="upload-drop-copy">
+              <span class="upload-drop-title">Arraste a planilha aqui</span>
+              <span class="drop-hint">ou clique para procurar no computador.</span>
+              <span class="upload-file-name" data-default="Nenhum arquivo selecionado">
+                Nenhum arquivo selecionado
+              </span>
+            </span>
+            <span class="upload-browse">Procurar</span>
+          </label>
+        </section>
       </div>
 
-      <button id="upload-submit" type="submit" class="btn btn-primary btn-block mt-4">
-        Carregar listas
-      </button>
+      <div class="upload-submit-row">
+        <button id="upload-submit" type="submit" class="btn btn-primary btn-block">
+          <i class="fas fa-cloud-arrow-up" aria-hidden="true"></i>
+          Carregar listas
+        </button>
+      </div>
     </form>
   </div>
 
@@ -220,13 +494,23 @@
     // Atualiza o texto do input de arquivo com o nome do arquivo escolhido
     var inputs = document.querySelectorAll('.custom-file-input');
 
+    function updateFileName(input) {
+      var zone = input.closest('.drop-zone');
+      if (!zone) return;
+
+      var fileName = input.files.length ? input.files[0].name : null;
+      var fileNameEl = zone.querySelector('.upload-file-name');
+
+      if (fileNameEl) {
+        fileNameEl.textContent = fileName || fileNameEl.getAttribute('data-default') || 'Nenhum arquivo selecionado';
+      }
+
+      zone.classList.toggle('has-file', Boolean(fileName));
+    }
+
     Array.prototype.forEach.call(inputs, function (input) {
       input.addEventListener('change', function () {
-        var fileName = this.files.length ? this.files[0].name : 'Nenhum arquivo selecionado';
-        var label = this.nextElementSibling;
-        if (label) {
-          label.textContent = fileName;
-        }
+        updateFileName(this);
       });
     });
 
@@ -238,14 +522,6 @@
       var fileInput = document.getElementById(inputId);
 
       if (!fileInput) return;
-
-      // Clique na zona abre o seletor de arquivo
-      zone.addEventListener('click', function (e) {
-        // Evita clicar diretamente no input (já abre de qualquer jeito)
-        if (e.target !== fileInput) {
-          fileInput.click();
-        }
-      });
 
       // Função auxiliar para evitar comportamento padrão
       var preventDefaults = function (e) {
@@ -290,7 +566,7 @@
         dt.items.add(file);
         fileInput.files = dt.files;
 
-        // Dispara o evento change para atualizar o label
+        // Dispara o evento change para atualizar o nome exibido
         var changeEvent = new Event('change', { bubbles: true });
         fileInput.dispatchEvent(changeEvent);
       });
@@ -305,7 +581,7 @@
       form.addEventListener('submit', function () {
         if (submitBtn) {
           submitBtn.disabled = true;
-          submitBtn.textContent = 'Carregando...';
+          submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Carregando...';
         }
         if (overlay) {
           overlay.classList.add('active');

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Sistema da Secretaria Escolar{% endblock %}</title>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 
     <!-- Favicon (coloque o arquivo em /static/favicon.ico) -->
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
@@ -36,8 +37,7 @@
       }
 
       /* ==========================================================
-         HEADER (APENAS QUANDO LOGADO)
-         - evita “quebra visual” do login
+         HEADER GLOBAL
          ========================================================== */
       header {
         position: sticky;
@@ -457,13 +457,20 @@
   </head>
 
   <body>
-    {# Header só quando logado (mantém login “limpo” como no seu print) #}
-    {% if session.get('logged_in') %}
-      <header id="app-header">
+    <button type="button"
+            class="theme-toggle"
+            id="theme-toggle"
+            data-theme-toggle
+            aria-label="Alternar tema claro e escuro">
+      <i class="fas fa-moon" aria-hidden="true"></i>
+    </button>
+    {# Header global da aplicação #}
+    <header id="app-header">
+      <div class="app-header-inner">
         <h1>E.M. José Padin Mouta</h1>
         <span>Sistema da Secretaria Escolar</span>
-      </header>
-    {% endif %}
+      </div>
+    </header>
 
     {# ALERTA (FIXO, SÓ QUANDO LOGADO) #}
     {% if session.get('logged_in') and deadline_alerts and deadline_alerts|length %}

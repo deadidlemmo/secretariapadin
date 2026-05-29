@@ -579,10 +579,50 @@
     }
 
     @media screen {
+      :root {
+        --card-screen-bg: linear-gradient(135deg, #e7f3ef 0%, #f7faf8 48%, #eff3f9 100%);
+        --card-screen-surface: rgba(255, 255, 255, 0.95);
+        --card-screen-text: #20352f;
+        --card-screen-muted: #61746c;
+        --card-screen-border: #d9e4df;
+        --card-screen-primary: #1f6f5f;
+        --card-screen-primary-dark: #174f45;
+        --card-screen-shadow: 0 16px 34px rgba(30, 53, 47, 0.14);
+      }
+
+      html[data-theme="dark"] {
+        --card-screen-bg: linear-gradient(135deg, #0f1715 0%, #151f1c 52%, #121923 100%);
+        --card-screen-surface: rgba(24, 35, 31, 0.95);
+        --card-screen-text: #eaf4f0;
+        --card-screen-muted: #aec4bb;
+        --card-screen-border: #31443e;
+        --card-screen-primary: #62d0b5;
+        --card-screen-primary-dark: #8ce3cd;
+        --card-screen-shadow: 0 20px 48px rgba(0, 0, 0, 0.36);
+      }
+
       body#carteirinhas-page {
-        background: linear-gradient(135deg, #e7f3ef 0%, #f7faf8 48%, #eff3f9 100%);
-        color: #20352f;
+        background: var(--card-screen-bg);
+        color: var(--card-screen-text);
         padding: 18px;
+      }
+
+      #carteirinhas-page .theme-toggle {
+        position: fixed;
+        top: 14px;
+        right: 14px;
+        z-index: 90;
+        width: 42px;
+        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--card-screen-border);
+        border-radius: 8px;
+        background: var(--card-screen-surface);
+        color: var(--card-screen-primary-dark);
+        box-shadow: var(--card-screen-shadow);
+        cursor: pointer;
       }
 
       #carteirinhas-page .carteirinhas-container {
@@ -599,11 +639,11 @@
         flex-wrap: wrap;
         padding: 12px;
         margin-bottom: 14px !important;
-        background: rgba(255, 255, 255, 0.95);
-        border: 1px solid #d9e4df;
-        border-top: 4px solid #1f6f5f;
+        background: var(--card-screen-surface);
+        border: 1px solid var(--card-screen-border);
+        border-top: 4px solid var(--card-screen-primary);
         border-radius: 8px;
-        box-shadow: 0 16px 34px rgba(30, 53, 47, 0.14);
+        box-shadow: var(--card-screen-shadow);
         backdrop-filter: blur(12px);
       }
 
@@ -617,13 +657,15 @@
       #localizarAluno {
         width: min(100%, 420px);
         border-radius: 8px;
-        border-color: #b8cbc3;
+        background: var(--card-screen-surface);
+        border-color: var(--card-screen-border);
+        color: var(--card-screen-text);
         box-shadow: 0 8px 18px rgba(30, 53, 47, 0.06);
         outline: none;
       }
 
       #localizarAluno:focus {
-        border-color: #1f6f5f;
+        border-color: var(--card-screen-primary);
         box-shadow: 0 0 0 0.08cm rgba(31, 111, 95, 0.16);
       }
 
@@ -641,7 +683,7 @@
       .alunos-sem-fotos-btn,
       .imprimir-carteirinhas,
       .relatorio-acao-primary {
-        background: linear-gradient(135deg, #174f45, #1f6f5f);
+        background: linear-gradient(135deg, var(--card-screen-primary-dark), var(--card-screen-primary));
       }
 
       .alunos-sem-fotos-btn:hover,
@@ -660,16 +702,17 @@
 
       .filtro-foto-form {
         border-radius: 8px;
-        border-color: #d9e4df;
+        background: var(--card-screen-surface);
+        border-color: var(--card-screen-border);
         box-shadow: none;
       }
 
       .filtro-foto-form input[type="checkbox"] {
-        accent-color: #1f6f5f;
+        accent-color: var(--card-screen-primary);
       }
 
       .filtro-foto-pill {
-        color: #174f45;
+        color: var(--card-screen-primary-dark);
       }
 
       #cards-success {
@@ -684,14 +727,14 @@
       }
 
       #relatorio-container .relatorio-inner {
-        background: #ffffff;
+        background: var(--card-screen-surface);
         border-radius: 8px;
-        border-color: #d9e4df;
+        border-color: var(--card-screen-border);
         box-shadow: 0 24px 60px rgba(20, 35, 31, 0.25);
       }
 
       .relatorio-header {
-        background: linear-gradient(135deg, #174f45, #1f6f5f);
+        background: linear-gradient(135deg, var(--card-screen-primary-dark), var(--card-screen-primary));
       }
 
       #filtro-relatorio {
@@ -705,7 +748,65 @@
       }
 
       .relatorio-acao-link {
-        background: #f5f8f6;
-        color: #20352f;
+        background: rgba(127, 148, 139, 0.14);
+        color: var(--card-screen-text);
+      }
+
+      html[data-theme="dark"] .page-number,
+      html[data-theme="dark"] .filtro-foto-form label,
+      html[data-theme="dark"] .relatorio-table,
+      html[data-theme="dark"] .relatorio-table thead th,
+      html[data-theme="dark"] .relatorio-table tbody td {
+        color: var(--card-screen-text);
+      }
+
+      html[data-theme="dark"] .relatorio-table tbody tr.relatorio-row:nth-child(even) {
+        background-color: rgba(255, 255, 255, 0.04);
+      }
+    }
+
+    @media screen {
+      html[data-theme="dark"] .alunos-sem-fotos-btn,
+      html[data-theme="dark"] .imprimir-carteirinhas,
+      html[data-theme="dark"] .relatorio-acao-primary {
+        background: linear-gradient(135deg, #1e7f6d, #2aa68f);
+        color: #f6fffc;
+        border: 1px solid #39b99f;
+        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.22);
+      }
+
+      html[data-theme="dark"] .alunos-sem-fotos-btn:hover,
+      html[data-theme="dark"] .imprimir-carteirinhas:hover,
+      html[data-theme="dark"] .relatorio-acao-primary:hover {
+        background: linear-gradient(135deg, #1a6d5f, #248f7d);
+        color: #ffffff;
+      }
+
+      html[data-theme="dark"] .imprimir-pagina {
+        background: #9a642d;
+        color: #ffffff;
+        border: 1px solid #c9863c;
+      }
+
+      html[data-theme="dark"] .imprimir-pagina:hover {
+        background: #825326;
+      }
+
+      html[data-theme="dark"] .badge-status.pendente {
+        background: rgba(240, 140, 140, 0.16);
+        color: #ffdada;
+        border: 1px solid rgba(240, 140, 140, 0.34);
+      }
+
+      html[data-theme="dark"] .serie-divider td {
+        background-color: #20302b;
+        border-bottom-color: #3b514a;
+        color: #d9f2ea;
+      }
+
+      html[data-theme="dark"] #filtro-relatorio {
+        background: #111a17;
+        color: #eaf4f0;
+        border: 1px solid #4e6960;
       }
     }

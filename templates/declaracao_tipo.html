@@ -13,19 +13,27 @@
 
 {% block content %}
   <div id="declaracao-page"
-       class="page-card"
+       class="page-card declaracao-page"
        data-segmento="{{ segmento or '' }}"
        data-tem-lista="{{ 'true' if tem_lista else 'false' }}"
        data-escolas-search-url="{{ url_for('escolas_search') }}"
        data-conclusao-5ano-url="{{ conclusao_5ano_url }}"
        data-escolaridade-5ano-url="{{ escolaridade_5ano_url }}">
-    <h2 class="page-title">Selecione o tipo de declaração</h2>
-    <p class="page-subtitle">
-      Escolha se a declaração será emitida para aluno do
-      <strong>Ensino Fundamental</strong>, da <strong>EJA</strong>
-      ou utilize a opção de <strong>Declaração Personalizada</strong>
-      para casos em que o aluno não está mais ativo na unidade.
-    </p>
+    <div class="declaracao-page-header">
+      <div class="declaracao-page-icon">
+        <i class="fas fa-file-signature" aria-hidden="true"></i>
+      </div>
+      <div class="declaracao-page-title">
+        <p class="declaracao-page-kicker">Documentos escolares</p>
+        <h2 class="page-title">Selecione o tipo de declaração</h2>
+        <p class="page-subtitle">
+          Escolha se a declaração será emitida para aluno do
+          <strong>Ensino Fundamental</strong>, da <strong>EJA</strong>
+          ou utilize a opção de <strong>Declaração Personalizada</strong>
+          para casos em que o aluno não está mais ativo na unidade.
+        </p>
+      </div>
+    </div>
 
     <div id="step-indicator" class="step-indicator">
       <i class="fas fa-route"></i>
@@ -36,7 +44,8 @@
 
     <div class="segmento-cards">
       <a href="{{ url_for('declaracao_tipo', segmento='Fundamental') }}"
-         class="segmento-card {% if segmento == 'Fundamental' %}ativo{% endif %}">
+         class="segmento-card {% if segmento == 'Fundamental' %}ativo{% endif %}"
+         {% if segmento == 'Fundamental' %}aria-current="page"{% endif %}>
         <div class="segmento-card-icon">
           <i class="fas fa-child"></i>
         </div>
@@ -46,10 +55,14 @@
             Emitida para alunos do Ensino Fundamental (2º ao 5º ano) da unidade.
           </p>
         </div>
+        <span class="segmento-card-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
       </a>
 
       <a href="{{ url_for('declaracao_tipo', segmento='EJA') }}"
-         class="segmento-card {% if segmento == 'EJA' %}ativo{% endif %}">
+         class="segmento-card {% if segmento == 'EJA' %}ativo{% endif %}"
+         {% if segmento == 'EJA' %}aria-current="page"{% endif %}>
         <div class="segmento-card-icon">
           <i class="fas fa-moon"></i>
         </div>
@@ -59,10 +72,14 @@
             Emitida para estudantes matriculados na Educação de Jovens e Adultos (EJA).
           </p>
         </div>
+        <span class="segmento-card-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
       </a>
 
       <a href="{{ url_for('declaracao_tipo', segmento='Personalizado') }}"
-         class="segmento-card {% if segmento == 'Personalizado' %}ativo{% endif %}">
+         class="segmento-card {% if segmento == 'Personalizado' %}ativo{% endif %}"
+         {% if segmento == 'Personalizado' %}aria-current="page"{% endif %}>
         <div class="segmento-card-icon">
           <i class="fas fa-user-edit"></i>
         </div>
@@ -72,6 +89,9 @@
             Para alunos que não constam mais na base ativa: dados preenchidos manualmente.
           </p>
         </div>
+        <span class="segmento-card-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
       </a>
     </div>
 
@@ -79,13 +99,17 @@
     {% if not segmento %}
       <div class="status-alert info">
         <i class="fas fa-info-circle"></i>
-        Selecione um dos cartões acima para iniciar a emissão de declarações.
+        <div class="status-alert-content">
+          Selecione um dos cartões acima para iniciar a emissão de declarações.
+        </div>
       </div>
     {% elif segmento == 'Personalizado' %}
       <div class="status-alert info">
         <i class="fas fa-info-circle"></i>
-        Você está na área de <strong>Declaração Personalizada</strong>. Os dados do aluno
-        serão preenchidos manualmente, inclusive segmento, ano/série e tipo de declaração.
+        <div class="status-alert-content">
+          Você está na área de <strong>Declaração Personalizada</strong>. Os dados do aluno
+          serão preenchidos manualmente, inclusive segmento, ano/série e tipo de declaração.
+        </div>
       </div>
     {% else %}
       {% with messages = get_flashed_messages(with_categories=True) %}
@@ -95,21 +119,26 @@
             {% if category == 'success' %}{% set cls = 'success' %}{% endif %}
             {% if category == 'error' %}{% set cls = 'info' %}{% endif %}
             <div class="status-alert {{ cls }}">
-              <i class="fas fa-info-circle"></i> {{ message }}
+              <i class="fas fa-info-circle"></i>
+              <div class="status-alert-content">{{ message }}</div>
             </div>
           {% endfor %}
         {% else %}
           {% if tem_lista %}
             <div class="status-alert success">
               <i class="fas fa-check-circle"></i>
-              Lista do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} carregada.
-              Selecione o aluno e o tipo de declaração abaixo para gerar o documento.
+              <div class="status-alert-content">
+                Lista do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} carregada.
+                Selecione o aluno e o tipo de declaração abaixo para gerar o documento.
+              </div>
             </div>
           {% else %}
             <div class="status-alert info">
               <i class="fas fa-info-circle"></i>
-              Nenhuma lista piloto do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} foi encontrada.
-              Anexe o arquivo em Excel abaixo e clique em <strong>Carregar lista piloto</strong> para habilitar a seleção de alunos.
+              <div class="status-alert-content">
+                Nenhuma lista piloto do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} foi encontrada.
+                Anexe o arquivo em Excel abaixo e clique em <strong>Carregar lista piloto</strong> para habilitar a seleção de alunos.
+              </div>
             </div>
           {% endif %}
         {% endif %}
@@ -119,7 +148,7 @@
     {# FORMULÁRIOS #}
     {% if segmento == 'Personalizado' %}
       {# --- FORMULÁRIO DE DECLARAÇÃO PERSONALIZADA --- #}
-      <form id="form-declaracao-personalizada" method="POST">
+      <form id="form-declaracao-personalizada" class="declaracao-form" method="POST">
         <input type="hidden" name="modo_declaracao" value="personalizada">
 
         {# PASSO 1 – SEGMENTO #}
@@ -323,17 +352,33 @@
 
     {% elif segmento %}
       {# --- FORMULÁRIO PADRÃO (Fundamental / EJA) --- #}
-      <form id="form-declaracao" method="POST" enctype="multipart/form-data">
+      <form id="form-declaracao" class="declaracao-form" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="segmento_escolhido" value="{{ segmento }}">
 
         {% if not tem_lista %}
-          <div class="form-group">
+          <div class="form-group declaracao-upload-field">
             <div class="form-section-title">
               <i class="fas fa-file-excel"></i>
               Lista piloto - {{ 'ENSINO FUNDAMENTAL' if segmento == 'Fundamental' else 'EJA' }} (Excel):
             </div>
-            <input type="file" class="form-control-file" name="excel_file"
-                   accept=".xlsx,.xls,.xlsm">
+            <label class="declaracao-upload-zone" for="excel_file">
+              <input type="file"
+                     id="excel_file"
+                     class="form-control-file declaracao-upload-input"
+                     name="excel_file"
+                     accept=".xlsx,.xls,.xlsm">
+              <span class="declaracao-upload-icon">
+                <i class="fas fa-file-excel" aria-hidden="true"></i>
+              </span>
+              <span class="declaracao-upload-copy">
+                <span class="declaracao-upload-title">Arraste a lista piloto aqui</span>
+                <span class="declaracao-upload-hint">ou clique para procurar no computador.</span>
+                <span class="declaracao-upload-name" data-default="Nenhum arquivo selecionado">
+                  Nenhum arquivo selecionado
+                </span>
+              </span>
+              <span class="declaracao-upload-button">Procurar</span>
+            </label>
           </div>
         {% endif %}
 

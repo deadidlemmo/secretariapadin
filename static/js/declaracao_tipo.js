@@ -16,6 +16,68 @@
       var conclusao5anoUrl = ($page.attr('data-conclusao-5ano-url') || '');
       var escolaridade5anoUrl = ($page.attr('data-escolaridade-5ano-url') || '');
 
+      function inicializarUploadDeclaracao() {
+        var $input = $('input[name="excel_file"]');
+        if (!$input.length) return;
+
+        var $zone = $input.closest('.declaracao-upload-zone');
+        var $name = $zone.find('.declaracao-upload-name');
+        var allowedExt = ['.xlsx', '.xls', '.xlsm'];
+
+        function atualizarNomeArquivo() {
+          var fileName = $input[0].files && $input[0].files.length ? $input[0].files[0].name : '';
+          $name.text(fileName || $name.attr('data-default') || 'Nenhum arquivo selecionado');
+          $zone.toggleClass('has-file', Boolean(fileName));
+        }
+
+        $input.on('change', atualizarNomeArquivo);
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (eventName) {
+          $zone.on(eventName, function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          });
+        });
+
+        ['dragenter', 'dragover'].forEach(function (eventName) {
+          $zone.on(eventName, function () {
+            $zone.addClass('dragover');
+          });
+        });
+
+        ['dragleave', 'drop'].forEach(function (eventName) {
+          $zone.on(eventName, function () {
+            $zone.removeClass('dragover');
+          });
+        });
+
+        $zone.on('drop', function (event) {
+          var original = event.originalEvent || {};
+          var files = original.dataTransfer && original.dataTransfer.files;
+          if (!files || !files.length) return;
+
+          var file = files[0];
+          var fileName = (file.name || '').toLowerCase();
+          var isValid = allowedExt.some(function (ext) {
+            return fileName.endsWith(ext);
+          });
+
+          if (!isValid) {
+            alert('Formato inválido. Use apenas arquivos .xlsx, .xls ou .xlsm.');
+            return;
+          }
+
+          var dt = new DataTransfer();
+          dt.items.add(file);
+          $input[0].files = dt.files;
+          $input.trigger('change');
+        });
+
+        atualizarNomeArquivo();
+      }
+
+      inicializarUploadDeclaracao();
+
       if (segmentoAtual === 'Personalizado') {
       /* ==========================================================
          JS – DECLARAÇÃO PERSONALIZADA
