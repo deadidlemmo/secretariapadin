@@ -21,7 +21,7 @@
   </button>
 
   <div id="loading-overlay">
-    <div style="text-align: center; color: white;">
+    <div class="loading-overlay-content">
       <div class="spinner-border" role="status">
         <span class="sr-only">Carregando...</span>
       </div>
@@ -31,8 +31,21 @@
   <div id="cards-success">Carteirinhas geradas com sucesso</div>
 
   <div class="carteirinhas-container">
-    <div class="no-print" style="margin-bottom: 10px;">
-      <button class="alunos-sem-fotos-btn" onclick="mostrarRelatorioAlunosSemFotos()">Alunos sem fotos</button>
+    <header class="carteirinhas-screen-header no-print">
+      <div class="screen-brand-mark">
+        <img src="{{ url_for('static', filename='logos/escola.png', _external=True) }}" alt="Logo da escola">
+      </div>
+      <div>
+        <h1>Carteirinhas Escolares</h1>
+        <p>Pré-visualize, confira fotos e imprima os crachás dos alunos.</p>
+      </div>
+    </header>
+
+    <div class="carteirinhas-toolbar no-print">
+      <button class="alunos-sem-fotos-btn" onclick="mostrarRelatorioAlunosSemFotos()">
+        <i class="fas fa-camera-retro" aria-hidden="true"></i>
+        Alunos sem fotos
+      </button>
 
       <!-- Filtros -->
       <form id="filtro-foto-form"
@@ -70,13 +83,16 @@
         {% endif %}
 
         <noscript>
-          <button type="submit" style="border:none;background:#1976d2;color:#fff;border-radius:999px;padding:0.15cm 0.35cm;cursor:pointer;">
+          <button type="submit" class="filter-submit-noscript">
             Aplicar
           </button>
         </noscript>
       </form>
 
-      <button class="imprimir-carteirinhas" onclick="imprimirCarteirinhas()">Imprimir Carteirinhas</button>
+      <button class="imprimir-carteirinhas" onclick="imprimirCarteirinhas()">
+        <i class="fas fa-print" aria-hidden="true"></i>
+        Imprimir Carteirinhas
+      </button>
     </div>
 
     <div id="search-container" class="no-print">
@@ -92,19 +108,31 @@
             {% for aluno in page %}
               <div class="borda-pontilhada" data-rm="{{ aluno.rm }}">
                 <div class="carteirinha">
-                  <div class="card-header-band">E.M JOSÉ PADIN MOUTA</div>
+                  <div class="card-header-band">
+                    <div class="card-school-mark">
+                      <img class="card-school-logo" src="{{ url_for('static', filename='logos/escola.png', _external=True) }}" alt="Logo da escola">
+                    </div>
+                    <div class="card-school-text">
+                      <div class="card-document-title">Documento do Estudante</div>
+                      <div class="card-school-name">E.M JOSÉ PADIN MOUTA</div>
+                    </div>
+                    <div class="card-year-top">{{ ano|default(2026) }}</div>
+                  </div>
 
                   <div class="card-body">
                     <div class="photo-wrapper">
-                      {% if aluno.foto_url %}
-                        <img src="{{ aluno.foto_url }}" alt="Foto" class="foto uploadable" data-rm="{{ aluno.rm }}">
-                      {% else %}
-                        <div class="foto uploadable" data-rm="{{ aluno.rm }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
-                          <span style="font-size:1.0cm; opacity:0.5; color: grey; margin-bottom: 0.1cm;">&#128247;</span>
-                          <small style="font-size:0.24cm; opacity:0.7; color: grey;">Anexe uma foto</small>
-                        </div>
-                      {% endif %}
-                      <input type="file" class="inline-upload" data-rm="{{ aluno.rm }}" style="display:none;" accept="image/*">
+                      <div class="photo-shell">
+                        {% if aluno.foto_url %}
+                          <img src="{{ aluno.foto_url }}" alt="Foto" class="foto uploadable" data-rm="{{ aluno.rm }}">
+                        {% else %}
+                          <div class="foto foto-placeholder uploadable" data-rm="{{ aluno.rm }}">
+                            <span class="foto-placeholder-icon"><i class="fas fa-camera" aria-hidden="true"></i></span>
+                            <small>Anexe uma foto</small>
+                          </div>
+                        {% endif %}
+                      </div>
+                      <div class="photo-caption">Foto do aluno</div>
+                      <input type="file" class="inline-upload" data-rm="{{ aluno.rm }}" accept="image/*">
                     </div>
 
                     <div class="info-panel">
@@ -133,19 +161,25 @@
                         <div class="info-value">{{ aluno.ra }}</div>
                       </div>
 
-                      <div class="info-row">
+                      <div class="info-row horario-row">
                         <div class="info-label">Horário:</div>
-                        <div class="info-value">{{ aluno.horario }}</div>
+                        <div class="info-value horario-value">
+                          {% if aluno.horario_dias %}
+                            <span class="horario-dia">{{ aluno.horario_dias }}</span>
+                            <span class="horario-faixa">{{ aluno.horario_faixa }}</span>
+                          {% else %}
+                            <span class="horario-faixa">{{ aluno.horario_faixa or aluno.horario }}</span>
+                          {% endif %}
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   <div class="card-footer">
                     <div class="status {{ aluno.classe_cor }}">
-                      <span class="icon">{{ aluno.status_icon|safe }}</span>
+                      <span class="status-symbol">{{ aluno.status_icon|safe }}</span>
                       <span class="status-text">{{ aluno.status_texto }}</span>
                     </div>
-                    <div class="year-pill">{{ ano|default(2026) }}</div>
                   </div>
                 </div>
               </div>
@@ -154,7 +188,7 @@
         </div>
       {% endfor %}
     {% else %}
-      <div class="no-print" style="margin-top: 0.6cm; color:#455a64; font-weight:700;">
+      <div class="no-print no-cards-message">
         Nenhuma carteirinha para exibir.
         {% if (somente_com_foto|default(false)) or (somente_nao_impressas|default(false)) %}
           (Verifique os filtros ativos.)
@@ -210,6 +244,10 @@
       </div>
     </div>
   </div>
+
+  <footer class="carteirinhas-footer no-print">
+    Desenvolvido por Nilson Cruz &copy; 2025. Todos os direitos reservados.
+  </footer>
 
 <script src="{{ url_for('static', filename='js/carteirinhas.js') }}"></script>
 

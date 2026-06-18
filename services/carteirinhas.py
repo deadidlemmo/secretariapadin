@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 
 import pandas as pd
 
@@ -55,6 +56,18 @@ def _status_sai_sozinho(value):
     }
 
 
+def _split_horario(value):
+    text = str(value or "").strip()
+    if not text:
+        return "", ""
+
+    match = re.match(r"^(.*?)\s+das\s+(.+)$", text, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip(), match.group(2).strip()
+
+    return "", text
+
+
 def _read_carteirinhas_lista(arquivo_excel):
     planilha = pd.read_excel(arquivo_excel, sheet_name="LISTA CORRIDA").copy()
     dados = planilha.loc[:, CARTEIRINHAS_COLUMNS].copy()
@@ -97,6 +110,7 @@ def build_carteirinhas_context(
             )
 
         status = _status_sai_sozinho(row["SAI SOZINHO?"])
+        horario_dias, horario_faixa = _split_horario(row["HOR\u00c1RIO"])
 
         alunos.append(
             {
@@ -106,6 +120,8 @@ def build_carteirinhas_context(
                 "ra": row["RA"],
                 "serie": row["S\u00c9RIE"],
                 "horario": row["HOR\u00c1RIO"],
+                "horario_dias": horario_dias,
+                "horario_faixa": horario_faixa,
                 "classe_cor": status["classe_cor"],
                 "status_texto": status["status_texto"],
                 "status_icon": status["status_icon"],

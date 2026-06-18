@@ -7,24 +7,14 @@ function showLoading() {
 
     var loadingOverlay = document.createElement('div');
     loadingOverlay.id = 'loading-overlay';
-    loadingOverlay.style.position = 'fixed';
-    loadingOverlay.style.top = '0';
-    loadingOverlay.style.left = '0';
-    loadingOverlay.style.right = '0';
-    loadingOverlay.style.bottom = '0';
-    loadingOverlay.style.background = 'rgba(0,0,0,0.5)';
-    loadingOverlay.style.display = 'flex';
-    loadingOverlay.style.alignItems = 'center';
-    loadingOverlay.style.justifyContent = 'center';
-    loadingOverlay.style.zIndex = '9999';
 
     loadingOverlay.innerHTML =
-      `<div style="text-align: center; color: white; font-family: Arial, sans-serif;">
+      `<div class="loading-overlay-content">
         <svg width="3.0cm" height="4.5cm" viewBox="0 0 6.0 9.0" xmlns="http://www.w3.org/2000/svg">
           <rect x="0.3" y="0.3" width="5.4" height="8.4" rx="0.3" ry="0.3" stroke="white" stroke-width="0.1" fill="none" />
           <rect id="badge-fill" x="0.3" y="8.7" width="5.4" height="0" rx="0.3" ry="0.3" fill="white" />
         </svg>
-        <p id="loading-text" style="margin-top: 0.2cm;">Gerando carteirinhas...</p>
+        <p id="loading-text" class="loading-progress-text">Gerando carteirinhas...</p>
       </div>`;
 
     document.body.appendChild(loadingOverlay);
@@ -377,13 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
               if(!msgDiv) {
                 msgDiv = document.createElement('div');
                 msgDiv.id = 'upload-success';
-                msgDiv.style.position = 'fixed';
-                msgDiv.style.top = '0.2cm';
-                msgDiv.style.right = '0.2cm';
-                msgDiv.style.backgroundColor = '#d4edda';
-                msgDiv.style.color = '#155724';
-                msgDiv.style.padding = '0.2cm';
-                msgDiv.style.borderRadius = '0.2cm';
+                msgDiv.className = 'upload-success-toast';
                 document.body.appendChild(msgDiv);
               }
               msgDiv.style.display = 'block';

@@ -21,7 +21,7 @@ def write_lista_corrida(path):
                 "RA": "RA101",
                 "SAI SOZINHO?": "SIM",
                 "S\u00c9RIE": "3\u00baA",
-                "HOR\u00c1RIO": "13h00",
+                "HOR\u00c1RIO": "Segunda \u00e0 Sexta-Feira das 13h00 \u00e0s 17h00",
             },
             {
                 "RM": 102,
@@ -68,10 +68,14 @@ class CarteirinhasServiceTests(unittest.TestCase):
         self.assertEqual(len(alunos), 2)
         self.assertEqual(alunos[0]["rm"], 101)
         self.assertEqual(alunos[0]["data_nasc"], "02/01/2020")
+        self.assertEqual(alunos[0]["horario_dias"], "Segunda \u00e0 Sexta-Feira")
+        self.assertEqual(alunos[0]["horario_faixa"], "13h00 \u00e0s 17h00")
         self.assertEqual(alunos[0]["classe_cor"], "verde")
         self.assertEqual(alunos[0]["foto_url"], "/static/fotos/101.jpg")
         self.assertFalse(alunos[0]["impresso"])
         self.assertEqual(alunos[1]["status_texto"], "N\u00e3o sai sozinho")
+        self.assertEqual(alunos[1]["horario_dias"], "")
+        self.assertEqual(alunos[1]["horario_faixa"], "08h00")
         self.assertTrue(alunos[1]["impresso"])
         self.assertEqual(context["total_sem_foto"], 1)
         self.assertEqual(context["alunos_sem_foto"][0]["rm"], 102)

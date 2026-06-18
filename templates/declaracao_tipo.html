@@ -430,11 +430,11 @@
             Unidade escolar anterior
           </legend>
           <div class="form-group mb-2">
-            <label for="unidade_anterior" style="font-size:0.82rem;">Buscar unidade (escolas.csv):</label>
-            <select id="unidade_anterior" name="unidade_anterior_select" style="width: 100%;"></select>
+            <label for="unidade_anterior" class="declaracao-compact-label">Buscar unidade (escolas.csv):</label>
+            <select id="unidade_anterior" name="unidade_anterior_select" class="declaracao-full-select"></select>
           </div>
           <div class="form-group mb-0">
-            <label for="unidade_anterior_manual" style="font-size:0.82rem;">
+            <label for="unidade_anterior_manual" class="declaracao-compact-label">
               Ou digite o nome da unidade:
             </label>
             <input type="text" id="unidade_anterior_manual"
@@ -450,7 +450,7 @@
             <i class="fas fa-calendar-check"></i>
             Frequência por mês (dias letivos x faltas)
           </legend>
-          <p style="font-size:0.82rem; color:#4b5563; margin-bottom:6px;">
+          <p class="frequencia-help-text">
             Preencha apenas os meses solicitados pelo responsável. Os meses em branco
             serão ignorados na declaração ou poderão aparecer como
             <strong>“Ainda não apurado”</strong>, conforme o modelo do documento.
@@ -499,7 +499,7 @@
           </div>
           {% endfor %}
 
-          <small style="font-size:0.78rem; color:#6b7280;">
+          <small class="frequencia-footnote">
             A frequência é calculada automaticamente pela fórmula
             <em>((dias letivos - faltas) / dias letivos) × 100</em>. Meses com dados
             inconsistentes (faltas maiores que dias letivos, por exemplo) serão

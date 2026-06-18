@@ -10,32 +10,32 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
   <style>
     body {
-      background: #eef2f3;
+      background: var(--app-page-bg, #eef2f3);
+      color: var(--app-text, #20352f);
       font-family: 'Montserrat', sans-serif;
-      margin-bottom: 60px; /* Espaço para o rodapé fixo */
+      margin-bottom: 0;
     }
     header {
-      background: linear-gradient(90deg, #283E51, #4B79A1);
-      color: #fff;
+      background: var(--app-surface-glass, rgba(255, 255, 255, 0.94));
+      color: var(--app-text, #20352f);
       padding: 20px;
       text-align: center;
-      border-bottom: 3px solid #1d2d3a;
-      border-radius: 0 0 15px 15px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      border-bottom: 1px solid var(--app-border, #d9e4df);
+      border-radius: 0;
+      box-shadow: 0 10px 28px rgba(30, 53, 47, 0.10);
     }
     footer {
-      background-color: #424242;
-      color: #fff;
+      background-color: var(--app-surface-glass, rgba(255, 255, 255, 0.86));
+      color: var(--app-muted, #61746c);
       text-align: center;
       padding: 10px;
-      position: fixed;
-      bottom: 0;
+      position: static;
       width: 100%;
     }
     /* Ajuste nas cards para aproximar do estilo do container-dashboard */
     .card {
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      border-radius: var(--app-radius, 8px);
+      box-shadow: var(--app-shadow-soft, 0 4px 12px rgba(0,0,0,0.15));
     }
     /* Overlay de carregamento */
     #loadingOverlay {
@@ -45,10 +45,11 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(255,255,255,0.8);
+      background: rgba(15, 24, 21, 0.70);
       z-index: 9999;
       align-items: center;
       justify-content: center;
+      backdrop-filter: blur(4px);
     }
   </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app_theme.css') }}">
