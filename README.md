@@ -225,13 +225,67 @@ web: gunicorn app:app --bind 0.0.0.0:$PORT --workers 3 --timeout 180 --graceful-
 
 Esse formato e compativel com plataformas como Render, que fornecem a variavel `$PORT`.
 
+### Render com PDF de Declaracoes
+
+A geracao oficial das declaracoes em PDF usa Chrome/Chromium em modo headless. Em deploy Python nativo, o Render instala as dependencias Python, mas nao garante automaticamente um navegador do sistema. Para evitar falha em `Gerar declaracao em PDF`, o caminho recomendado neste projeto e usar Docker.
+
+Arquivos adicionados para esse fluxo:
+
+```text
+Dockerfile
+.dockerignore
+scripts/check_pdf_environment.py
+```
+
+O `Dockerfile` usa `python:3.12-slim-bookworm`, instala `chromium` e define:
+
+```text
+DECLARACAO_PDF_BROWSER_PATH=/usr/bin/chromium
+```
+
+No Render:
+
+1. Crie ou ajuste o Web Service para usar Docker.
+2. Configure as variaveis obrigatorias:
+
+```text
+FLASK_SECRET_KEY=...
+ACCESS_TOKEN=...
+MAX_CONTENT_LENGTH_MB=50
+SCHOOL_YEAR=2026
+SESSION_COOKIE_SECURE=1
+```
+
+3. Nao e necessario configurar `DECLARACAO_PDF_BROWSER_PATH` se usar o `Dockerfile`, pois ele ja define `/usr/bin/chromium`.
+4. Apos o deploy, teste login, upload da Lista Piloto e geracao de uma declaracao em PDF.
+
+Para validar a imagem localmente, quando Docker estiver instalado:
+
+```powershell
+docker build -t secretariapadin .
+docker run --env-file .env -p 5000:10000 secretariapadin
+```
+
+Depois acesse:
+
+```text
+http://127.0.0.1:5000
+```
+
+Para testar somente o Chromium/PDF dentro do container:
+
+```powershell
+docker run --env-file .env secretariapadin python scripts/check_pdf_environment.py
+```
+
 Antes de publicar, revise:
 
 - Token e chave secreta.
-- Persistencia da pasta `uploads/`.
-- Persistencia da pasta `static/fotos/`.
+- Persistencia da pasta `uploads/`, caso voce espere manter arquivos enviados apos restart/redeploy.
+- Persistencia da pasta `static/fotos/`, caso fotos sejam enviadas pelo sistema em producao. Fotos ja versionadas no repositorio entram na imagem Docker.
 - Disponibilidade dos modelos em `modelos/`.
 - Limites de upload e tempo de resposta para planilhas grandes.
+- Funcionamento da geracao PDF com Chromium.
 
 ## Cuidados com Dados
 

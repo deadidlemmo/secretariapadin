@@ -2,10 +2,11 @@
 <html lang="pt-br">
 <head>
   <meta charset="utf-8">
-  <title>{{ titulo }} - E.M José Padin Mouta</title>
+  <title>Declaração Escolar - E.M José Padin Mouta</title>
   <style>
     @page {
-      margin: 0;
+      size: A4;
+      margin: 10mm 14mm;
     }
     html, body {
       margin: 0;
@@ -99,11 +100,270 @@
       font-size: 14px;
     }
 
+    body.modelo-siae {
+      font-family: Arial, sans-serif;
+      font-size: 13.5pt;
+      line-height: 1.16;
+      color: #111;
+    }
+    body.modelo-siae * {
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+    body.modelo-siae .declaration-container {
+      max-width: 182mm;
+      margin: 0 auto;
+      min-height: 277mm;
+      display: flex;
+      flex-direction: column;
+    }
+    body.modelo-siae .content {
+      padding: 0 4mm;
+      margin-bottom: 0;
+      text-align: left;
+      hyphens: none;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+    body.modelo-siae .content,
+    body.modelo-siae .content p,
+    body.modelo-siae .content span,
+    body.modelo-siae .content div,
+    body.modelo-siae .content li,
+    body.modelo-siae strong {
+      font-family: Arial, sans-serif;
+      font-size: 13.5pt;
+    }
+    body.modelo-siae strong {
+      font-size: inherit;
+      font-family: inherit;
+    }
+    body.modelo-siae .header {
+      border-bottom-width: 1px;
+      margin-bottom: 4mm;
+      padding-bottom: 2mm;
+    }
+    body.modelo-siae .header h1 {
+      font-size: 15pt;
+      line-height: 1.15;
+    }
+    body.modelo-siae .header p {
+      margin: 1mm 0;
+      font-size: 10.5pt;
+      line-height: 1.15;
+    }
+    body.modelo-siae .header img {
+      height: 18mm !important;
+    }
+    body.modelo-siae .declaration-bottom {
+      position: static;
+      margin-top: auto;
+      padding-top: 0;
+    }
+    body.modelo-siae .signature .line {
+      width: 90mm;
+      margin: 0 auto 4mm;
+      background-color: #000;
+    }
+    body.modelo-siae .signature p {
+      margin: 0 0 3mm;
+      font-size: 11.5pt;
+      color: #111;
+    }
+    body.modelo-siae .footer {
+      margin-top: 8mm;
+      border-top: 2px solid #000;
+      padding-top: 4mm;
+      font-size: 9pt;
+      color: #444;
+    }
+    body.modelo-siae .footer p {
+      margin: 0;
+      font-size: 9pt;
+    }
+    .declaracao-render {
+      margin: 0;
+      text-align: left;
+    }
+    .siae-declaration {
+      color: #111;
+      font-family: inherit;
+      text-align: left;
+    }
+    .siae-title {
+      margin: 5mm 0 5mm;
+      text-align: center;
+      color: #111;
+      font-family: inherit;
+      font-size: 16.5pt;
+      font-style: normal;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    .siae-student-lines {
+      margin: 0 0 4mm;
+      line-height: 1.2;
+      text-align: left;
+    }
+    .siae-student-line {
+      display: block;
+      width: 100%;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      box-sizing: border-box;
+      background: transparent;
+      font-size: 13.5pt;
+    }
+    .siae-fill {
+      display: inline;
+      min-width: 0;
+      padding: 0;
+      border-bottom: 0;
+      font-weight: 700;
+      text-align: inherit;
+      line-height: inherit;
+      vertical-align: baseline;
+    }
+    .siae-fill.long {
+      min-width: 0;
+      text-align: left;
+    }
+    .siae-fill.medium {
+      min-width: 0;
+    }
+    .siae-fill.small {
+      min-width: 0;
+    }
+    .siae-fill.tiny {
+      min-width: 0;
+    }
+    .siae-options {
+      display: grid;
+      gap: 0;
+      margin-top: 0;
+      border-top: 1px solid #777;
+      border-bottom: 1px solid #777;
+    }
+    .siae-option {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr);
+      gap: 9px;
+      align-items: start;
+      break-inside: avoid;
+      position: relative;
+      padding: 5px 0 6px;
+      border: 0;
+      border-bottom: 1px solid #bbb;
+      border-radius: 0;
+      box-sizing: border-box;
+      min-height: 32px;
+    }
+    .siae-option:last-child {
+      border-bottom: 0;
+    }
+    .siae-check {
+      width: 32px;
+      height: 32px;
+      border: 1.7px solid #000;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 16pt;
+      line-height: 1;
+      margin-top: 0;
+      text-align: center;
+      overflow: hidden;
+    }
+    .siae-option.locked {
+      color: #333;
+    }
+    .siae-option.locked .siae-check {
+      background: transparent;
+    }
+    .siae-option.selected {
+      padding-top: 6px;
+      padding-bottom: 7px;
+    }
+    .siae-option-text {
+      position: relative;
+      text-align: left;
+      max-width: 100%;
+      overflow-wrap: normal;
+      word-break: normal;
+      font-size: 13.5pt;
+      line-height: 1.18;
+    }
+    .siae-option.locked .siae-option-text {
+      text-decoration-line: line-through;
+      text-decoration-color: #555;
+      text-decoration-thickness: 1px;
+      text-decoration-skip-ink: none;
+    }
+    .siae-option-detail {
+      display: block;
+      margin-top: 1mm;
+      font-size: 13.5pt;
+      line-height: 1.18;
+    }
+    .siae-observations {
+      margin-top: 5mm;
+      font-size: 13.5pt;
+      line-height: 1.2;
+    }
+    .siae-observations p {
+      margin: 0;
+      font-size: 13.5pt;
+      line-height: 1.2;
+    }
+    .siae-observations-title {
+      margin-bottom: 3mm !important;
+    }
+    .siae-observations-content {
+      margin: 0;
+      padding: 0 0 0 4mm;
+      border-left: 1.5px solid #777;
+    }
+    .siae-observations .siae-observation-paragraph {
+      margin: 0 0 2mm;
+      font-size: 13.5pt;
+      line-height: 1.2;
+      text-align: left;
+    }
+    .siae-observations .siae-observation-paragraph:last-child {
+      margin-bottom: 0;
+    }
+    .siae-closing {
+      margin: 4mm 0 0;
+      font-size: 13.5pt;
+      line-height: 1.2;
+    }
+    .siae-date {
+      margin: 6mm 0 3.5mm;
+      text-align: right;
+      font-size: 13.5pt;
+    }
+    .declaracao-extra {
+      margin-top: 0.42cm;
+      font-size: 12px;
+      line-height: 1.25;
+    }
+    .declaracao-extra table {
+      font-size: 11px;
+    }
+
     @media print {
       .no-print { display: none !important; }
+      html {
+        margin: 0;
+        padding: 0;
+        width: auto;
+        min-height: auto;
+      }
       body {
         margin: 0;
-        padding: {{ print_body_padding }};
+        padding: 0;
         font-size: 14px;
         font-family: 'Montserrat', sans-serif;
         color: #000;
@@ -171,6 +431,96 @@
       body.transferencia-com-observacoes .signature p {
         font-size: 14px;
       }
+
+      body.modelo-siae {
+        width: auto;
+        min-height: auto;
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        font-size: 13.5pt;
+        line-height: 1.16;
+      }
+      body.modelo-siae .declaration-container {
+        max-width: none;
+        margin: 0;
+        height: auto;
+        max-height: none;
+        min-height: calc(297mm - 20mm);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        box-sizing: border-box;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      body.modelo-siae .content {
+        padding: 0 4mm;
+        text-align: left !important;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      body.modelo-siae .content p,
+      body.modelo-siae .declaracao-render,
+      body.modelo-siae .siae-option-text {
+        text-align: left !important;
+      }
+      body.modelo-siae .date {
+        display: none;
+      }
+      body.modelo-siae .declaration-bottom {
+        position: static;
+        margin-top: 0;
+        padding-top: 8mm;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      body.modelo-siae .header {
+        margin-bottom: 4mm;
+        padding-bottom: 2mm;
+      }
+      body.modelo-siae .header h1 {
+        font-size: 15pt;
+      }
+      body.modelo-siae .header p {
+        font-size: 10.5pt;
+      }
+      body.modelo-siae .header img {
+        height: 18mm !important;
+      }
+      body.modelo-siae .footer {
+        font-size: 9pt;
+      }
+      body.modelo-siae .signature p {
+        font-size: 11.5pt;
+      }
+      body.modelo-siae .siae-title {
+        margin: 4mm 0 4mm;
+      }
+      body.modelo-siae .siae-options {
+        gap: 0;
+      }
+      body.modelo-siae .siae-student-lines {
+        margin-bottom: 4mm;
+      }
+      body.modelo-siae .siae-option {
+        padding-top: 4px;
+        padding-bottom: 5px;
+      }
+      body.modelo-siae .siae-option.selected {
+        padding-top: 5px;
+        padding-bottom: 6px;
+      }
+      body.modelo-siae .siae-observations {
+        margin-top: 5mm;
+      }
+      body.modelo-siae .siae-closing {
+        margin-top: 4mm;
+      }
+      body.modelo-siae .siae-date {
+        margin-top: auto;
+        margin-bottom: 3mm;
+      }
     }
 
     .content, .content p, .date {
@@ -204,6 +554,7 @@
   </style>
 </head>
 <body{% if body_classes %} class="{{ body_classes|join(' ') }}"{% endif %}>
+  {% set is_modelo_siae = body_classes and ('modelo-siae' in body_classes) %}
   <div class="declaration-container">
     <div class="header">
       <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -211,20 +562,29 @@
         <div>
           <h1>Secretaria de Educação</h1>
           <p>E.M José Padin Mouta</p>
-          <p>Município da Estância Balneária de Praia Grande</p>
-          <p>Estado de São Paulo</p>
+          <p>Município da Estância Balneária de Praia Grande{% if is_modelo_siae %}/SP{% endif %}</p>
+          {% if not is_modelo_siae %}
+            <p>Estado de São Paulo</p>
+          {% endif %}
         </div>
         <img src="/static/logos/municipio.png" alt="Município Logo" style="height:80px;">
       </div>
     </div>
-    <div class="date">
-      <p>{{ data_extenso }}</p>
-    </div>
+    {% if not is_modelo_siae %}
+      <div class="date">
+        <p>{{ data_extenso }}</p>
+      </div>
+    {% endif %}
     <div class="content">
-      <h2 style="text-align:center;text-transform:uppercase;color:#283E51;">
-        {{ titulo }}
-      </h2>
-      <p>{{ declaracao_text|safe }}</p>
+      {% if not is_modelo_siae %}
+        <h2 style="text-align:center;text-transform:uppercase;color:#283E51;">
+          {{ titulo }}
+        </h2>
+      {% endif %}
+      <div class="declaracao-render">{{ declaracao_text|safe }}</div>
+      {% if is_modelo_siae %}
+        <div class="siae-date">{{ data_extenso }}</div>
+      {% endif %}
     </div>
     <div class="declaration-bottom">
       <div class="signature">
@@ -237,8 +597,16 @@
       </div>
     </div>
   </div>
-  <div class="no-print" style="text-align:center;margin-top:20px;">
-    <button onclick="window.print()" class="print-button">Imprimir Declaração</button>
+  <div class="no-print acoes-preview">
+    {% if pdf_url %}
+      <a href="{{ pdf_url }}" target="_blank" rel="noopener" class="print-button">
+        Gerar PDF da Declaração
+      </a>
+    {% else %}
+      <span class="print-button print-button-disabled" aria-disabled="true">
+        PDF indisponível
+      </span>
+    {% endif %}
   </div>
 </body>
 </html>

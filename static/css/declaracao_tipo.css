@@ -1051,9 +1051,20 @@
   animation: tutorialPulse 1.8s ease-in-out infinite !important;
 }
 
+#declaracao-page .btn-lote.step-highlight-field {
+  background: linear-gradient(135deg, #165b50, #1e7569) !important;
+  border-color: #1f6f5f !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary) 34%, transparent), 0 12px 24px rgba(31, 111, 95, 0.18) !important;
+  animation: tutorialPulse 1.8s ease-in-out infinite !important;
+}
+
 #declaracao-page .btn-declaracao.step-highlight-field i,
 #declaracao-page .btn-declaracao.step-highlight-field .fas,
-#declaracao-page .btn-declaracao.step-highlight-field .fa {
+#declaracao-page .btn-declaracao.step-highlight-field .fa,
+#declaracao-page .btn-lote.step-highlight-field i,
+#declaracao-page .btn-lote.step-highlight-field .fas,
+#declaracao-page .btn-lote.step-highlight-field .fa {
   color: #ffffff !important;
 }
 
@@ -1156,6 +1167,12 @@ html[data-theme="dark"] #declaracao-page .btn-declaracao:disabled .fa {
 html[data-theme="dark"] #declaracao-page .btn-lote {
   background: #386f89;
   border-color: #4c8dab;
+}
+
+html[data-theme="dark"] #declaracao-page .btn-lote.step-highlight-field {
+  background: linear-gradient(135deg, #1d5f56, #2b6a62) !important;
+  border-color: #5fa89a !important;
+  color: #ffffff !important;
 }
 
 html[data-theme="dark"] #declaracao-page .btn-voltar {

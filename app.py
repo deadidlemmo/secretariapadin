@@ -41,6 +41,12 @@ from services.declaracoes import (
     normalizar_tipo_escolar_form,
     resolve_historico_fields,
 )
+from services.declaracoes_pdf import (
+    DeclaracaoPdfError,
+    DeclaracaoPdfNotFound,
+    create_declaracao_pdf_token,
+    render_declaracao_pdf_bytes,
+)
 from services.fotos import save_student_photo
 from services.prazos import build_deadline_alerts as build_deadline_alerts_service
 from services.quadros_atendimento import (
@@ -265,8 +271,38 @@ def marcar_carteirinhas_impressas():
 
 
 # ==========================================================
-#  DECLARAÇÕES – GERAÇÃO HTML (SINGULAR)
+#  DECLARAÇÕES – GERAÇÃO PDF/HTML (SINGULAR)
 # ==========================================================
+
+def render_declaracao_print_html(**template_context):
+    return render_template(
+        "declaracao_print.html",
+        **template_context,
+        pdf_url=None,
+    )
+
+
+def render_declaracao_pdf_response(**template_context):
+    html_for_pdf = render_declaracao_print_html(**template_context)
+    token = create_declaracao_pdf_token(html_for_pdf, current_app.root_path)
+    pdf_bytes = render_declaracao_pdf_bytes(token)
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        download_name="declaracao_escolar.pdf",
+        as_attachment=False,
+    )
+
+
+def render_declaracao_print_page(**template_context):
+    html_for_pdf = render_declaracao_print_html(**template_context)
+    token = create_declaracao_pdf_token(html_for_pdf, current_app.root_path)
+    return render_template(
+        "declaracao_print.html",
+        **template_context,
+        pdf_url=url_for("declaracao_pdf", token=token),
+    )
+
 
 def gerar_declaracao_escolar(
     file_path,
@@ -276,6 +312,7 @@ def gerar_declaracao_escolar(
     deve_historico=False,
     unidade_anterior=None,
     dados_frequencia=None,
+    preview=False,
 ):
     """
     Gera o HTML de uma declaração escolar (Escolaridade, Transferência, Conclusão
@@ -330,22 +367,24 @@ def gerar_declaracao_escolar(
     data_extenso_str = data_extenso_praia_grande()
     additional_css = DECLARACAO_PRINT_CSS
 
-    return render_template(
-        "declaracao_print.html",
-        titulo=context["titulo"],
-        data_extenso=data_extenso_str,
-        declaracao_text=context["declaracao_text"],
-        additional_css=additional_css,
-        body_classes=context["body_classes"],
-        print_body_padding="0.5cm 0.5cm",
-    )
+    template_context = {
+        "titulo": context["titulo"],
+        "data_extenso": data_extenso_str,
+        "declaracao_text": context["declaracao_text"],
+        "additional_css": additional_css,
+        "body_classes": context["body_classes"],
+        "print_body_padding": "0.5cm 0.5cm",
+    }
+    if preview:
+        return render_declaracao_print_page(**template_context)
+    return render_declaracao_pdf_response(**template_context)
 
 
 # ==========================================================
 #  DECLARAÇÃO PERSONALIZADA (Fundamental / EJA)
 # ==========================================================
 
-def gerar_declaracao_personalizada(dados):
+def gerar_declaracao_personalizada(dados, preview=False):
     """
     Gera o HTML de declarações personalizadas (Conclusão, Matrícula cancelada
     ou Não Comparecimento - NCOM).
@@ -357,14 +396,34 @@ def gerar_declaracao_personalizada(dados):
     data_extenso_str = data_extenso_praia_grande()
     additional_css = DECLARACAO_PRINT_CSS
 
-    return render_template(
-        "declaracao_print.html",
-        titulo=context["titulo"],
-        data_extenso=data_extenso_str,
-        declaracao_text=context["declaracao_text"],
-        additional_css=additional_css,
-        body_classes=[],
-        print_body_padding="1.5cm 1.5cm",
+    template_context = {
+        "titulo": context["titulo"],
+        "data_extenso": data_extenso_str,
+        "declaracao_text": context["declaracao_text"],
+        "additional_css": additional_css,
+        "body_classes": [],
+        "print_body_padding": "1.5cm 1.5cm",
+    }
+    if preview:
+        return render_declaracao_print_page(**template_context)
+    return render_declaracao_pdf_response(**template_context)
+
+
+@app.route("/declaracao/pdf/<token>")
+@login_required
+def declaracao_pdf(token):
+    try:
+        pdf_bytes = render_declaracao_pdf_bytes(token)
+    except DeclaracaoPdfNotFound as exc:
+        return str(exc), 404
+    except DeclaracaoPdfError as exc:
+        return str(exc), 500
+
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        download_name="declaracao_escolar.pdf",
+        as_attachment=False,
     )
 
 
@@ -583,6 +642,7 @@ def declaracao_conclusao_5ano():
 def declaracao_tipo():
     if request.method == "POST":
         modo_declaracao = request.form.get("modo_declaracao")
+        preview = request.form.get("preview") == "1"
 
         # -------------------------------
         # FLUXO: DECLARAÇÃO PERSONALIZADA
@@ -594,16 +654,23 @@ def declaracao_tipo():
                 flash(str(e), "error")
                 return redirect(url_for("declaracao_tipo", segmento=e.segmento or "Personalizado"))
 
-            declaracao_html = gerar_declaracao_personalizada(dados_personalizados)
+            try:
+                declaracao_response = gerar_declaracao_personalizada(
+                    dados_personalizados,
+                    preview=preview,
+                )
+            except DeclaracaoPdfError as e:
+                flash(str(e), "error")
+                return redirect(url_for("declaracao_tipo", segmento="Personalizado"))
 
-            if declaracao_html is None:
+            if declaracao_response is None:
                 flash(
                     "Não foi possível gerar a declaração personalizada. Verifique os dados informados.",
                     "error",
                 )
                 return redirect(url_for("declaracao_tipo", segmento="Personalizado"))
 
-            return declaracao_html
+            return declaracao_response
 
         # -------------------------------
         # FLUXO NORMAL: FUNDAMENTAL / EJA
@@ -687,20 +754,25 @@ def declaracao_tipo():
                 flash(str(e), "error")
                 return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        declaracao_html = gerar_declaracao_escolar(
-            file_path=file_path,
-            rm=rm,
-            tipo=tipo,
-            deve_historico=deve_historico,
-            unidade_anterior=unidade_anterior,
-            dados_frequencia=dados_frequencia,
-        )
+        try:
+            declaracao_response = gerar_declaracao_escolar(
+                file_path=file_path,
+                rm=rm,
+                tipo=tipo,
+                deve_historico=deve_historico,
+                unidade_anterior=unidade_anterior,
+                dados_frequencia=dados_frequencia,
+                preview=preview,
+            )
+        except DeclaracaoPdfError as e:
+            flash(str(e), "error")
+            return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        if declaracao_html is None:
+        if declaracao_response is None:
             flash("Aluno não encontrado na lista piloto.", "error")
             return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        return declaracao_html
+        return declaracao_response
 
     # --------------------------------------
     # GET: EXIBE A TELA

@@ -9,6 +9,14 @@
         $('#loading-overlay').css('display', 'flex');
       }
 
+      function ocultarOverlay() {
+        $('#loading-overlay').hide();
+      }
+
+      function liberarTelaAposAbrirPdf() {
+        window.setTimeout(ocultarOverlay, 1200);
+      }
+
       var $page = $('#declaracao-page');
       var segmentoAtual = ($page.attr('data-segmento') || '');
       var temLista = ($page.attr('data-tem-lista') || 'false') === 'true';
@@ -372,8 +380,10 @@
           e.preventDefault();
           return false;
         }
-        // Gerando declaração personalizada
-        mostrarOverlay('Gerando declaração, aguarde...');
+        // Gerando PDF da declaração personalizada.
+        $(this).attr('target', '_blank');
+        mostrarOverlay('Gerando PDF da declaração, aguarde...');
+        liberarTelaAposAbrirPdf();
         return true;
       });
 
@@ -642,13 +652,13 @@
             aplicarHighlightPadrao('#frequencia-container');
             return;
           }
-          $indicatorText.text('Passo 4 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração".');
+          $indicatorText.text('Passo 4 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração em PDF".');
           aplicarHighlightPadrao('#btn-gerar');
           return;
         }
 
         if (!isTransfOuConc) {
-          $indicatorText.text('Passo 3 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração".');
+          $indicatorText.text('Passo 3 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração em PDF".');
           aplicarHighlightPadrao('#btn-gerar');
           return;
         }
@@ -665,7 +675,7 @@
           return;
         }
 
-        $indicatorText.text('Passo ' + totalSteps + ' de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração".');
+        $indicatorText.text('Passo ' + totalSteps + ' de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração em PDF".');
         aplicarHighlightPadrao('#btn-gerar');
       }
 
@@ -743,6 +753,7 @@
         }
         // Carregando lista piloto
         mostrarOverlay('Carregando lista piloto, aguarde...');
+        $('#form-declaracao').removeAttr('target');
         // Envia o formulário ignorando validações de RM/tipo (apenas upload da lista)
         document.getElementById('form-declaracao').submit();
       });
@@ -790,6 +801,7 @@
       });
 
       $('#form-declaracao').on('submit', function (e) {
+        var $form = $(this);
         var tipo = normalizarTipo($('#tipo').val());
 
         // Submissões que vierem do botão "Carregar lista piloto"
@@ -798,8 +810,10 @@
 
         if (confirmandoEnvio) {
           confirmandoEnvio = false;
-          // Gerando declaração após confirmação
-          mostrarOverlay('Gerando declaração, aguarde...');
+          // Gerando PDF da declaração após confirmação.
+          $form.attr('target', '_blank');
+          mostrarOverlay('Gerando PDF da declaração, aguarde...');
+          liberarTelaAposAbrirPdf();
           return true;
         }
 
@@ -826,8 +840,10 @@
           return false;
         }
 
-        // Geração de declaração sem modal (ex.: escolaridade ou frequência)
-        mostrarOverlay('Gerando declaração, aguarde...');
+        // Geração de PDF sem modal (ex.: escolaridade ou frequência).
+        $form.attr('target', '_blank');
+        mostrarOverlay('Gerando PDF da declaração, aguarde...');
+        liberarTelaAposAbrirPdf();
         return true;
       });
 

@@ -318,8 +318,18 @@ class DeclaracoesServiceTests(unittest.TestCase):
 
         self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Escolaridade")
         self.assertIn("Aluno Fundamental", context["declaracao_text"])
-        self.assertIn("hor\u00e1rio de aula", context["declaracao_text"])
-        self.assertEqual(context["body_classes"], [])
+        self.assertIn("possui a seguinte situa\u00e7\u00e3o escolar", context["declaracao_text"])
+        self.assertIn("Hor\u00e1rio de aula", context["declaracao_text"])
+        self.assertIn("regularmente matriculado(a) e frequente", context["declaracao_text"])
+        self.assertIn("Observa\u00e7\u00e3o:", context["declaracao_text"])
+        self.assertIn("siae-observations", context["declaracao_text"])
+        self.assertIn("Por ser express\u00e3o da verdade", context["declaracao_text"])
+        self.assertIn("siae-option-escolaridade selected", context["declaracao_text"])
+        self.assertIn("siae-student-line", context["declaracao_text"])
+        self.assertIn("N\u00e3o preenchido", context["declaracao_text"])
+        self.assertNotIn("na cidade de", context["declaracao_text"])
+        self.assertNotIn("siae-municipal-heading", context["declaracao_text"])
+        self.assertEqual(context["body_classes"], ["modelo-siae"])
 
     def test_build_declaracao_escolar_context_transferencia_observacoes(self):
         escolas_df = pd.DataFrame(
@@ -348,7 +358,21 @@ class DeclaracoesServiceTests(unittest.TestCase):
         self.assertIn("Notas", context["declaracao_text"])
         self.assertIn("ESCOLA ORIGEM", context["declaracao_text"])
         self.assertIn("Bolsa Fam\u00edlia", context["declaracao_text"])
-        self.assertEqual(context["body_classes"], ["transferencia-com-observacoes"])
+        self.assertIn("Observa\u00e7\u00f5es:", context["declaracao_text"])
+        self.assertIn("O Munic\u00edpio adota o Ensino Fundamental de 09 anos.", context["declaracao_text"])
+        self.assertIn(
+            "O aluno deve o hist\u00f3rico escolar da unidade anterior, referente \u00e0 Unidade: "
+            "ESCOLA ORIGEM - Praia Grande/SP. Ap\u00f3s sua entrega, o documento ser\u00e1 confeccionado "
+            "em at\u00e9 30 dias \u00fateis.",
+            context["declaracao_text"],
+        )
+        self.assertIn("paragrafo-observacao", context["declaracao_text"])
+        self.assertNotIn("<ul>", context["declaracao_text"])
+        self.assertNotIn("<li>", context["declaracao_text"])
+        self.assertEqual(context["declaracao_text"].count("Observa\u00e7\u00e3o:"), 0)
+        self.assertEqual(context["declaracao_text"].count("Observa\u00e7\u00f5es:"), 1)
+        self.assertIn("siae-option-transferencia selected", context["declaracao_text"])
+        self.assertEqual(context["body_classes"], ["modelo-siae", "transferencia-com-observacoes"])
 
     def test_build_declaracao_escolar_context_eja_conclusao(self):
         context = build_declaracao_escolar_context(
@@ -366,6 +390,8 @@ class DeclaracoesServiceTests(unittest.TestCase):
         self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Conclus\u00e3o")
         self.assertIn("2\u00ba semestre", context["declaracao_text"])
         self.assertIn("1\u00aa S\u00c9RIE E.M", context["declaracao_text"])
+        self.assertIn("siae-option-conclusao selected", context["declaracao_text"])
+        self.assertEqual(context["body_classes"], ["modelo-siae"])
 
     def test_build_declaracao_escolar_context_frequencia_and_invalid(self):
         context = build_declaracao_escolar_context(

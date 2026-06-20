@@ -100,11 +100,37 @@ class StaticSecurityTests(unittest.TestCase):
         self.assertIn("var(--app-control-radius)", css)
         self.assertIn("var(--app-pill-radius)", css)
         self.assertIn("#declaracao-page .btn-declaracao.step-highlight-field", css)
+        self.assertIn("#declaracao-page .btn-lote.step-highlight-field", css)
         self.assertIn("background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary)) !important", css)
         self.assertIn("#declaracao-page .btn-declaracao.step-highlight-field:disabled", css)
         self.assertIn("#declaracao-page .btn-declaracao:disabled i", css)
+        self.assertIn("liberarTelaAposAbrirPdf", js)
+        self.assertIn("window.setTimeout(ocultarOverlay, 1200)", js)
         self.assertNotIn("{{", js)
         self.assertNotIn("{%", js)
+
+    def test_docker_deploy_files_preserve_pdf_and_school_assets(self):
+        dockerfile = read_text("Dockerfile")
+        dockerignore = read_text(".dockerignore")
+        env_example = read_text(".env.example")
+        readme = read_text("README.md")
+        check_pdf = read_text("scripts/check_pdf_environment.py")
+
+        self.assertIn("FROM python:3.12-slim-bookworm", dockerfile)
+        self.assertIn("chromium", dockerfile)
+        self.assertIn("DECLARACAO_PDF_BROWSER_PATH=/usr/bin/chromium", dockerfile)
+        self.assertIn("gunicorn app:app", dockerfile)
+        self.assertIn("WEB_CONCURRENCY:-3", dockerfile)
+        self.assertIn("DECLARACAO_PDF_BROWSER_PATH=", env_example)
+        self.assertIn("Render com PDF de Declaracoes", readme)
+        self.assertIn("scripts/check_pdf_environment.py", readme)
+        self.assertIn("find_browser_executable", check_pdf)
+        self.assertIn("render_declaracao_pdf_bytes", check_pdf)
+
+        self.assertIn("uploads/*", dockerignore)
+        self.assertIn("!uploads/escolas.csv", dockerignore)
+        self.assertNotIn("static/fotos", dockerignore)
+        self.assertNotIn("modelos/", dockerignore)
 
     def test_declaracao_tipo_preserves_form_contracts(self):
         template = read_text("templates/declaracao_tipo.html")
@@ -130,12 +156,93 @@ class StaticSecurityTests(unittest.TestCase):
             "declaracao-full-select",
             "frequencia-help-text",
             "frequencia-footnote",
+            'formtarget="_blank"',
+            "Gerar declaração em PDF",
+            "Gerar declaração personalizada em PDF",
         ]:
             self.assertIn(expected, template)
         self.assertIn("declaracao-page-header", template)
         self.assertIn("segmento-card-arrow", template)
         self.assertIn("declaracao-upload-zone", template)
         self.assertIn("status-alert-content", template)
+
+    def test_declaracao_print_supports_siae_model_layout(self):
+        template = read_text("templates/declaracao_print.html")
+        service = read_text("services/declaracoes.py")
+
+        for expected in [
+            "modelo-siae",
+            "siae-declaration",
+            "siae-option",
+            "siae-check",
+            "siae-date",
+            "declaracao-render",
+            "siae-student-line",
+            "siae-option-detail",
+            "siae-closing",
+            "siae-observations",
+            "siae-observations-content",
+            "is_modelo_siae",
+            "pdf_url",
+            "acoes-preview",
+            "Gerar PDF da Declaração",
+            "max-width: 182mm",
+            "min-height: calc(297mm - 20mm)",
+            "margin: 10mm 14mm",
+            "font-family: Arial, sans-serif",
+            "font-size: 13.5pt",
+            "border-bottom: 0",
+            "border-top: 1px solid #777",
+            "border-bottom: 1px solid #bbb",
+            "border-radius: 0",
+            "grid-template-columns: 32px minmax(0, 1fr)",
+            "place-items: center",
+            "text-decoration-line: line-through",
+            "grid-template-rows: auto minmax(0, 1fr) auto",
+            "margin-top: auto",
+            "font-size: 11.5pt",
+        ]:
+            self.assertIn(expected, template)
+
+        for expected in [
+            "_build_modelo_siae_declaracao_html",
+            "siae-option-{key}",
+            '_build_siae_option("conclusao"',
+            '_build_siae_option("escolaridade"',
+            '_build_siae_option("transferencia"',
+            "_build_siae_observations_html",
+            "_build_historico_unidade_observacao",
+            "bloco-observacoes",
+            "paragrafo-observacao",
+            "conteudo-observacoes",
+            "N\\u00e3o preenchido",
+            "Selecionada",
+        ]:
+            self.assertIn(expected, service)
+
+        for removed in [
+            "<ul>",
+            "<li>",
+        ]:
+            self.assertNotIn(removed, service)
+
+        for removed in [
+            "siae-modelo-label",
+            "siae-municipal-heading",
+            "siae-option-status",
+            "Georgia",
+            "Times New Roman",
+            "window.print()",
+        ]:
+            self.assertNotIn(removed, template)
+
+        for removed in [
+            "siae-modelo-label",
+            "siae-municipal-heading",
+            "na cidade de",
+            "Estado de <span",
+        ]:
+            self.assertNotIn(removed, service)
 
     def test_carteirinhas_assets_are_externalized(self):
         template = read_text("templates/gerar_carteirinhas.html")

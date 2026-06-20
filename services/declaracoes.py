@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from html import escape
 from numbers import Number
 
 import pandas as pd
@@ -21,17 +22,41 @@ MONTHS_BR = {
 }
 
 DECLARACAO_PRINT_CSS = """
+.acoes-preview {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+  display: flex;
+  gap: 8px;
+}
 .print-button {
+  display: inline-block;
   background-color: #283E51;
   color: #fff;
   border: none;
   padding: 10px 20px;
   border-radius: 5px;
   cursor: pointer;
-  margin-top: 20px;
+  text-decoration: none;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.2;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
 }
 .print-button:hover {
   background-color: #1d2d3a;
+  color: #fff;
+  text-decoration: none;
+}
+.print-button-disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+@media print {
+  .acoes-preview {
+    display: none !important;
+  }
 }
 """
 
@@ -800,6 +825,189 @@ def _build_historico_unidade_html(unidade_anterior, escolas_df) -> str:
     return f"<strong>Unidade:</strong> {unidade_anterior}<br><br>"
 
 
+def _build_historico_unidade_observacao(unidade_anterior, escolas_df) -> str:
+    if not unidade_anterior:
+        return ""
+
+    unidade_anterior = " ".join(str(unidade_anterior).strip().split())
+    esc_df = None
+    if escolas_df is not None:
+        try:
+            esc_df = escolas_df[
+                escolas_df.iloc[:, 3].str.upper() == unidade_anterior.upper()
+            ]
+        except Exception:
+            esc_df = None
+
+    if esc_df is not None and not esc_df.empty:
+        unidade_nome = str(esc_df.iloc[0, 3]).strip()
+        municipio = str(esc_df.iloc[0, 2]).strip()
+        uf = str(esc_df.iloc[0, 1]).strip()
+        local = f" - {municipio}/{uf}" if municipio or uf else ""
+        return f"Unidade: {unidade_nome}{local}."
+
+    return f"Unidade: {unidade_anterior}."
+
+
+def _html(value) -> str:
+    return escape(str(value or "").strip())
+
+
+def _selected_key(tipo) -> str:
+    if tipo == "Escolaridade":
+        return "escolaridade"
+    if tipo == "Transferencia":
+        return "transferencia"
+    if tipo == "Conclus\u00e3o":
+        return "conclusao"
+    return ""
+
+
+def _ensino_label(segmento) -> str:
+    if segmento == "EJA":
+        return "segmento de Educa\u00e7\u00e3o de Jovens e Adultos (EJA)"
+    return "Ensino Fundamental"
+
+
+def _series_conclusao_text(serie, segmento, semestre_texto="") -> tuple[str, str]:
+    if segmento == "EJA":
+        mapping = {
+            "1\u00aa S\u00c9RIE E.F": "2\u00aa S\u00c9RIE E.F",
+            "2\u00aa S\u00c9RIE E.F": "3\u00aa S\u00c9RIE E.F",
+            "3\u00aa S\u00c9RIE E.F": "4\u00aa S\u00c9RIE E.F",
+            "4\u00aa S\u00c9RIE E.F": "5\u00aa S\u00c9RIE E.F",
+            "5\u00aa S\u00c9RIE E.F": "6\u00aa S\u00c9RIE E.F",
+            "6\u00aa S\u00c9RIE E.F": "7\u00aa S\u00c9RIE E.F",
+            "7\u00aa S\u00c9RIE E.F": "8\u00aa S\u00c9RIE E.F",
+            "8\u00aa S\u00c9RIE E.F": "1\u00aa S\u00c9RIE E.M",
+            "1\u00aa S\u00c9RIE E.M": "2\u00aa S\u00c9RIE E.M",
+            "2\u00aa S\u00c9RIE E.M": "3\u00aa S\u00c9RIE E.M",
+            "3\u00aa S\u00c9RIE E.M": "ENSINO SUPERIOR",
+        }
+        serie_atual = str(serie)
+        semestre = f" - {semestre_texto}" if semestre_texto else ""
+        return f"{serie_atual}{semestre}", mapping.get(serie_atual.upper(), "a s\u00e9rie subsequente")
+
+    match = re.search(r"(\d+)\u00ba", str(serie))
+    next_year = int(match.group(1)) + 1 if match else None
+    return str(serie), f"{next_year}\u00ba ano" if next_year else "a s\u00e9rie subsequente"
+
+
+def _series_transferencia_text(serie) -> str:
+    return re.sub(r"^(\d+\u00ba).*", r"\1 ano", str(serie))
+
+
+def _build_siae_option(key, selected_key, text):
+    selected = key == selected_key
+    status = "Selecionada" if selected else "N\u00e3o preenchido"
+    status_class = "selected" if selected else "locked"
+    mark = "X" if selected else ""
+    return (
+        f'<div class="siae-option siae-option-{key} {status_class}" aria-label="{status}">'
+        f'<span class="siae-check" aria-label="{status}">{mark}</span>'
+        f'<div class="siae-option-text">{text}'
+        "</div>"
+        "</div>"
+    )
+
+
+def _build_siae_observations_html(observacoes):
+    items = [str(obs or "").strip() for obs in observacoes if str(obs or "").strip()]
+    if not items:
+        return ""
+
+    if len(items) == 1:
+        return (
+            '<section class="siae-observations bloco-observacoes">'
+            f'<p><strong>Observa\u00e7\u00e3o:</strong> {_html(items[0])}</p>'
+            "</section>"
+        )
+
+    paragraphs = "".join(
+        f'<p class="siae-observation-paragraph paragrafo-observacao">{_html(item)}</p>'
+        for item in items
+    )
+    return (
+        '<section class="siae-observations bloco-observacoes">'
+        '<p class="siae-observations-title"><strong>Observa\u00e7\u00f5es:</strong></p>'
+        f'<div class="siae-observations-content conteudo-observacoes">{paragraphs}</div>'
+        "</section>"
+    )
+
+
+def _build_modelo_siae_declaracao_html(
+    *,
+    tipo,
+    segmento,
+    nome,
+    ra,
+    ra_label,
+    data_nasc,
+    serie,
+    horario="Desconhecido",
+    semestre_texto="",
+    ano=None,
+    observacoes_adicionais=None,
+):
+    selected = _selected_key(tipo)
+    if not selected:
+        return ""
+
+    ano = ano or datetime.now().year
+    ensino = _ensino_label(segmento)
+    serie_conclusao, serie_subsequente = _series_conclusao_text(serie, segmento, semestre_texto)
+    serie_transferencia = _series_transferencia_text(serie)
+
+    declaracao_intro = (
+        '<div class="siae-student-lines">'
+        '<div class="siae-student-line">'
+        f'Declaro, para os devidos fins, que o(a) aluno(a) <span class="siae-fill long">{_html(nome)}</span>, '
+        f'{_html(ra_label)} n\u00ba <span class="siae-fill medium">{_html(ra)}</span>, '
+        f'nascido(a) em <span class="siae-fill short">{_html(data_nasc)}</span>, possui a seguinte situa\u00e7\u00e3o '
+        'escolar nesta Unidade Escolar:'
+        '</div>'
+        '</div>'
+    )
+
+    conclusao = (
+        f'Concluiu o(a) <span class="siae-fill small">{_html(serie_conclusao)}</span> do '
+        f'<span class="siae-fill medium">{_html(ensino)}</span> nesta Unidade Escolar, no ano de '
+        f'<span class="siae-fill tiny">{_html(ano)}</span>, estando apto(a) a ingressar no(a) '
+        f'<span class="siae-fill small">{_html(serie_subsequente)}</span>.'
+    )
+    escolaridade = (
+        f'\u00c9 aluno(a) regularmente matriculado(a) e frequente no(a) '
+        f'<span class="siae-fill medium">{_html(serie)}</span> do '
+        f'<span class="siae-fill medium">{_html(ensino)}</span> nesta Unidade Escolar.'
+        f'<span class="siae-option-detail">Hor\u00e1rio de aula: {_html(horario)}.</span>'
+    )
+    transferencia = (
+        'Pediu transfer\u00eancia nesta data e os documentos solicitados ser\u00e3o expedidos no prazo de '
+        '<span class="siae-fill tiny">30 dias \u00fateis</span>. '
+        'O(a) aluno(a) tem direito a matricular-se no(a) '
+        f'<span class="siae-fill small">{_html(serie_transferencia)}</span> do '
+        f'<span class="siae-fill medium">{_html(ensino)}</span>.'
+    )
+
+    observacoes = ["O Município adota o Ensino Fundamental de 09 anos."]
+    observacoes.extend(observacoes_adicionais or [])
+    observacoes_html = _build_siae_observations_html(observacoes)
+
+    return (
+        '<section class="siae-declaration" aria-label="Modelo municipal de declaração">'
+        '<h2 class="siae-title">DECLARAÇÃO</h2>'
+        f'{declaracao_intro}'
+        '<div class="siae-options">'
+        f'{_build_siae_option("conclusao", selected, conclusao)}'
+        f'{_build_siae_option("escolaridade", selected, escolaridade)}'
+        f'{_build_siae_option("transferencia", selected, transferencia)}'
+        '</div>'
+        f'{observacoes_html}'
+        '<p class="siae-closing frase-final">Por ser expressão da verdade, firmamos a presente declaração.</p>'
+        '</section>'
+    )
+
+
 def build_declaracao_escolar_context(
     *,
     tipo,
@@ -827,6 +1035,8 @@ def build_declaracao_escolar_context(
     is_eja = segmento == "EJA"
     declaracao_text = ""
     tem_observacoes = False
+    observacoes_html = ""
+    observacoes_siae = []
 
     if tipo == "Escolaridade":
         titulo = "Declara\u00e7\u00e3o de Escolaridade"
@@ -978,38 +1188,72 @@ def build_declaracao_escolar_context(
 
     if deve_historico or (valor_bolsa == "SIM" and tipo != "Escolaridade"):
         tem_observacoes = True
-        declaracao_text += "<br><br><strong>Observa\u00e7\u00f5es:</strong><br>"
-        declaracao_text += (
+        observacoes_html += "<br><br><strong>Observa\u00e7\u00f5es:</strong><br>"
+        observacoes_html += (
             '<label class="checkbox-label" '
             "style='display:block;text-align:justify;font-size:14px;'>"
         )
 
         if deve_historico:
-            declaracao_text += '<span class="warning-icon">&#9888;</span> '
-            declaracao_text += (
+            historico_observacao = "O aluno deve o histórico escolar da unidade anterior"
+            unidade_observacao = _build_historico_unidade_observacao(
+                unidade_anterior,
+                escolas_df,
+            )
+            if unidade_observacao:
+                historico_observacao += f", referente à {unidade_observacao.rstrip('.')}"
+            historico_observacao += (
+                ". Após sua entrega, o documento será confeccionado em até 30 dias úteis."
+            )
+            observacoes_siae.append(historico_observacao)
+
+            observacoes_html += '<span class="warning-icon">&#9888;</span> '
+            observacoes_html += (
                 "O aluno deve o hist\u00f3rico escolar da unidade anterior:<br><br>"
             )
-            declaracao_text += _build_historico_unidade_html(unidade_anterior, escolas_df)
-            declaracao_text += (
+            observacoes_html += _build_historico_unidade_html(unidade_anterior, escolas_df)
+            observacoes_html += (
                 "Ap\u00f3s sua entrega, o documento ser\u00e1 confeccionado em "
                 "at\u00e9 30 dias \u00fateis.<br><br>"
             )
 
         if valor_bolsa == "SIM" and tipo != "Escolaridade":
-            declaracao_text += (
+            observacoes_siae.append("O aluno é beneficiário do Programa Bolsa Família.")
+
+            observacoes_html += (
                 '<img src="/static/logos/bolsa_familia.jpg" '
                 'alt="Bolsa Fam\u00edlia" '
                 'style="width:28px;vertical-align:middle;margin-right:5px;">'
                 "O aluno \u00e9 benefici\u00e1rio do Programa Bolsa Fam\u00edlia."
             )
 
-        declaracao_text += "</label>"
+        observacoes_html += "</label>"
+        declaracao_text += observacoes_html
 
     body_classes = []
     if tipo in ("Frequencia", "Frequ\u00eancia"):
         body_classes.append("tipo-frequencia")
     if tipo == "Transferencia" and tem_observacoes:
         body_classes.append("transferencia-com-observacoes")
+
+    if tipo in ("Escolaridade", "Transferencia", "Conclus\u00e3o"):
+        declaracao_text = _build_modelo_siae_declaracao_html(
+            tipo=tipo,
+            segmento=segmento,
+            nome=nome,
+            ra=ra,
+            ra_label=ra_label,
+            data_nasc=data_nasc,
+            serie=serie,
+            horario=horario,
+            semestre_texto=semestre_texto,
+            observacoes_adicionais=observacoes_siae,
+        )
+        if tipo == "Transferencia" and notas_tabela_html:
+            declaracao_text += '<div class="declaracao-extra declaracao-notas">'
+            declaracao_text += notas_tabela_html
+            declaracao_text += "</div>"
+        body_classes.insert(0, "modelo-siae")
 
     return {
         "titulo": titulo,
