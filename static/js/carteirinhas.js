@@ -284,36 +284,58 @@ if (filtroRelatorioInput) {
 }
 
 /* ====== BUSCA POR NOME OU RM ====== */
+function normalizarBuscaCarteirinha(valor) {
+  var texto = (valor || '').toString().toLowerCase();
+  if (typeof texto.normalize === 'function') {
+    texto = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  return texto;
+}
+
 var localizarInput = document.getElementById('localizarAluno');
+var localizarScrollTimeout = null;
 if (localizarInput) {
   localizarInput.addEventListener('input', function () {
-    var filtro = this.value.trim().toLowerCase();
-    var cards = document.querySelectorAll('.borda-pontilhada');
+    var filtro = normalizarBuscaCarteirinha(this.value.trim());
+    var pages = Array.prototype.slice.call(document.querySelectorAll('.page'));
     var primeiroVisivel = null;
 
-    cards.forEach(function (card) {
-      var nomeElem = card.querySelector('.info-name-text');
-      var nome = nomeElem ? nomeElem.textContent.toLowerCase() : '';
-      var rm = (card.getAttribute('data-rm') || '').toString().toLowerCase();
+    pages.forEach(function (page) {
+      var cards = Array.prototype.slice.call(page.querySelectorAll('.borda-pontilhada'));
+      var paginaTemResultado = false;
 
-      var textoBusca = nome + ' ' + rm;
+      cards.forEach(function (card) {
+        var nomeElem = card.querySelector('.info-name-text');
+        var nome = normalizarBuscaCarteirinha(nomeElem ? nomeElem.textContent : '');
+        var rm = normalizarBuscaCarteirinha(card.getAttribute('data-rm') || '');
+        var textoBusca = nome + ' ' + rm;
+        var corresponde = !filtro || textoBusca.indexOf(filtro) > -1;
 
-      if (!filtro || textoBusca.indexOf(filtro) > -1) {
-        card.style.display = '';
-        if (!primeiroVisivel) {
-          primeiroVisivel = card;
+        card.style.display = corresponde ? '' : 'none';
+
+        if (corresponde) {
+          paginaTemResultado = true;
+          if (filtro && !primeiroVisivel) {
+            primeiroVisivel = card;
+          }
         }
-      } else {
-        card.style.display = 'none';
-      }
+      });
+
+      page.style.display = (!filtro || paginaTemResultado) ? '' : 'none';
     });
 
+    if (localizarScrollTimeout) {
+      clearTimeout(localizarScrollTimeout);
+    }
+
     if (filtro && primeiroVisivel) {
-      primeiroVisivel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      primeiroVisivel.classList.add('card-highlight');
-      setTimeout(function () {
-        primeiroVisivel.classList.remove('card-highlight');
-      }, 1500);
+      localizarScrollTimeout = setTimeout(function () {
+        primeiroVisivel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        primeiroVisivel.classList.add('card-highlight');
+        setTimeout(function () {
+          primeiroVisivel.classList.remove('card-highlight');
+        }, 1500);
+      }, 120);
     }
   });
 }

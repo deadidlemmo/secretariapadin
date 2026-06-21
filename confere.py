@@ -1,26 +1,42 @@
 import os
+import re
 import uuid
 from functools import wraps
 
-from flask import Blueprint, Flask, request, render_template, flash, redirect, url_for, jsonify, session
-import pandas as pd
-import pdfplumber
-import unicodedata
+from flask import (
+    Blueprint,
+    Flask,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
 
-from utils.uploads import allowed_excel_file, allowed_extension, unique_secure_filename
+from services.conferir_listas import (
+    build_excel_report,
+    format_turma_key,
+    normalize_turma_lista,
+    normalize_turma_sed,
+    preview_sed_pdf_scope,
+    load_result,
+    prepare_result_for_view,
+    run_conferencia,
+    save_result,
+)
+from utils.uploads import allowed_excel_file, allowed_extension
 
-# Cria o blueprint
-confere_bp = Blueprint('confere', __name__, template_folder='templates')
 
-# Definições e configurações do subsistema
+confere_bp = Blueprint("confere", __name__, template_folder="templates")
+
 UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), "uploads")
-
-# Configuração do upload
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
+RESULTS_FOLDER = os.path.join(UPLOAD_FOLDER, "conferencias")
 ALLOWED_PDF_EXTENSIONS = {".pdf"}
-CONFERE_EXCEL_SESSION_KEY = "confere_excel_file"
+
+os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
 
 def confere_login_required(f):
@@ -33,310 +49,190 @@ def confere_login_required(f):
     return decorated_function
 
 
-def _save_excel_to_session(file_storage):
-    filename = unique_secure_filename(file_storage.filename or "", prefix="confere")
-    if not filename:
-        return None, "Nenhum arquivo selecionado."
-    if not allowed_excel_file(filename):
-        return None, "Formato invalido. Envie uma planilha .xlsx, .xls ou .xlsm."
+def _collect_sed_pdf_uploads():
+    files = [file for file in request.files.getlist("sed_pdfs") if file and file.filename]
+    items = []
+    errors = []
 
-    excel_path = os.path.join(UPLOAD_FOLDER, filename)
-    file_storage.save(excel_path)
-    session[CONFERE_EXCEL_SESSION_KEY] = excel_path
-    return excel_path, None
+    for file_storage in files:
+        original_name = file_storage.filename or "arquivo_sem_nome.pdf"
+        if not allowed_extension(original_name, ALLOWED_PDF_EXTENSIONS):
+            errors.append(
+                {
+                    "arquivo": original_name,
+                    "erro": "Arquivo rejeitado: envie apenas PDFs gerados pelo SED.",
+                }
+            )
+            continue
+
+        content = file_storage.read()
+        if not content:
+            errors.append(
+                {
+                    "arquivo": original_name,
+                    "erro": "Arquivo PDF vazio ou nao enviado corretamente.",
+                }
+            )
+            continue
+
+        items.append({"filename": original_name, "content": content})
+
+    return files, items, errors
 
 
-def _get_session_excel_path():
-    path = session.get(CONFERE_EXCEL_SESSION_KEY)
-    if path and os.path.exists(path):
-        return path
-    session.pop(CONFERE_EXCEL_SESSION_KEY, None)
-    return None
+def _attach_upload_errors(result, uploaded_files, upload_errors):
+    if not upload_errors:
+        return result
+
+    result["pdf_errors"] = upload_errors + result.get("pdf_errors", [])
+    summary = result.setdefault("summary", {})
+    summary["total_pdfs_processados"] = len(uploaded_files)
+    summary["total_pdfs_com_erro"] = len(result["pdf_errors"])
+    return result
 
 
-def _is_valid_pdf_upload(file_storage):
-    return bool(file_storage and file_storage.filename and allowed_extension(file_storage.filename, ALLOWED_PDF_EXTENSIONS))
+def _turma_sort_key(turma_key):
+    match = re.fullmatch(r"(\d{1,2})([A-Z])", turma_key or "")
+    if not match:
+        return (999, turma_key or "")
+    return (int(match.group(1)), match.group(2))
 
-# Mapeamento de séries para os intervalos de linhas (usado quando não for "Todas as séries")
-mapeamento = {
-    '2ºA': (0, 50),
-    '2ºB': (50, 100),
-    '2ºC': (100, 150),
-    '2ºD': (150, 200),
-    '2ºE': (200, 250),
-    '2ºF': (250, 300),
-    '3ºA': (300, 350),
-    '3ºB': (350, 400),
-    '3ºC': (400, 450),
-    '3ºD': (450, 500),
-    '3ºE': (500, 550),
-    '3ºF': (550, 600),
-    '4ºA': (600, 650),
-    '4ºB': (650, 700),
-    '4ºC': (700, 750),
-    '4ºD': (750, 800),
-    '4ºE': (800, 850),
-    '4ºF': (850, 900),
-    '4ºG': (900, 950),
-    '5ºA': (950, 1000),
-    '5ºB': (1000, 1050),
-    '5ºC': (1050, 1100),
-    '5ºD': (1100, 1150),
-    '5ºE': (1150, 1200),
-    '5ºF': (1200, 1250),
-    '5ºG': (1250, 1300),
-}
 
-def normalize_str(s):
-    """Normaliza a string removendo acentuação, espaços extras e convertendo para minúsculas."""
-    s = s.lower()
-    s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
-    s = " ".join(s.split())
-    return s
+def _row_turma_key(row):
+    return (
+        normalize_turma_lista(row.get("turma_lista", ""))
+        or normalize_turma_sed(row.get("turma_sed", ""))
+        or "SEM_TURMA"
+    )
 
-def obter_dados_serie(serie, excel_filepath):
-    """
-    Extrai os dados do Excel referentes à série selecionada.
-    Lê a aba "LISTA CORRIDA" do arquivo Excel e filtra o intervalo mapeado.
-    """
-    try:
-        df = pd.read_excel(excel_filepath, sheet_name="LISTA CORRIDA", usecols='D,I', header=0)
-    except Exception as e:
-        return f"Erro ao ler o arquivo Excel: {str(e)}"
-    
-    if df.shape[1] < 2:
-        return "As colunas necessárias não foram encontradas no arquivo Excel."
-    
-    if serie not in mapeamento:
-        return f"Série '{serie}' não encontrada no mapeamento."
-    
-    inicio, fim = mapeamento[serie]
-    df_serie = df.iloc[inicio:fim].copy()
-    df_serie.columns = ['Nome', 'OBS']
-    df_serie = df_serie[df_serie['Nome'].notna()]
-    df_serie = df_serie[~df_serie['Nome'].astype(str).str.strip().isin(['0', '#REF#'])]
-    df_serie['OBS'] = df_serie['OBS'].apply(lambda x: '-' if str(x).strip() == '0' else x)
-    return df_serie
 
-def obter_dados_pdf(file):
-    """
-    Extrai a tabela do PDF enviado pelo usuário.
-    """
-    all_rows = []
-    header = None
-    with pdfplumber.open(file) as pdf:
-        for page in pdf.pages:
-            table = page.extract_table()
-            if table:
-                if header is None:
-                    header = table[0]
-                for row in table[1:]:
-                    all_rows.append(row)
-    if not all_rows or header is None:
-        return None
-    df_pdf = pd.DataFrame(all_rows, columns=header)
-    df_pdf.columns = [col.strip() for col in df_pdf.columns]
-    df_pdf.rename(columns={
-        'Nome do Aluno': 'Nome',
-        'Situação': 'Situacao',
-        'Data Movimentação': 'DataMovimentacao'
-    }, inplace=True)
-    df_pdf = df_pdf[df_pdf['Nome'].notna()]
-    df_pdf = df_pdf[~df_pdf['Nome'].astype(str).str.strip().isin(['0', '#REF#'])]
-    return df_pdf
+def _build_result_groups(result):
+    groups_by_key = {}
+    category_order = {
+        "inconsistencia_situacao": 0,
+        "nao_encontrado_sed": 1,
+        "nao_encontrado_lista": 2,
+        "divergencia_cadastral": 3,
+        "ok": 4,
+    }
 
-def comparar_listas(df_excel, df_pdf):
-    """
-    Compara as listas do Excel e do PDF para identificar divergências.
-    """
-    def has_TE(obs):
-        if pd.isna(obs):
-            return False
-        return 'te' in normalize_str(str(obs))
-    
-    def has_BXTR_or_TRAN(sit):
-        if pd.isna(sit):
-            return False
-        sit_norm = normalize_str(str(sit))
-        return sit_norm in ['bxtr', 'tran']
-    
-    def has_REMP(obs):
-        if pd.isna(obs):
-            return False
-        return 'rem p' in normalize_str(str(obs))
-    
-    def has_REMA(sit):
-        if pd.isna(sit):
-            return False
-        return 'rema' in normalize_str(str(sit))
-    
-    df_excel = df_excel.copy()
-    df_pdf = df_pdf.copy()
-    df_excel['nome_norm'] = df_excel['Nome'].apply(normalize_str)
-    df_pdf['nome_norm'] = df_pdf['Nome'].apply(normalize_str)
-    
-    divergencias = []
-    df_merged = pd.merge(df_excel, df_pdf, on='nome_norm', suffixes=('_excel', '_pdf'))
-    for _, row in df_merged.iterrows():
-        te_excel = has_TE(row['OBS'])
-        bxtr_tran_pdf = has_BXTR_or_TRAN(row['Situacao'])
-        if te_excel and not bxtr_tran_pdf:
-            reason = "Aluno transferido na lista piloto mas não transferido no SED"
-            divergencias.append({
-                "Nome": row['Nome_excel'],
-                "OBS (Excel)": row['OBS'],
-                "Situacao (PDF)": row['Situacao'],
-                "Divergência": reason
-            })
-        elif bxtr_tran_pdf and not te_excel:
-            reason = "Aluno transferido no SED mas não transferido na lista piloto"
-            divergencias.append({
-                "Nome": row['Nome_excel'],
-                "OBS (Excel)": row['OBS'],
-                "Situacao (PDF)": row['Situacao'],
-                "Divergência": reason
-            })
-        remp_excel = has_REMP(row['OBS'])
-        rema_pdf = has_REMA(row['Situacao'])
-        if remp_excel and not rema_pdf:
-            reason = "Aluno remanejado na lista piloto mas não remanejado no SED"
-            divergencias.append({
-                "Nome": row['Nome_excel'],
-                "OBS (Excel)": row['OBS'],
-                "Situacao (PDF)": row['Situacao'],
-                "Divergência": reason
-            })
-        elif rema_pdf and not remp_excel:
-            reason = "Aluno remanejado no SED mas não remanejado na lista piloto"
-            divergencias.append({
-                "Nome": row['Nome_excel'],
-                "OBS (Excel)": row['OBS'],
-                "Situacao (PDF)": row['Situacao'],
-                "Divergência": reason
-            })
-    
-    excel_lookup = df_excel.set_index('nome_norm').to_dict(orient='index')
-    pdf_lookup = df_pdf.drop_duplicates(subset=['nome_norm']).set_index('nome_norm').to_dict(orient='index')
-    
-    set_excel = set(df_excel['nome_norm'])
-    set_pdf = set(df_pdf['nome_norm'])
-    
-    for nome in set_pdf - set_excel:
-        info_pdf = pdf_lookup.get(nome, {})
-        divergencias.append({
-            "Nome": info_pdf.get('Nome', nome),
-            "OBS (Excel)": "-",
-            "Situacao (PDF)": "-",
-            "Divergência": "Aluno presente no SED mas não na lista piloto"
-        })
-    
-    for nome in set_excel - set_pdf:
-        info_excel = excel_lookup.get(nome, {})
-        divergencias.append({
-            "Nome": info_excel.get('Nome', nome),
-            "OBS (Excel)": "-",
-            "Situacao (PDF)": "-",
-            "Divergência": "Aluno presente na lista piloto mas não no SED"
-        })
-    
-    if divergencias:
-        return pd.DataFrame(divergencias).sort_values(by="Nome")
-    else:
-        return None
+    for row in result.get("rows", []):
+        turma_key = _row_turma_key(row)
+        label = "Sem turma" if turma_key == "SEM_TURMA" else format_turma_key(turma_key)
+        group = groups_by_key.setdefault(turma_key, {"key": turma_key, "label": label, "rows": []})
+        group["rows"].append(row)
 
-@confere_bp.route('/upload_excel', methods=['POST'])
-@confere_login_required
-def upload_excel():
-    if _get_session_excel_path() is not None:
-        return jsonify({"success": False, "message": "Arquivo Excel já foi carregado anteriormente."})
-    
-    if 'listaExcel' not in request.files:
-        return jsonify({"success": False, "message": "Nenhum arquivo Excel enviado."})
-    file_excel = request.files['listaExcel']
-    if file_excel.filename == '':
-        return jsonify({"success": False, "message": "Nenhum arquivo selecionado."})
+    groups = sorted(groups_by_key.values(), key=lambda group: _turma_sort_key(group["key"]))
+    for group in groups:
+        group["rows"].sort(
+            key=lambda row: (
+                category_order.get(row.get("categoria"), 99),
+                row.get("nome_lista") or row.get("nome_sed") or "",
+            )
+        )
+    return groups
 
-    _excel_path, error = _save_excel_to_session(file_excel)
-    if error:
-        return jsonify({"success": False, "message": error}), 400
 
-    return jsonify({"success": True, "message": "Arquivo Excel carregado com sucesso!"})
-
-@confere_bp.route('/', methods=['GET', 'POST'])
+@confere_bp.route("/", methods=["GET", "POST"])
 @confere_login_required
 def index():
-    dados_excel = None
-    dados_pdf = None
-    divergencias = None
-    error_excel = None
-    selected_series = None
-    excel_path = _get_session_excel_path()
+    if request.method == "GET":
+        return render_template("index.html", result=None)
 
-    if request.method == 'POST':
-        selected_series = request.form.get('serie')
-        if excel_path is None:
-            flash("Nenhum arquivo Excel foi carregado. Por favor, anexe um arquivo Excel.", "danger")
-        else:
-            if selected_series == "Todas as séries":
-                # Obtém os arquivos enviados para cada série pelo nome único
-                pdf_dict = {}
-                for key in request.files.keys():
-                    if key.startswith("listaPDF_"):
-                        file_pdf = request.files.get(key)
-                        if file_pdf and file_pdf.filename != '':
-                            if not _is_valid_pdf_upload(file_pdf):
-                                flash(f"Arquivo PDF inválido para {key}. Envie um arquivo .pdf.", "warning")
-                                continue
-                            # O sufixo indica a série
-                            serie_from_key = key.replace("listaPDF_", "")
-                            pdf_dict[serie_from_key] = file_pdf
+    lista_piloto = request.files.get("lista_piloto")
+    if not lista_piloto or not lista_piloto.filename:
+        flash("Anexe a Lista Piloto em Excel para executar a conferencia.", "danger")
+        return redirect(url_for("confere.index"))
+    if not allowed_excel_file(lista_piloto.filename):
+        flash("Formato invalido para Lista Piloto. Envie .xlsx, .xls ou .xlsm.", "danger")
+        return redirect(url_for("confere.index"))
 
-                divergencias_dict = {}
-                for serie in mapeamento.keys():
-                    df_excel_serie = obter_dados_serie(serie, excel_path)
-                    if isinstance(df_excel_serie, str):
-                        flash(f"Erro na série {serie}: {df_excel_serie}", "danger")
-                        continue
-                    if serie in pdf_dict:
-                        df_pdf = obter_dados_pdf(pdf_dict[serie])
-                        if df_pdf is not None:
-                            df_div = comparar_listas(df_excel_serie, df_pdf)
-                            if df_div is not None:
-                                # Se o resultado for um Series (apenas uma linha), converte para DataFrame
-                                if isinstance(df_div, pd.Series):
-                                    df_div = df_div.to_frame().T
-                                divergencias_dict[serie] = df_div
-                    else:
-                        flash(f"Nenhum PDF enviado para a série {serie}.", "warning")
-                if divergencias_dict:
-                    divergencias = divergencias_dict
-            else:
-                # Opção de série individual
-                result = obter_dados_serie(selected_series, excel_path)
-                if isinstance(result, str):
-                    error_excel = result
-                else:
-                    dados_excel = result
+    uploaded_files, sed_items, upload_errors = _collect_sed_pdf_uploads()
+    if not sed_items:
+        if upload_errors:
+            for error in upload_errors:
+                flash(error["erro"], "warning")
+        flash("Anexe pelo menos um PDF valido do SED para executar a conferencia.", "danger")
+        return redirect(url_for("confere.index"))
 
-                if 'listaPDF' in request.files:
-                    file_pdf = request.files['listaPDF']
-                    if file_pdf.filename != '':
-                        if _is_valid_pdf_upload(file_pdf):
-                            dados_pdf = obter_dados_pdf(file_pdf)
-                        else:
-                            flash("Arquivo PDF inválido. Envie um arquivo .pdf.", "danger")
-                if dados_excel is not None and dados_pdf is not None:
-                    divergencias = comparar_listas(dados_excel, dados_pdf)
-    
-    return render_template('index.html', 
-                           dados_excel=dados_excel, 
-                           dados_pdf=dados_pdf, 
-                           divergencias=divergencias,
-                           error_excel=error_excel,
-                           selected_series=selected_series)
+    try:
+        result = run_conferencia(lista_piloto, sed_items)
+    except Exception as exc:
+        flash(f"Nao foi possivel executar a conferencia: {exc}", "danger")
+        return redirect(url_for("confere.index"))
 
-if __name__ == '__main__':
+    result = _attach_upload_errors(result, uploaded_files, upload_errors)
+    result_id = uuid.uuid4().hex
+    save_result(result, RESULTS_FOLDER, result_id)
+    return redirect(url_for("confere.resultado", result_id=result_id))
+
+
+@confere_bp.route("/preview-pdfs", methods=["POST"])
+@confere_login_required
+def preview_pdfs():
+    uploaded_files, sed_items, upload_errors = _collect_sed_pdf_uploads()
+    preview = (
+        preview_sed_pdf_scope(sed_items)
+        if sed_items
+        else {
+            "turmas": [],
+            "turma_keys": [],
+            "pdfs_validos": 0,
+            "pdfs_ignorados": 0,
+            "pdfs_selecionados": 0,
+            "errors": [],
+            "duplicate_files": [],
+        }
+    )
+    errors = upload_errors + preview.get("errors", [])
+    duplicate_files = preview.get("duplicate_files", [])
+    return jsonify(
+        {
+            "turmas": preview.get("turmas", []),
+            "pdfs_validos": preview.get("pdfs_validos", 0),
+            "pdfs_ignorados": len(errors) + len(duplicate_files),
+            "pdfs_selecionados": len(uploaded_files),
+            "errors": errors,
+            "duplicate_files": duplicate_files,
+        }
+    )
+
+
+@confere_bp.route("/resultado/<result_id>", methods=["GET"])
+@confere_login_required
+def resultado(result_id):
+    result = load_result(RESULTS_FOLDER, result_id)
+    if result is None:
+        flash("Resultado de conferencia nao encontrado. Execute a conferencia novamente.", "warning")
+        return redirect(url_for("confere.index"))
+    result = prepare_result_for_view(result)
+    return render_template(
+        "index.html",
+        result=result,
+        result_groups=_build_result_groups(result),
+        result_id=result_id,
+    )
+
+
+@confere_bp.route("/exportar/excel/<result_id>", methods=["GET"])
+@confere_login_required
+def exportar_excel(result_id):
+    result = load_result(RESULTS_FOLDER, result_id)
+    if result is None:
+        flash("Resultado de conferencia nao encontrado. Execute a conferencia novamente.", "warning")
+        return redirect(url_for("confere.index"))
+
+    output = build_excel_report(result)
+    return send_file(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name="conferencia_lista_piloto_sed.xlsx",
+    )
+
+
+if __name__ == "__main__":
     app = Flask(__name__)
     app.secret_key = os.getenv("FLASK_SECRET_KEY") or uuid.uuid4().hex
-    app.register_blueprint(confere_bp, url_prefix='/confere')
+    app.register_blueprint(confere_bp, url_prefix="/confere")
     app.run(debug=True)

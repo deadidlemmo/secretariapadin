@@ -436,11 +436,13 @@
     }
 
     .status-symbol {
-      display: grid;
-      place-items: center;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       flex: 0 0 auto;
-      width: 0.38cm;
-      height: 0.38cm;
+      width: 0.42cm;
+      height: 0.42cm;
       border-radius: 999px;
       font-family: Arial, sans-serif;
       font-size: 0;
@@ -452,13 +454,14 @@
       text-align: center;
     }
 
-    .status-symbol::before {
-      display: grid;
-      place-items: center;
-      width: 100%;
-      height: 100%;
-      font-size: 0.23cm;
-      line-height: 1;
+    .status-symbol::before,
+    .status-symbol::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      display: block;
+      box-sizing: border-box;
     }
 
     .status-text {
@@ -478,7 +481,15 @@
     }
 
     .status.verde .status-symbol::before {
-      content: "\2713";
+      width: 0.13cm;
+      height: 0.23cm;
+      border: solid currentColor;
+      border-width: 0 0.045cm 0.045cm 0;
+      transform: translate(-50%, -58%) rotate(45deg);
+    }
+
+    .status.verde .status-symbol::after {
+      display: none;
     }
 
     .status.vermelho {
@@ -492,8 +503,19 @@
     }
 
     .status.vermelho .status-symbol::before {
-      content: "!";
-      font-size: 0.25cm;
+      width: 0.045cm;
+      height: 0.19cm;
+      border-radius: 999px;
+      background: currentColor;
+      transform: translate(-50%, -68%);
+    }
+
+    .status.vermelho .status-symbol::after {
+      width: 0.058cm;
+      height: 0.058cm;
+      border-radius: 999px;
+      background: currentColor;
+      transform: translate(-50%, 105%);
     }
 
     #loading-overlay {
@@ -693,9 +715,7 @@
         font-size: 0.32cm;
         padding: 0.12cm 0.24cm;
       }
-      .status-symbol { width: 0.38cm; height: 0.38cm; font-size: 0; }
-      .status-symbol::before { font-size: 0.23cm; }
-      .status.vermelho .status-symbol::before { font-size: 0.25cm; }
+      .status-symbol { width: 0.42cm; height: 0.42cm; font-size: 0; }
 
       .carteirinha,
       .status,
@@ -782,13 +802,6 @@
       accent-color: #1976d2;
       cursor: pointer;
     }
-    .filtro-foto-pill {
-      font-size: 0.28cm;
-      font-weight: 700;
-      color: #1565c0;
-      white-space: nowrap;
-    }
-
     /* ====== RELATÓRIO ALUNOS SEM FOTO (MODAL) ====== */
     #relatorio-container {
       display: none;
@@ -983,7 +996,7 @@
         background: var(--card-screen-bg);
         color: var(--card-screen-text);
         min-height: 100vh;
-        padding: 18px 24px 22px;
+        padding: 0 0 22px;
         box-sizing: border-box;
       }
 
@@ -1006,7 +1019,8 @@
       }
 
       #carteirinhas-page .carteirinhas-container {
-        max-width: 1280px;
+        width: 100%;
+        max-width: none;
       }
 
       #carteirinhas-page .carteirinhas-screen-header {
@@ -1014,13 +1028,17 @@
         grid-template-columns: 64px minmax(0, 1fr);
         gap: 16px;
         align-items: center;
-        width: min(100%, 1120px);
-        margin: 0 auto 16px;
-        padding: 18px 22px;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0 0 16px;
+        padding: 18px clamp(24px, 4vw, 56px);
         background: var(--card-screen-surface);
         border: 1px solid var(--card-screen-border);
-        border-left: 5px solid var(--card-screen-primary);
-        border-radius: 8px;
+        border-left: 0;
+        border-right: 0;
+        border-top: 0;
+        border-bottom: 1px solid var(--card-screen-border);
+        border-radius: 0;
         box-shadow: var(--card-screen-shadow);
         color: var(--card-screen-text);
       }
@@ -1061,31 +1079,44 @@
       }
 
       #carteirinhas-page .carteirinhas-toolbar {
-        position: sticky;
-        top: 10px;
+        position: relative;
+        top: auto;
         z-index: 40;
         display: flex;
+        flex-direction: row;
         align-items: center;
-        gap: 10px;
+        justify-content: center;
+        gap: 12px;
         flex-wrap: wrap;
-        padding: 14px;
-        margin-bottom: 14px !important;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 16px clamp(24px, 4vw, 56px);
+        margin-bottom: 20px !important;
         background: var(--card-screen-surface);
         border: 1px solid var(--card-screen-border);
         border-top: 4px solid var(--card-screen-primary);
-        border-radius: 8px;
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
         box-shadow: var(--card-screen-shadow);
       }
 
+      #carteirinhas-page .toolbar-actions-row {
+        display: contents;
+      }
+
       #search-container.no-print {
-        width: 100%;
-        margin: 0 0 18px;
-        display: flex;
+        order: 4;
+        width: auto;
+        margin: 0;
+        display: inline-flex;
         justify-content: center;
+        flex: 0 1 360px;
+        box-sizing: border-box;
       }
 
       #localizarAluno {
-        width: min(100%, 420px);
+        width: min(100%, 360px);
         min-height: var(--card-screen-control-height);
         padding: 0 16px;
         border: 1px solid var(--card-screen-border);
@@ -1095,6 +1126,7 @@
         box-shadow: inset 0 1px 2px rgba(30, 53, 47, 0.05), 0 8px 18px rgba(30, 53, 47, 0.06);
         outline: none;
         font-weight: 700;
+        box-sizing: border-box;
         transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
       }
 
@@ -1124,10 +1156,24 @@
         font-weight: 800;
         letter-spacing: 0;
         box-shadow: 0 10px 20px rgba(30, 53, 47, 0.12);
+        margin: 0;
+        white-space: nowrap;
       }
 
       .carteirinhas-toolbar .imprimir-carteirinhas {
-        margin-left: auto;
+        order: 2;
+        margin-left: 0;
+      }
+
+      .carteirinhas-toolbar .alunos-sem-fotos-btn {
+        order: 1;
+      }
+
+      .carteirinhas-toolbar .alunos-sem-fotos-btn,
+      .carteirinhas-toolbar .imprimir-carteirinhas {
+        min-height: var(--card-screen-control-height);
+        padding-top: 0;
+        padding-bottom: 0;
       }
 
       .alunos-sem-fotos-btn,
@@ -1151,28 +1197,31 @@
       }
 
       .filtro-foto-form {
+        order: 3;
         min-height: var(--card-screen-control-height);
-        border-radius: var(--card-screen-pill-radius);
-        background: var(--card-screen-elevated);
-        border-color: var(--card-screen-border);
+        border-radius: 0;
+        background: transparent;
+        border: 0;
         box-shadow: none;
-        gap: 12px;
-        padding: 8px 12px;
+        gap: 10px;
+        padding: 0;
+        margin: 0;
       }
 
       .filtro-foto-form label {
+        min-height: var(--card-screen-control-height);
         color: var(--card-screen-text);
-        min-height: 32px;
-        padding: 0 2px;
+        padding: 0 14px;
         letter-spacing: 0;
+        border: 1px solid var(--card-screen-border);
+        border-radius: var(--card-screen-control-radius);
+        background: var(--card-screen-elevated);
+        box-shadow: 0 10px 20px rgba(30, 53, 47, 0.08);
+        white-space: nowrap;
       }
 
       .filtro-foto-form input[type="checkbox"] {
         accent-color: var(--card-screen-primary);
-      }
-
-      .filtro-foto-pill {
-        color: var(--card-screen-primary-dark);
       }
 
       #cards-success {
@@ -1180,6 +1229,20 @@
         color: #2f7d56;
         border: 1px solid #b8dfc8;
         border-radius: 8px;
+      }
+
+      #carteirinhas-page .page {
+        width: min(100%, 1280px);
+        margin-left: auto;
+        margin-right: auto;
+        box-sizing: border-box;
+      }
+
+      #carteirinhas-page .page .imprimir-pagina {
+        width: max-content;
+        min-width: 150px;
+        margin: 8px auto 16px;
+        display: flex;
       }
 
       #relatorio-container {
@@ -1314,6 +1377,47 @@
 
       html[data-theme="dark"] .relatorio-table tbody tr.relatorio-row:nth-child(even) {
         background-color: #1a2924;
+      }
+
+      @media (min-width: 1024px) {
+        body#carteirinhas-page {
+          padding-inline: 0;
+        }
+
+        #carteirinhas-page .carteirinhas-container {
+          width: 100%;
+        }
+
+        #carteirinhas-page .carteirinhas-screen-header,
+        #carteirinhas-page .carteirinhas-toolbar {
+          width: 100%;
+        }
+
+        #carteirinhas-page .carteirinhas-screen-header {
+          margin-bottom: 18px;
+        }
+
+        #carteirinhas-page .toolbar-actions-row {
+          display: contents;
+        }
+
+        #carteirinhas-page .filtro-foto-form {
+          width: fit-content;
+          max-width: 100%;
+        }
+
+        #carteirinhas-page .carteirinhas-toolbar .imprimir-carteirinhas {
+          min-width: 190px;
+          margin-left: 0;
+        }
+
+        #search-container.no-print {
+          margin-top: 0;
+        }
+
+        #localizarAluno {
+          width: min(100%, 360px);
+        }
       }
     }
 

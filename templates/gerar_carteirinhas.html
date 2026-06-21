@@ -42,6 +42,7 @@
     </header>
 
     <div class="carteirinhas-toolbar no-print">
+      <div class="toolbar-actions-row">
       <button class="alunos-sem-fotos-btn" onclick="mostrarRelatorioAlunosSemFotos()">
         <i class="fas fa-camera-retro" aria-hidden="true"></i>
         Alunos sem fotos
@@ -76,12 +77,6 @@
           Somente não impressas
         </label>
 
-        {% if (somente_com_foto|default(false)) or (somente_nao_impressas|default(false)) %}
-          <span class="filtro-foto-pill">
-            (ativo{% if (somente_com_foto|default(false)) %} • foto{% endif %}{% if (somente_nao_impressas|default(false)) %} • não impressas{% endif %})
-          </span>
-        {% endif %}
-
         <noscript>
           <button type="submit" class="filter-submit-noscript">
             Aplicar
@@ -93,10 +88,11 @@
         <i class="fas fa-print" aria-hidden="true"></i>
         Imprimir Carteirinhas
       </button>
-    </div>
+      </div>
 
-    <div id="search-container" class="no-print">
-      <input type="text" id="localizarAluno" placeholder="Localizar Aluno">
+      <div id="search-container" class="no-print">
+        <input type="text" id="localizarAluno" placeholder="Localizar Aluno">
+      </div>
     </div>
 
     {% if pages %}

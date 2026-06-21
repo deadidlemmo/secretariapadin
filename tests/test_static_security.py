@@ -70,10 +70,10 @@ class StaticSecurityTests(unittest.TestCase):
     def test_confere_routes_require_login(self):
         protected = set()
         for name, decorators, _routes in route_functions("confere.py"):
-            if name in {"upload_excel", "index"}:
+            if name in {"index", "resultado", "exportar_excel"}:
                 self.assertTrue(any("confere_login_required" == decorator for decorator in decorators))
                 protected.add(name)
-        self.assertEqual(protected, {"upload_excel", "index"})
+        self.assertEqual(protected, {"index", "resultado", "exportar_excel"})
 
     def test_holidays_path_uses_existing_file(self):
         source = read_text("app.py") + read_text("config.py")
@@ -191,16 +191,21 @@ class StaticSecurityTests(unittest.TestCase):
             "margin: 10mm 14mm",
             "font-family: Arial, sans-serif",
             "font-size: 13.5pt",
+            "font-size: 18pt",
+            "font-size: 12pt",
             "border-bottom: 0",
             "border-top: 1px solid #777",
             "border-bottom: 1px solid #bbb",
             "border-radius: 0",
             "grid-template-columns: 32px minmax(0, 1fr)",
+            "align-items: center",
             "place-items: center",
+            "align-self: center",
             "text-decoration-line: line-through",
             "grid-template-rows: auto minmax(0, 1fr) auto",
             "margin-top: auto",
-            "font-size: 11.5pt",
+            "font-size: 13.5pt",
+            "font-weight: 400",
         ]:
             self.assertIn(expected, template)
 
@@ -260,9 +265,11 @@ class StaticSecurityTests(unittest.TestCase):
         self.assertNotIn("{%", js)
         self.assertIn("logos/escola.png", template)
         self.assertNotIn(">JP<", template)
+        self.assertNotIn("filtro-foto-pill", template)
         for expected in [
             "carteirinhas-screen-header",
             "carteirinhas-toolbar",
+            "toolbar-actions-row",
             "loading-overlay-content",
             "card-school-mark",
             "card-school-logo",
@@ -294,7 +301,7 @@ class StaticSecurityTests(unittest.TestCase):
             ".upload-success-toast",
             ".carteirinhas-screen-header",
             ".carteirinhas-footer",
-            "max-width: 1280px",
+            "max-width: none",
             "rgba(0, 0, 0, 0.76)",
             "#244e47",
             "width: 10cm",
@@ -303,6 +310,15 @@ class StaticSecurityTests(unittest.TestCase):
             "background: #c5161d",
         ]:
             self.assertIn(expected, css)
+        for expected in [
+            "normalizarBuscaCarteirinha",
+            "localizarScrollTimeout",
+            "paginaTemResultado",
+            "page.style.display",
+            "scrollIntoView",
+        ]:
+            self.assertIn(expected, js)
+        self.assertNotIn(".filtro-foto-pill", css)
         self.assertNotIn(">Saída<", template)
         for forbidden in ["qrcode", "qr-code", "qr_code"]:
             self.assertNotIn(forbidden, template.lower())
@@ -315,14 +331,15 @@ class StaticSecurityTests(unittest.TestCase):
         theme_js = read_text("static/js/theme.js")
 
         self.assertIn("css/app_theme.css", base)
-        self.assertIn("css/app_theme.css", confere)
         self.assertIn("js/theme.js", base)
-        self.assertIn("js/theme.js", confere)
         self.assertIn("js/theme.js", carteirinhas)
         self.assertIn("data-theme-toggle", base)
-        self.assertIn("data-theme-toggle", confere)
         self.assertIn("data-theme-toggle", carteirinhas)
+        self.assertIn('{% extends "base.html" %}', confere)
         self.assertIn("confere-page", confere)
+        self.assertIn('name="lista_piloto"', confere)
+        self.assertIn('name="sed_pdfs"', confere)
+        self.assertIn("Conferindo listas", confere)
         self.assertTrue((ROOT / "static" / "css" / "app_theme.css").exists())
         self.assertTrue((ROOT / "static" / "js" / "theme.js").exists())
         self.assertNotIn("{{", theme_js)
@@ -393,7 +410,21 @@ class StaticSecurityTests(unittest.TestCase):
             "--card-screen-control-radius: 14px",
             "--card-screen-control-height: 46px",
             "#localizarAluno::placeholder",
-            "border-radius: var(--card-screen-pill-radius)",
+            "border-radius: var(--card-screen-control-radius)",
+            "@media (min-width: 1024px)",
+            "position: relative",
+            "flex-direction: row",
+            "display: contents",
+            "order: 4",
+            "order: 3",
+            "width: min(100%, 1280px)",
+            "width: min(100%, 360px)",
+            "min-width: 150px",
+            ".status-symbol::after",
+            "border-width: 0 0.045cm 0.045cm 0",
+            "transform: translate(-50%, -58%) rotate(45deg)",
+            "transform: translate(-50%, -68%)",
+            "transform: translate(-50%, 105%)",
         ]:
             self.assertIn(expected, carteirinhas_css)
 
@@ -471,6 +502,50 @@ class StaticSecurityTests(unittest.TestCase):
         ]:
             self.assertIn(expected, css)
 
+    def test_confere_internal_batch_upload_contract(self):
+        template = read_text("templates/index.html")
+        dashboard = read_text("templates/dashboard.html")
+
+        for expected in [
+            'id="confere-form"',
+            'action="{{ url_for(\'confere.index\') }}"',
+            'name="lista_piloto"',
+            'name="sed_pdfs"',
+            "excel-dropzone",
+            "excel-file-count",
+            "sed-scope-preview",
+            "sed-scope-turmas",
+            "confere.preview_pdfs",
+            'accept=".pdf,application/pdf"',
+            "multiple",
+            "sed-dropzone",
+            "sed-file-list",
+            "sed-file-count",
+            "Executar conferência",
+            "Exportar Excel",
+            "data-confere-filter",
+            'data-confere-filter="pendencias"',
+            "data-turma-filter",
+            "data-turma-key",
+            "turma-filter-row",
+            "result-controls",
+            "result-list",
+            "data-result-group",
+            "result-group-header",
+            "result-card",
+            "comparison-grid",
+            "Nova conferência",
+            "confere-result-search",
+            "confere-empty-filter",
+            "applyResultFilter",
+            "activeTurmaFilter",
+            "app-loading-overlay",
+            'aria-hidden="true" style="display: none;"',
+        ]:
+            self.assertIn(expected, template)
+        self.assertIn("url_for('confere.index')", dashboard)
+        self.assertNotIn("conferealunos.onrender.com", dashboard + template)
+
     def test_quadro_loading_overlays_use_theme_classes(self):
         for path in [
             "templates/quadro_atendimento_mensal.html",
@@ -500,9 +575,9 @@ class StaticSecurityTests(unittest.TestCase):
     def test_dashboard_preserves_navigation_links(self):
         template = read_text("templates/dashboard.html")
 
-        for endpoint in ["declaracao_tipo", "carteirinhas", "quadros", "logout_route"]:
+        for endpoint in ["declaracao_tipo", "carteirinhas", "quadros", "logout_route", "confere.index"]:
             self.assertIn(f"url_for('{endpoint}')", template)
-        self.assertIn("https://conferealunos.onrender.com/", template)
+        self.assertNotIn("https://conferealunos.onrender.com/", template)
         self.assertIn("dashboard-page", template)
         self.assertIn("option-card", template)
         self.assertIn("var(--app-control-radius)", template)

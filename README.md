@@ -190,8 +190,10 @@ Evite renomear ou mover esses arquivos sem atualizar os caminhos em `app.py`.
 | `/quadros/atendimento_mensal` | Quadro de Atendimento Mensal |
 | `/quadros/transferencias` | Informativo Semanal / transferencias |
 | `/quadros/quantitativo_mensal` | Quadro Quantitativo Mensal de Transferencias |
+| `/conferir-listas` | Atalho interno para Conferencia de Listas |
 | `/confere/` | Conferencia de listas |
-| `/confere/upload_excel` | Upload da Lista Piloto para conferencia |
+| `/confere/resultado/<id>` | Resultado temporario da conferencia |
+| `/confere/exportar/excel/<id>` | Exportacao Excel do relatorio de conferencia |
 | `/escolas/search` | Busca de escolas para Select2 |
 
 ## Configuracoes Importantes
@@ -325,7 +327,7 @@ Revise o resultado com `git status` antes de commitar.
 ## Pontos de Atencao
 
 - `app.py` concentra quase toda a aplicacao. Mudancas pequenas devem ser bem localizadas.
-- `confere.py` guarda o caminho do Excel na sessao para evitar mistura entre usuarios e workers.
+- `confere.py` processa a Lista Piloto e multiplos PDFs do SED em lote, salvando resultados temporarios em `uploads/conferencias/`.
 - `templates/prazos_alertas.html` referencia `alerts_mark_sent`, mas nao ha rota correspondente encontrada no codigo atual.
 - A rota `/quadros/inclusao` esta desativada e redireciona para o menu de quadros.
 - As dependencias incluem pacotes de banco de dados/migracao, mas o codigo atual nao usa modelos SQLAlchemy.

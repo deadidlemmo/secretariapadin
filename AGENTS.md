@@ -83,7 +83,7 @@ Se precisar criar arquivos de teste, use nomes claramente ficticios e remova-os 
 - `/carteirinhas`, `/carteirinhas/marcar_impressas`.
 - `/upload_foto`, `/upload_multiplas_fotos`, `/upload_inline_foto`.
 - `/quadros`, `/quantinclusao`, `/quadros/atendimento_mensal`, `/quadros/transferencias`, `/quadros/quantitativo_mensal`.
-- `/confere/` e `/confere/upload_excel`.
+- `/conferir-listas`, `/confere/`, `/confere/resultado/<id>` e `/confere/exportar/excel/<id>`.
 - `/escolas/search`.
 
 ## Pontos de Atencao Tecnicos

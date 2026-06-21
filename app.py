@@ -525,6 +525,12 @@ def dashboard():
     return render_template("dashboard.html")
 
 
+@app.route("/conferir-listas", methods=["GET"])
+@login_required
+def conferir_listas():
+    return redirect(url_for("confere.index"))
+
+
 # ==========================================================
 #  CARTEIRINHAS – ROTA PRINCIPAL (AJUSTADA)
 #  - Mantém tudo que já existe
