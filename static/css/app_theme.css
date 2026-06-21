@@ -555,26 +555,101 @@ body:not(#carteirinhas-page) .btn-danger,
 
 .app-loading-panel {
   width: min(560px, calc(100vw - 32px));
+  display: grid;
+  gap: 16px;
   padding: 24px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--app-radius);
-  background: rgba(15, 24, 21, 0.82);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(127, 184, 170, 0.16), transparent 36%),
+    rgba(15, 24, 21, 0.90);
   text-align: center;
   color: #ffffff;
   font-family: Montserrat, Arial, sans-serif;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
 }
 
+.app-loading-orb,
 .app-loading-spinner {
-  width: 3rem;
-  height: 3rem;
-  border-width: 0.3rem;
+  width: 62px;
+  height: 62px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  border: 1px solid rgba(167, 207, 195, 0.44);
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgb(38, 115, 101), rgb(117, 178, 164));
+  color: #ffffff;
+  font-size: 1.25rem;
+  box-shadow: 0 0 0 0 rgba(127, 184, 170, 0.36);
+  animation: app-loading-pulse 1.7s ease-in-out infinite;
+}
+
+.app-loading-kicker {
+  margin: 0 0 4px;
+  color: rgb(167, 207, 195);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .app-loading-message {
-  margin-top: 12px;
+  margin: 0;
   font-size: 0.95rem;
   font-weight: 800;
+  line-height: 1.45;
+}
+
+.app-loading-progress {
+  position: relative;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.app-loading-progress span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 46%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(117, 178, 164), rgb(232, 185, 96), rgb(117, 178, 164));
+  animation: app-loading-bar 1.35s ease-in-out infinite;
+}
+
+.app-loading-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-loading-steps li {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--app-pill-radius);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.app-loading-steps li.is-active {
+  border-color: rgba(167, 207, 195, 0.72);
+  background: rgba(127, 184, 170, 0.18);
+  color: #ffffff;
+}
+
+.app-loading-steps li.is-done {
+  color: rgb(167, 207, 195);
 }
 
 .app-loading-hint,
@@ -601,6 +676,47 @@ body:not(#carteirinhas-page) .btn-danger,
   display: flex;
   justify-content: center;
   margin-top: 14px;
+}
+
+.app-loading-actions .btn-secondary-action {
+  min-height: 40px;
+  border-color: rgba(167, 207, 195, 0.52);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff !important;
+}
+
+@keyframes app-loading-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(127, 184, 170, 0.34);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 12px rgba(127, 184, 170, 0);
+  }
+}
+
+@keyframes app-loading-bar {
+  0% {
+    transform: translateX(-105%);
+  }
+  100% {
+    transform: translateX(230%);
+  }
+}
+
+@media (max-width: 620px) {
+  .app-loading-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-orb,
+  .app-loading-progress span {
+    animation: none;
+  }
 }
 
 .app-loading-actions[hidden],

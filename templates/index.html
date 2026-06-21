@@ -1633,10 +1633,22 @@
 
     <div id="loadingOverlay" class="app-loading-overlay" aria-hidden="true" style="display: none;">
       <div class="app-loading-panel">
-        <div class="app-loading-spinner" aria-hidden="true"></div>
-        <p class="app-loading-message">
+        <div class="app-loading-orb app-loading-spinner" aria-hidden="true">
+          <i class="fas fa-clipboard-check"></i>
+        </div>
+        <p class="app-loading-kicker">ConferÃªncia em andamento</p>
+        <p class="app-loading-message" id="loadingStatusMessage">
           Conferindo listas... Aguarde enquanto o sistema lê os PDFs do SED e compara com a Lista Piloto.
         </p>
+        <div class="app-loading-progress" aria-hidden="true">
+          <span></span>
+        </div>
+        <ol class="app-loading-steps" aria-label="Etapas da conferÃªncia">
+          <li class="is-active" data-loading-step="0">Ler PDFs</li>
+          <li data-loading-step="1">Extrair alunos</li>
+          <li data-loading-step="2">Comparar bases</li>
+          <li data-loading-step="3">Montar resultado</li>
+        </ol>
         <p class="app-loading-hint" id="loadingLongHint" hidden>
           Esta conferência está demorando mais que o normal. Continue aguardando se foram enviados muitos PDFs.
         </p>
@@ -1732,9 +1744,11 @@
       const sedScopeErrors = document.getElementById("sed-scope-errors");
       const submitButton = document.getElementById("btn-executar-conferencia");
       const loadingOverlay = document.getElementById("loadingOverlay");
+      const loadingStatusMessage = document.getElementById("loadingStatusMessage");
       const loadingLongHint = document.getElementById("loadingLongHint");
       const loadingErrorMessage = document.getElementById("loadingErrorMessage");
       const loadingActions = document.getElementById("loadingActions");
+      const loadingSteps = document.querySelectorAll("[data-loading-step]");
       const cancelLoadingButton = document.getElementById("btn-cancel-loading");
       const filterButtons = document.querySelectorAll("[data-confere-filter]");
       const turmaFilterButtons = document.querySelectorAll("[data-turma-filter]");
@@ -1758,17 +1772,44 @@
       let sedPreviewRequestId = 0;
       let printSelectionPrepared = false;
       let loadingLongTimer = null;
+      let loadingStepTimer = null;
+      let loadingStepIndex = 0;
       let activeConferenceController = null;
+      const loadingMessages = [
+        "Lendo os PDFs do SED e preparando os dados da Lista Piloto.",
+        "Extraindo alunos, RAs, turmas e situacoes dos arquivos anexados.",
+        "Comparando Lista Piloto com SED e identificando divergencias.",
+        "Organizando o resultado final para exibicao."
+      ];
 
       function resetLoadingOverlay() {
         window.clearTimeout(loadingLongTimer);
+        window.clearInterval(loadingStepTimer);
         loadingLongTimer = null;
+        loadingStepTimer = null;
+        loadingStepIndex = 0;
+        if (loadingStatusMessage) loadingStatusMessage.textContent = loadingMessages[0];
+        loadingSteps.forEach((step, index) => {
+          step.classList.toggle("is-active", index === 0);
+          step.classList.remove("is-done");
+        });
         if (loadingLongHint) loadingLongHint.hidden = true;
         if (loadingErrorMessage) {
           loadingErrorMessage.hidden = true;
           loadingErrorMessage.textContent = "";
         }
         if (loadingActions) loadingActions.hidden = true;
+      }
+
+      function advanceLoadingStep() {
+        loadingStepIndex = Math.min(loadingStepIndex + 1, loadingMessages.length - 1);
+        if (loadingStatusMessage) {
+          loadingStatusMessage.textContent = loadingMessages[loadingStepIndex];
+        }
+        loadingSteps.forEach((step, index) => {
+          step.classList.toggle("is-active", index === loadingStepIndex);
+          step.classList.toggle("is-done", index < loadingStepIndex);
+        });
       }
 
       function showLoadingOverlay() {
@@ -1778,10 +1819,11 @@
           loadingOverlay.style.display = "flex";
           loadingOverlay.setAttribute("aria-hidden", "false");
         }
+        loadingStepTimer = window.setInterval(advanceLoadingStep, 6500);
         loadingLongTimer = window.setTimeout(function () {
           if (loadingLongHint) loadingLongHint.hidden = false;
           if (loadingActions) loadingActions.hidden = false;
-        }, 90000);
+        }, 25000);
       }
 
       function hideLoadingOverlay() {
@@ -1795,7 +1837,9 @@
 
       function showLoadingError(message) {
         window.clearTimeout(loadingLongTimer);
+        window.clearInterval(loadingStepTimer);
         loadingLongTimer = null;
+        loadingStepTimer = null;
         if (submitButton) submitButton.disabled = false;
         if (loadingLongHint) loadingLongHint.hidden = true;
         if (loadingOverlay) {
@@ -2105,6 +2149,42 @@
         });
       }
 
+      function categoryMatchesResultFilter(category, filter) {
+        return filter === "todos" || category === filter || (filter === "pendencias" && category !== "ok");
+      }
+
+      function updateTurmaFilterCounts(search) {
+        const countsByTurma = new Map();
+        let totalCount = 0;
+
+        document.querySelectorAll("[data-result-group]").forEach((group) => {
+          const turmaKey = group.dataset.turmaKey || "";
+          let groupCount = 0;
+
+          group.querySelectorAll("[data-category]").forEach((row) => {
+            const category = row.dataset.category;
+            const categoryVisible = categoryMatchesResultFilter(category, activeResultFilter);
+            const searchVisible = !search || (row.dataset.search || "").includes(search);
+
+            if (categoryVisible && searchVisible) {
+              groupCount += 1;
+            }
+          });
+
+          countsByTurma.set(turmaKey, groupCount);
+          totalCount += groupCount;
+        });
+
+        turmaFilterButtons.forEach((button) => {
+          const countElement = button.querySelector(".filter-count");
+          if (!countElement) return;
+
+          const turmaKey = button.dataset.turmaFilter || "todas";
+          const count = turmaKey === "todas" ? totalCount : (countsByTurma.get(turmaKey) || 0);
+          countElement.textContent = count;
+        });
+      }
+
       function applyResultFilter(filter) {
         activeResultFilter = filter || activeResultFilter;
         const search = resultSearch ? resultSearch.value.trim().toLowerCase() : "";
@@ -2116,7 +2196,7 @@
 
           group.querySelectorAll("[data-category]").forEach((row) => {
             const category = row.dataset.category;
-            const categoryVisible = activeResultFilter === "todos" || category === activeResultFilter || (activeResultFilter === "pendencias" && category !== "ok");
+            const categoryVisible = categoryMatchesResultFilter(category, activeResultFilter);
             const searchVisible = !search || (row.dataset.search || "").includes(search);
             const visible = turmaVisible && categoryVisible && searchVisible;
             row.style.display = visible ? "" : "none";
@@ -2132,6 +2212,8 @@
         if (emptyFilterMessage) {
           emptyFilterMessage.style.display = visibleCount ? "none" : "block";
         }
+
+        updateTurmaFilterCounts(search);
       }
 
       function openPrintModal() {
