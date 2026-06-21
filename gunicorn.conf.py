@@ -1,4 +1,7 @@
-# gunicorn.conf.py
-bind = "0.0.0.0:$PORT"  # Utilize a variável de ambiente PORT fornecida pelo Render
-workers = 3
-timeout = 120
+import os
+
+
+bind = f"0.0.0.0:{os.getenv('PORT', '10000')}"
+workers = int(os.getenv("WEB_CONCURRENCY", "2"))
+timeout = int(os.getenv("GUNICORN_TIMEOUT", "300"))
+graceful_timeout = int(os.getenv("GUNICORN_GRACEFUL_TIMEOUT", "60"))

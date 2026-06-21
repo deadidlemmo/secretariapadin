@@ -197,6 +197,12 @@
     color: #8a5a00;
   }
 
+  html[data-theme="dark"] .confere-page .excel-count {
+    border: 1px solid color-mix(in srgb, var(--confere-warning) 42%, var(--app-border));
+    background: color-mix(in srgb, var(--confere-warning) 18%, var(--app-surface));
+    color: var(--confere-warning-strong-text);
+  }
+
   .confere-page .selected-files {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1631,6 +1637,15 @@
         <p class="app-loading-message">
           Conferindo listas... Aguarde enquanto o sistema lê os PDFs do SED e compara com a Lista Piloto.
         </p>
+        <p class="app-loading-hint" id="loadingLongHint" hidden>
+          Esta conferência está demorando mais que o normal. Continue aguardando se foram enviados muitos PDFs.
+        </p>
+        <p class="app-loading-error" id="loadingErrorMessage" hidden></p>
+        <div class="app-loading-actions" id="loadingActions" hidden>
+          <button type="button" class="btn-secondary-action" id="btn-cancel-loading">
+            Voltar ao formulário
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1717,6 +1732,10 @@
       const sedScopeErrors = document.getElementById("sed-scope-errors");
       const submitButton = document.getElementById("btn-executar-conferencia");
       const loadingOverlay = document.getElementById("loadingOverlay");
+      const loadingLongHint = document.getElementById("loadingLongHint");
+      const loadingErrorMessage = document.getElementById("loadingErrorMessage");
+      const loadingActions = document.getElementById("loadingActions");
+      const cancelLoadingButton = document.getElementById("btn-cancel-loading");
       const filterButtons = document.querySelectorAll("[data-confere-filter]");
       const turmaFilterButtons = document.querySelectorAll("[data-turma-filter]");
       const resultSearch = document.getElementById("confere-result-search");
@@ -1738,6 +1757,57 @@
       let selectedFiles = [];
       let sedPreviewRequestId = 0;
       let printSelectionPrepared = false;
+      let loadingLongTimer = null;
+      let activeConferenceController = null;
+
+      function resetLoadingOverlay() {
+        window.clearTimeout(loadingLongTimer);
+        loadingLongTimer = null;
+        if (loadingLongHint) loadingLongHint.hidden = true;
+        if (loadingErrorMessage) {
+          loadingErrorMessage.hidden = true;
+          loadingErrorMessage.textContent = "";
+        }
+        if (loadingActions) loadingActions.hidden = true;
+      }
+
+      function showLoadingOverlay() {
+        resetLoadingOverlay();
+        if (submitButton) submitButton.disabled = true;
+        if (loadingOverlay) {
+          loadingOverlay.style.display = "flex";
+          loadingOverlay.setAttribute("aria-hidden", "false");
+        }
+        loadingLongTimer = window.setTimeout(function () {
+          if (loadingLongHint) loadingLongHint.hidden = false;
+          if (loadingActions) loadingActions.hidden = false;
+        }, 90000);
+      }
+
+      function hideLoadingOverlay() {
+        resetLoadingOverlay();
+        if (submitButton) submitButton.disabled = false;
+        if (loadingOverlay) {
+          loadingOverlay.style.display = "none";
+          loadingOverlay.setAttribute("aria-hidden", "true");
+        }
+      }
+
+      function showLoadingError(message) {
+        window.clearTimeout(loadingLongTimer);
+        loadingLongTimer = null;
+        if (submitButton) submitButton.disabled = false;
+        if (loadingLongHint) loadingLongHint.hidden = true;
+        if (loadingOverlay) {
+          loadingOverlay.style.display = "flex";
+          loadingOverlay.setAttribute("aria-hidden", "false");
+        }
+        if (loadingErrorMessage) {
+          loadingErrorMessage.textContent = message;
+          loadingErrorMessage.hidden = false;
+        }
+        if (loadingActions) loadingActions.hidden = false;
+      }
 
       function syncExcelInput() {
         const transfer = new DataTransfer();
@@ -1980,17 +2050,58 @@
       }
 
       if (form) {
-        form.addEventListener("submit", function (event) {
+        form.addEventListener("submit", async function (event) {
           if (!sedInput.files.length) {
             event.preventDefault();
             alert("Anexe pelo menos um PDF do SED antes de executar a conferência.");
             return;
           }
-          if (submitButton) submitButton.disabled = true;
-          if (loadingOverlay) {
-            loadingOverlay.style.display = "flex";
-            loadingOverlay.setAttribute("aria-hidden", "false");
+          event.preventDefault();
+          showLoadingOverlay();
+          activeConferenceController = new AbortController();
+
+          try {
+            const response = await fetch(form.action, {
+              method: "POST",
+              body: new FormData(form),
+              credentials: "same-origin",
+              signal: activeConferenceController.signal
+            });
+            activeConferenceController = null;
+
+            if (response.redirected) {
+              window.location.href = response.url;
+              return;
+            }
+
+            if (response.ok) {
+              const html = await response.text();
+              document.open();
+              document.write(html);
+              document.close();
+              return;
+            }
+
+            throw new Error("O servidor não concluiu a conferência. Tente novamente ou reduza a quantidade de PDFs por execução.");
+          } catch (error) {
+            activeConferenceController = null;
+            if (error && error.name === "AbortError") return;
+            showLoadingError(
+              error && error.message
+                ? error.message
+                : "A conferência foi interrompida. Verifique os arquivos e tente novamente."
+            );
           }
+        });
+      }
+
+      if (cancelLoadingButton) {
+        cancelLoadingButton.addEventListener("click", function () {
+          if (activeConferenceController) {
+            activeConferenceController.abort();
+            activeConferenceController = null;
+          }
+          hideLoadingOverlay();
         });
       }
 
