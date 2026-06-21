@@ -14,12 +14,22 @@
     --confere-warning: rgb(208, 138, 31);
     --confere-missing-sed: rgb(194, 65, 12);
     --confere-missing-lista: rgb(29, 78, 216);
+    --confere-warning-text: rgb(122, 77, 0);
+    --confere-warning-strong-text: rgb(58, 40, 0);
     --confere-field-color: var(--confere-warning);
-    --confere-field-text: rgb(122, 77, 0);
-    --confere-field-strong-text: rgb(58, 40, 0);
+    --confere-field-text: var(--confere-warning-text);
+    --confere-field-strong-text: var(--confere-warning-strong-text);
     width: min(calc(100vw - 56px), 1310px);
     margin: 0 auto;
     color: var(--app-text);
+  }
+
+  html[data-theme="dark"] .confere-page {
+    --confere-warning: rgb(239, 190, 107);
+    --confere-missing-sed: rgb(239, 153, 126);
+    --confere-missing-lista: rgb(151, 183, 255);
+    --confere-warning-text: rgb(246, 205, 131);
+    --confere-warning-strong-text: rgb(255, 240, 208);
   }
 
   .confere-page .confere-shell {
@@ -652,8 +662,8 @@
   .confere-page .result-card[data-category="divergencia_cadastral"] {
     border-left-color: var(--confere-warning);
     --confere-field-color: var(--confere-warning);
-    --confere-field-text: rgb(122, 77, 0);
-    --confere-field-strong-text: rgb(58, 40, 0);
+    --confere-field-text: var(--confere-warning-text);
+    --confere-field-strong-text: var(--confere-warning-strong-text);
   }
 
   .confere-page .result-status-cell {
@@ -856,12 +866,12 @@
   .confere-page .result-card[data-category="divergencia_cadastral"] .result-observation {
     border-color: color-mix(in srgb, var(--confere-warning) 44%, var(--app-border));
     background: color-mix(in srgb, var(--confere-warning) 13%, var(--app-surface));
-    color: rgb(122, 77, 0);
+    color: var(--confere-warning-text);
   }
 
   .confere-page .result-card[data-category="divergencia_cadastral"] .result-observation i {
     background: color-mix(in srgb, var(--confere-warning) 18%, var(--app-surface));
-    color: rgb(138, 90, 0);
+    color: var(--confere-warning-text);
   }
 
   .confere-page .no-filter-results {
@@ -911,7 +921,7 @@
 
   .confere-page .status-divergencia_cadastral {
     background: color-mix(in srgb, var(--confere-warning) 18%, var(--app-surface));
-    color: #8a5a00;
+    color: var(--confere-warning-text);
   }
 
   .confere-page .pdf-errors {
