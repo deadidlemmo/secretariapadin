@@ -1,0 +1,702 @@
+{% extends "base.html" %}
+
+{% block title %}Quadro Quantitativo de Inclusão{% endblock %}
+
+{% block extra_styles %}
+  .quant-inc-wrapper {
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 32px 28px 24px;
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    width: 100%;
+    max-width: 820px;
+    color: #283E51;
+  }
+
+  .quant-inc-header h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .quant-inc-header p {
+    font-size: 0.9rem;
+    color: #5d6c7a;
+    margin-bottom: 14px;
+  }
+
+  .flash-container { margin-bottom: 14px; }
+
+  .section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374a5a;
+    margin-bottom: 6px;
+  }
+
+  .helper-text {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+
+  /* ------------------------------ */
+  /* ALERTA: múltiplos profissionais */
+  /* ------------------------------ */
+  .multi-prof-alert {
+    display: none;
+    border-radius: 14px;
+    border: 1px solid #f2d6a3;
+    background: linear-gradient(180deg, #fff8e6 0%, #fff2cc 100%);
+    padding: 14px 14px 12px;
+    margin-bottom: 14px;
+    color: #5a3c00;
+  }
+  .multi-prof-alert.show { display: block; }
+
+  .multi-prof-alert .title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .multi-prof-alert .title i {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f59e0b;
+    color: #3f2a00;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .multi-prof-alert .desc {
+    font-size: 0.86rem;
+    color: #6b4a00;
+    margin: 0 0 10px;
+  }
+  .multi-prof-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.88rem;
+  }
+  .multi-prof-item { margin-bottom: 8px; }
+  .multi-prof-item strong { color: #4a3300; }
+  .multi-prof-profs { color: #5a3c00; }
+
+  /* ------------------------------------------ */
+  /* ALERTA: plano preenchido sem inclusão */
+  /* ------------------------------------------ */
+  .plan-wo-inc-alert {
+    display: none;
+    border-radius: 14px;
+    border: 1px solid #f5c2c7;
+    background: linear-gradient(180deg, #fff5f5 0%, #ffe3e6 100%);
+    padding: 14px 14px 12px;
+    margin-bottom: 14px;
+    color: #7a1120;
+  }
+  .plan-wo-inc-alert.show { display: block; }
+
+  .plan-wo-inc-alert .title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .plan-wo-inc-alert .title i {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #dc3545;
+    color: #fff;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .plan-wo-inc-alert .desc {
+    font-size: 0.86rem;
+    color: #7a1120;
+    margin: 0 0 10px;
+  }
+  .plan-wo-inc-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.88rem;
+  }
+  .plan-wo-inc-item { margin-bottom: 10px; }
+  .plan-wo-inc-item strong { color: #5f0d18; }
+
+  .plan-wo-inc-students {
+    margin-top: 6px;
+    padding-left: 14px;
+    color: #7a1120;
+  }
+
+  .plan-wo-inc-students li {
+    margin-bottom: 4px;
+    line-height: 1.35;
+  }
+
+  .alert-note-truncated {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: inherit;
+    opacity: 0.9;
+    font-style: italic;
+  }
+
+  details.audit {
+    margin-top: 6px;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.55);
+  }
+  details.audit summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #4a3300;
+  }
+  .audit-body {
+    margin-top: 8px;
+    padding-left: 8px;
+    font-size: 0.86rem;
+    color: #6b4a00;
+    line-height: 1.35;
+  }
+  .audit-body code,
+  .plan-wo-inc-students code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.82rem;
+    background: rgba(0,0,0,0.06);
+    padding: 1px 6px;
+    border-radius: 8px;
+  }
+
+  /* ------------------------------ */
+  /* Dropzone */
+  /* ------------------------------ */
+  .dropzone {
+    position: relative;
+    border-radius: 12px;
+    border: 1px dashed #d0d7de;
+    padding: 16px 18px;
+    background: #f9fafb;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition:
+      border-color 0.18s ease,
+      background 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .dropzone:hover {
+    border-color: #4B79A1;
+    background: #f5f7ff;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.07);
+  }
+
+  .dropzone.dragover {
+    border-color: #4B79A1;
+    background: #eef2ff;
+  }
+
+  .dropzone-icon-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #283E51, #4B79A1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .dropzone-icon-circle i {
+    color: #ffffff;
+    font-size: 1.3rem;
+  }
+
+  .dropzone-text-block { flex: 1; }
+
+  .dropzone-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #283E51;
+  }
+
+  .dropzone-subtitle {
+    margin: 2px 0 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+
+  .dropzone-filename {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: #4b5563;
+    font-style: italic;
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .btn-generate {
+    margin-top: 18px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    padding: 10px 18px;
+    font-weight: 600;
+  }
+
+  .back-links {
+    margin-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .back-links a { font-size: 0.85rem; }
+
+  @media (max-width: 768px) {
+    .quant-inc-wrapper { padding: 24px 18px 20px; }
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="quant-inc-wrapper">
+    <div class="quant-inc-header">
+      <h2>Quadro Quantitativo de Inclusão</h2>
+      <p>
+        Gere o quadro a partir da <strong>Lista Piloto</strong> (aba <strong>LISTA CORRIDA</strong>).
+        Ao final, o Excel será baixado automaticamente.
+      </p>
+    </div>
+
+    {# ALERTA MULTIPROFISSIONAIS (renderizado via JS após POST) #}
+    <div id="multi-prof-alert" class="multi-prof-alert" role="alert" aria-live="polite">
+      <div class="title">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>Atenção</div>
+      </div>
+      <p class="desc">
+        Turmas com <strong>2 ou mais</strong> profissionais diferentes no <strong>Plano de Ação</strong>.
+      </p>
+      <ul id="multi-prof-list" class="multi-prof-list"></ul>
+      <div id="multi-prof-note" class="alert-note-truncated" style="display:none;">
+        A lista foi truncada por limite do cabeçalho da resposta. Revise a planilha para ver todos os casos.
+      </div>
+    </div>
+
+    {# ALERTA PLANO SEM INCLUSÃO (renderizado via JS após POST) #}
+    <div id="plan-wo-inc-alert" class="plan-wo-inc-alert" role="alert" aria-live="polite">
+      <div class="title">
+        <i class="fas fa-user-slash"></i>
+        <div>Inconsistência encontrada</div>
+      </div>
+      <p class="desc">
+        Há alunos com <strong>Plano de Ação</strong> preenchido, mas <strong>sem marcação de Inclusão</strong>.
+        Esses alunos <strong>não foram contados</strong> no Plano de Ação.
+      </p>
+      <ul id="plan-wo-inc-list" class="plan-wo-inc-list"></ul>
+      <div id="plan-wo-inc-note" class="alert-note-truncated" style="display:none;">
+        A lista foi truncada por limite do cabeçalho da resposta. Revise a planilha para ver todos os casos.
+      </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-container">
+          {% for category, message in messages %}
+            {% set bs_class = 'danger' if category == 'error' else (category if category in ['success', 'info', 'warning', 'primary'] else 'info') %}
+            <div class="alert alert-{{ bs_class }} mb-2" role="alert">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form id="form-quantinclusao" method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="responsavel">Responsável pelo preenchimento</label>
+        <input
+          type="text"
+          class="form-control"
+          name="responsavel"
+          id="responsavel"
+          placeholder="Digite o nome do responsável"
+          required
+        >
+        <small class="helper-text">
+          Este nome será inserido automaticamente no modelo do quadro.
+        </small>
+      </div>
+
+      <div class="form-group mt-3">
+        <div class="section-title">Lista Piloto – Ensino Fundamental (Regular)</div>
+        <div id="drop-regular" class="dropzone">
+          <div class="dropzone-icon-circle">
+            <i class="fas fa-file-excel"></i>
+          </div>
+          <div class="dropzone-text-block">
+            <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+            <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
+            <div class="dropzone-filename" id="regular-filename">
+              Nenhum arquivo selecionado.
+            </div>
+          </div>
+          <input
+            type="file"
+            id="lista_regular"
+            name="lista_regular"
+            accept=".xlsx,.xls,.xlsm"
+            required
+          >
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-generate" id="btn-gerar-quantinc">
+        Gerar Quadro Quantitativo de Inclusão
+      </button>
+
+      <div class="back-links">
+        <a href="{{ url_for('quadros') }}" class="btn btn-light btn-sm">
+          <i class="fas fa-arrow-left"></i> Voltar para Quadros
+        </a>
+        <span class="helper-text">
+          O arquivo Excel será baixado automaticamente após a geração.
+        </span>
+      </div>
+    </form>
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function setupDropzone(inputId, dropId, labelId) {
+    const input = document.getElementById(inputId);
+    const drop = document.getElementById(dropId);
+    const label = document.getElementById(labelId);
+
+    if (!input || !drop || !label) return;
+
+    input.addEventListener('change', function () {
+      if (input.files && input.files.length > 0) {
+        label.textContent = input.files[0].name;
+      } else {
+        label.textContent = 'Nenhum arquivo selecionado.';
+      }
+    });
+
+    ['dragenter', 'dragover'].forEach(evtName => {
+      drop.addEventListener(evtName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evtName => {
+      drop.addEventListener(evtName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.remove('dragover');
+      });
+    });
+
+    drop.addEventListener('drop', function (e) {
+      const dt = e.dataTransfer;
+      if (!dt || !dt.files || !dt.files.length) return;
+
+      const file = dt.files[0];
+      const name = (file.name || '').toLowerCase();
+      const allowed = ['.xlsx', '.xls', '.xlsm'];
+      const isValid = allowed.some(ext => name.endsWith(ext));
+
+      if (!isValid) {
+        alert('Formato inválido. Use arquivos .xlsx, .xls ou .xlsm.');
+        return;
+      }
+
+      const newDt = new DataTransfer();
+      newDt.items.add(file);
+      input.files = newDt.files;
+
+      label.textContent = file.name;
+    });
+  }
+
+  function showQuantInclusaoLoading() {
+    const existing = document.getElementById('loading-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.className = 'app-loading-overlay';
+
+    overlay.innerHTML = `
+      <div class="app-loading-panel">
+        <div class="spinner-border app-loading-spinner" role="status">
+          <span class="sr-only">Carregando...</span>
+        </div>
+        <p class="app-loading-message">
+          Gerando Quadro Quantitativo de Inclusão, aguarde...
+        </p>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+  }
+
+  function hideQuantInclusaoLoading() {
+    const existing = document.getElementById('loading-overlay');
+    if (existing) existing.remove();
+  }
+
+  function b64ToUtf8(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array([...bin].map(ch => ch.charCodeAt(0)));
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function clearMultiProfAlert() {
+    const box = document.getElementById('multi-prof-alert');
+    const list = document.getElementById('multi-prof-list');
+    const note = document.getElementById('multi-prof-note');
+    if (!box || !list || !note) return;
+    list.innerHTML = '';
+    note.style.display = 'none';
+    box.classList.remove('show');
+  }
+
+  function clearPlanWithoutInclusionAlert() {
+    const box = document.getElementById('plan-wo-inc-alert');
+    const list = document.getElementById('plan-wo-inc-list');
+    const note = document.getElementById('plan-wo-inc-note');
+    if (!box || !list || !note) return;
+    list.innerHTML = '';
+    note.style.display = 'none';
+    box.classList.remove('show');
+  }
+
+  function renderMultiProfAlert(alerts, truncated = false) {
+    const box = document.getElementById('multi-prof-alert');
+    const list = document.getElementById('multi-prof-list');
+    const note = document.getElementById('multi-prof-note');
+    if (!box || !list || !note) return;
+
+    if (!alerts || !alerts.length) {
+      clearMultiProfAlert();
+      return;
+    }
+
+    list.innerHTML = '';
+
+    alerts.forEach(a => {
+      const turma = escapeHtml(a.turma || '');
+      const qtd = Number(a.qtd_profissionais || 0);
+      const profs = (a.profissionais || []).map(escapeHtml).join(', ');
+
+      const li = document.createElement('li');
+      li.className = 'multi-prof-item';
+
+      li.innerHTML = `
+        <div>
+          <strong>${turma}</strong> — ${qtd} profissionais:
+          <span class="multi-prof-profs">${profs}</span>
+        </div>
+      `;
+
+      if (Array.isArray(a.auditoria) && a.auditoria.length) {
+        const detailsWrap = document.createElement('div');
+        detailsWrap.innerHTML = a.auditoria.map(block => {
+          const prof = escapeHtml(block.profissional || '');
+          const alunos = Array.isArray(block.amostra_alunos) ? block.amostra_alunos : [];
+          const alunosLines = alunos.map(u => {
+            const rm = escapeHtml(u.rm || '');
+            const nome = escapeHtml(u.nome || '');
+            return `<div><code>${rm}</code>${nome ? ' — ' + nome : ''}</div>`;
+          }).join('') || '<div>(sem dados)</div>';
+
+          return `
+            <details class="audit">
+              <summary>${prof} (amostra)</summary>
+              <div class="audit-body">${alunosLines}</div>
+            </details>
+          `;
+        }).join('');
+
+        li.appendChild(detailsWrap);
+      }
+
+      list.appendChild(li);
+    });
+
+    note.style.display = truncated ? 'block' : 'none';
+    box.classList.add('show');
+  }
+
+  function renderPlanWithoutInclusionAlert(alerts, truncated = false) {
+    const box = document.getElementById('plan-wo-inc-alert');
+    const list = document.getElementById('plan-wo-inc-list');
+    const note = document.getElementById('plan-wo-inc-note');
+    if (!box || !list || !note) return;
+
+    if (!alerts || !alerts.length) {
+      clearPlanWithoutInclusionAlert();
+      return;
+    }
+
+    list.innerHTML = '';
+
+    alerts.forEach(item => {
+      const turma = escapeHtml(item.turma || '');
+      const qtd = Number(item.qtd_casos || 0);
+      const alunos = Array.isArray(item.alunos) ? item.alunos : [];
+
+      const li = document.createElement('li');
+      li.className = 'plan-wo-inc-item';
+
+      let alunosHtml = '<li>(sem dados)</li>';
+      if (alunos.length) {
+        alunosHtml = alunos.map(aluno => {
+          const rm = escapeHtml(aluno.rm || '');
+          const nome = escapeHtml(aluno.nome || '');
+          const prof = escapeHtml(aluno.profissional || '');
+          return `
+            <li>
+              <code>${rm}</code>${nome ? ' — ' + nome : ''}${prof ? ' — Profissional: <strong>' + prof + '</strong>' : ''}
+            </li>
+          `;
+        }).join('');
+      }
+
+      li.innerHTML = `
+        <div>
+          <strong>${turma}</strong> — ${qtd} caso(s)
+        </div>
+        <ul class="plan-wo-inc-students">
+          ${alunosHtml}
+        </ul>
+      `;
+
+      list.appendChild(li);
+    });
+
+    note.style.display = truncated ? 'block' : 'none';
+    box.classList.add('show');
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    setupDropzone('lista_regular', 'drop-regular', 'regular-filename');
+
+    const form = document.getElementById('form-quantinclusao');
+    if (!form) return;
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      clearMultiProfAlert();
+      clearPlanWithoutInclusionAlert();
+      showQuantInclusaoLoading();
+
+      const formData = new FormData(form);
+
+      try {
+        const response = await fetch(form.action || window.location.href, {
+          method: 'POST',
+          body: formData
+        });
+
+        const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+
+        if (!response.ok) {
+          const text = await response.text();
+          document.open();
+          document.write(text);
+          document.close();
+          return;
+        }
+
+        // Os detalhes com nomes/RMs ficam na aba ALERTAS do Excel, não em headers HTTP.
+        const multiProfCount = Number(response.headers.get('X-QuantInclusao-Alerts-Count') || 0);
+        if (multiProfCount > 0) {
+          renderMultiProfAlert([{
+            turma: 'Aba ALERTAS',
+            qtd_profissionais: multiProfCount,
+            profissionais: ['Confira os detalhes no arquivo baixado']
+          }], false);
+        }
+
+        const planWoIncCount = Number(response.headers.get('X-QuantInclusao-PlanWithoutInclusion-Count') || 0);
+        if (planWoIncCount > 0) {
+          renderPlanWithoutInclusionAlert([{
+            turma: 'Aba ALERTAS',
+            qtd_casos: planWoIncCount,
+            alunos: []
+          }], false);
+        }
+
+        if (contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+          const blob = await response.blob();
+
+          let filename = 'Quadro_Quantitativo_de_Inclusao.xlsx';
+          const disposition = response.headers.get('Content-Disposition');
+          if (disposition) {
+            const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+            if (filenameMatch && filenameMatch[1]) {
+              filename = filenameMatch[1].replace(/['"]/g, '');
+            }
+          }
+
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        } else {
+          const text = await response.text();
+          document.open();
+          document.write(text);
+          document.close();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro de rede ao gerar o Quadro Quantitativo de Inclusão.');
+      } finally {
+        hideQuantInclusaoLoading();
+      }
+    });
+  });
+</script>
+{% endblock %}

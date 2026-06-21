@@ -1,0 +1,595 @@
+{% extends "base.html" %}   
+
+{% block title %}Declaração Escolar - Tipo{% endblock %}
+
+{# CSS externos (Select2) #}
+{% block extra_css %}
+  {{ super() }}
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/declaracao_tipo.css') }}">
+{% endblock %}
+
+{% block content %}
+  <div id="declaracao-page"
+       class="page-card declaracao-page"
+       data-segmento="{{ segmento or '' }}"
+       data-tem-lista="{{ 'true' if tem_lista else 'false' }}"
+       data-escolas-search-url="{{ url_for('escolas_search') }}"
+       data-conclusao-5ano-url="{{ conclusao_5ano_url }}"
+       data-escolaridade-5ano-url="{{ escolaridade_5ano_url }}">
+    <div class="declaracao-page-header">
+      <div class="declaracao-page-icon">
+        <i class="fas fa-file-signature" aria-hidden="true"></i>
+      </div>
+      <div class="declaracao-page-title">
+        <p class="declaracao-page-kicker">Documentos escolares</p>
+        <h2 class="page-title">Selecione o tipo de declaração</h2>
+        <p class="page-subtitle">
+          Escolha se a declaração será emitida para aluno do
+          <strong>Ensino Fundamental</strong>, da <strong>EJA</strong>
+          ou utilize a opção de <strong>Declaração Personalizada</strong>
+          para casos em que o aluno não está mais ativo na unidade.
+        </p>
+      </div>
+    </div>
+
+    <div id="step-indicator" class="step-indicator">
+      <i class="fas fa-route"></i>
+      <span id="step-indicator-text">
+        Siga os passos abaixo para gerar a declaração.
+      </span>
+    </div>
+
+    <div class="segmento-cards">
+      <a href="{{ url_for('declaracao_tipo', segmento='Fundamental') }}"
+         class="segmento-card {% if segmento == 'Fundamental' %}ativo{% endif %}"
+         {% if segmento == 'Fundamental' %}aria-current="page"{% endif %}>
+        <div class="segmento-card-icon">
+          <i class="fas fa-child"></i>
+        </div>
+        <div>
+          <div class="segmento-card-title">Declaração Fundamental</div>
+          <p class="segmento-card-text">
+            Emitida para alunos do Ensino Fundamental (2º ao 5º ano) da unidade.
+          </p>
+        </div>
+        <span class="segmento-card-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
+      </a>
+
+      <a href="{{ url_for('declaracao_tipo', segmento='EJA') }}"
+         class="segmento-card {% if segmento == 'EJA' %}ativo{% endif %}"
+         {% if segmento == 'EJA' %}aria-current="page"{% endif %}>
+        <div class="segmento-card-icon">
+          <i class="fas fa-moon"></i>
+        </div>
+        <div>
+          <div class="segmento-card-title">Declaração EJA</div>
+          <p class="segmento-card-text">
+            Emitida para estudantes matriculados na Educação de Jovens e Adultos (EJA).
+          </p>
+        </div>
+        <span class="segmento-card-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
+      </a>
+
+      <a href="{{ url_for('declaracao_tipo', segmento='Personalizado') }}"
+         class="segmento-card {% if segmento == 'Personalizado' %}ativo{% endif %}"
+         {% if segmento == 'Personalizado' %}aria-current="page"{% endif %}>
+        <div class="segmento-card-icon">
+          <i class="fas fa-user-edit"></i>
+        </div>
+        <div>
+          <div class="segmento-card-title">Declaração Personalizada</div>
+          <p class="segmento-card-text">
+            Para alunos que não constam mais na base ativa: dados preenchidos manualmente.
+          </p>
+        </div>
+        <span class="segmento-card-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
+      </a>
+    </div>
+
+    {# Mensagens #}
+    {% if not segmento %}
+      <div class="status-alert info">
+        <i class="fas fa-info-circle"></i>
+        <div class="status-alert-content">
+          Selecione um dos cartões acima para iniciar a emissão de declarações.
+        </div>
+      </div>
+    {% elif segmento == 'Personalizado' %}
+      <div class="status-alert info">
+        <i class="fas fa-info-circle"></i>
+        <div class="status-alert-content">
+          Você está na área de <strong>Declaração Personalizada</strong>. Os dados do aluno
+          serão preenchidos manualmente, inclusive segmento, ano/série e tipo de declaração.
+        </div>
+      </div>
+    {% else %}
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            {% set cls = 'info' %}
+            {% if category == 'success' %}{% set cls = 'success' %}{% endif %}
+            {% if category == 'error' %}{% set cls = 'info' %}{% endif %}
+            <div class="status-alert {{ cls }}">
+              <i class="fas fa-info-circle"></i>
+              <div class="status-alert-content">{{ message }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          {% if tem_lista %}
+            <div class="status-alert success">
+              <i class="fas fa-check-circle"></i>
+              <div class="status-alert-content">
+                Lista do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} carregada.
+                Selecione o aluno e o tipo de declaração abaixo para gerar o documento.
+              </div>
+            </div>
+          {% else %}
+            <div class="status-alert info">
+              <i class="fas fa-info-circle"></i>
+              <div class="status-alert-content">
+                Nenhuma lista piloto do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} foi encontrada.
+                Anexe o arquivo em Excel abaixo e clique em <strong>Carregar lista piloto</strong> para habilitar a seleção de alunos.
+              </div>
+            </div>
+          {% endif %}
+        {% endif %}
+      {% endwith %}
+    {% endif %}
+
+    {# FORMULÁRIOS #}
+    {% if segmento == 'Personalizado' %}
+      {# --- FORMULÁRIO DE DECLARAÇÃO PERSONALIZADA --- #}
+      <form id="form-declaracao-personalizada" class="declaracao-form" method="POST">
+        <input type="hidden" name="modo_declaracao" value="personalizada">
+
+        {# PASSO 1 – SEGMENTO #}
+        <div class="form-group" id="group-segmento-perso">
+          <div class="form-section-title">
+            <i class="fas fa-layer-group"></i> Segmento da declaração:
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio"
+                   name="segmento_personalizado" id="seg_fund" value="Fundamental">
+            <label class="form-check-label" for="seg_fund">Ensino Fundamental</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio"
+                   name="segmento_personalizado" id="seg_eja" value="EJA">
+            <label class="form-check-label" for="seg_eja">EJA</label>
+          </div>
+        </div>
+
+        {# PASSO 2 – DADOS BÁSICOS (aparecem após escolher segmento) #}
+        <div id="group-dados-basicos" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-id-card"></i> Dados básicos do aluno:
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="nome_aluno">Nome completo do aluno:</label>
+              <input type="text" id="nome_aluno" name="nome_aluno"
+                     class="form-control" required>
+            </div>
+            <div class="form-group col-md-3">
+              <label for="data_nascimento">Data de nascimento:</label>
+              <input type="date" id="data_nascimento" name="data_nascimento"
+                     class="form-control" required>
+            </div>
+            <div class="form-group col-md-3">
+              <label for="ra">RA:</label>
+              <input type="text" id="ra" name="ra"
+                     class="form-control" required>
+            </div>
+          </div>
+        </div>
+
+        {# PASSO 3 – TIPO (aparece após dados básicos) #}
+        <div class="form-group" id="group-tipo-perso" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-file-alt"></i> Tipo de declaração:
+          </div>
+          <select id="tipo_declaracao_personalizada"
+                  name="tipo_declaracao_personalizada"
+                  class="form-control" required>
+            <option value="">Selecione</option>
+            <option value="Conclusao">Conclusão</option>
+            <option value="MatriculaCancelada">Matrícula cancelada</option>
+            <option value="NCOM">Não Comparecimento (NCOM)</option>
+          </select>
+        </div>
+
+        {# PASSO 4 – DADOS ESPECÍFICOS (mostrados conforme tipo) #}
+
+        {# BLOCO – CONCLUSÃO #}
+        <div id="box-conclusao" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-check-double"></i> Dados para declaração de conclusão:
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="ano_serie_concluida">Ano/série concluída:</label>
+              <select id="ano_serie_concluida" name="ano_serie_concluida"
+                      class="form-control">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-6">
+              <label for="ano_conclusao">Ano de conclusão:</label>
+              <select id="ano_conclusao" name="ano_conclusao"
+                      class="form-control year-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" id="group-semestre-conclusao">
+            <label class="d-block">Semestre da conclusão (somente para EJA):</label>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio"
+                     name="semestre_conclusao" id="sem_conc_1" value="1º semestre">
+              <label class="form-check-label" for="sem_conc_1">1º semestre</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio"
+                     name="semestre_conclusao" id="sem_conc_2" value="2º semestre">
+              <label class="form-check-label" for="sem_conc_2">2º semestre</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="d-block">Deve histórico escolar da unidade?</label>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio"
+                     name="deve_historico_unidade" id="hist_unid_sim" value="Sim">
+              <label class="form-check-label" for="hist_unid_sim">Sim</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio"
+                     name="deve_historico_unidade" id="hist_unid_nao" value="Não">
+              <label class="form-check-label" for="hist_unid_nao">Não</label>
+            </div>
+          </div>
+        </div>
+
+        {# BLOCO – MATRÍCULA CANCELADA #}
+        <div id="box-matricula" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-user-times"></i> Dados para matrícula cancelada:
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="ano_serie_matricula">Ano/série da matrícula:</label>
+              <select id="ano_serie_matricula" name="ano_serie_matricula"
+                      class="form-control">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label for="ano_matricula">Ano da matrícula:</label>
+              <select id="ano_matricula" name="ano_matricula"
+                      class="form-control year-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4" id="group-semestre-matricula">
+              <label class="d-block">Semestre da matrícula (somente para EJA):</label>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio"
+                       name="semestre_matricula_opcao" id="sem_mat_1" value="1º semestre">
+                <label class="form-check-label" for="sem_mat_1">1º semestre</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio"
+                       name="semestre_matricula_opcao" id="sem_mat_2" value="2º semestre">
+                <label class="form-check-label" for="sem_mat_2">2º semestre</label>
+              </div>
+            </div>
+          </div>
+          {# campo oculto que será enviado para o backend #}
+          <input type="hidden" id="semestre_matricula_hidden" name="semestre_matricula" value="">
+        </div>
+
+        {# BLOCO – NCOM #}
+        <div id="box-ncom" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-user-slash"></i> Dados para Não Comparecimento (NCOM):
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="ano_serie_vaga">Ano/série da vaga:</label>
+              <select id="ano_serie_vaga" name="ano_serie_vaga"
+                      class="form-control">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label for="ano_referencia_ncom">Ano de referência:</label>
+              <select id="ano_referencia_ncom" name="ano_referencia_ncom"
+                      class="form-control year-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4" id="group-semestre-ncom">
+              <label class="d-block">Semestre de referência (somente para EJA / opcional):</label>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio"
+                       name="semestre_referencia_ncom" id="sem_ncom_1" value="1º semestre">
+                <label class="form-check-label" for="sem_ncom_1">1º semestre</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio"
+                       name="semestre_referencia_ncom" id="sem_ncom_2" value="2º semestre">
+                <label class="form-check-label" for="sem_ncom_2">2º semestre</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="declaracao-actions">
+          <button type="submit" id="btn-gerar-personalizada"
+                  class="btn-declaracao" formtarget="_blank" disabled>
+            <i class="fas fa-file-pdf"></i> Gerar declaração personalizada em PDF
+          </button>
+
+          <button type="button" id="btn-limpar-personalizada" class="btn-clear">
+            <i class="fas fa-eraser"></i> Limpar campos
+          </button>
+
+          <a href="{{ dashboard_url }}" class="btn-voltar">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+          </a>
+        </div>
+      </form>
+
+    {% elif segmento %}
+      {# --- FORMULÁRIO PADRÃO (Fundamental / EJA) --- #}
+      <form id="form-declaracao" class="declaracao-form" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="segmento_escolhido" value="{{ segmento }}">
+
+        {% if not tem_lista %}
+          <div class="form-group declaracao-upload-field">
+            <div class="form-section-title">
+              <i class="fas fa-file-excel"></i>
+              Lista piloto - {{ 'ENSINO FUNDAMENTAL' if segmento == 'Fundamental' else 'EJA' }} (Excel):
+            </div>
+            <label class="declaracao-upload-zone" for="excel_file">
+              <input type="file"
+                     id="excel_file"
+                     class="form-control-file declaracao-upload-input"
+                     name="excel_file"
+                     accept=".xlsx,.xls,.xlsm">
+              <span class="declaracao-upload-icon">
+                <i class="fas fa-file-excel" aria-hidden="true"></i>
+              </span>
+              <span class="declaracao-upload-copy">
+                <span class="declaracao-upload-title">Arraste a lista piloto aqui</span>
+                <span class="declaracao-upload-hint">ou clique para procurar no computador.</span>
+                <span class="declaracao-upload-name" data-default="Nenhum arquivo selecionado">
+                  Nenhum arquivo selecionado
+                </span>
+              </span>
+              <span class="declaracao-upload-button">Procurar</span>
+            </label>
+          </div>
+        {% endif %}
+
+        <div class="form-group" id="group-aluno">
+          <div class="form-section-title">
+            <i class="fas fa-user-graduate"></i> Aluno:
+          </div>
+          <select id="rm" name="rm" class="form-control" required>
+            <option value="">Selecione o aluno</option>
+            {% for a in alunos %}
+              <option value="{{ a.rm }}">{{ a.rm }} - {{ a.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group" id="group-tipo">
+          <div class="form-section-title">
+            <i class="fas fa-file-alt"></i> Tipo de declaração:
+          </div>
+          <select id="tipo" name="tipo" class="form-control" required>
+            <option value="">Selecione</option>
+            <option value="Escolaridade">Declaração de Escolaridade</option>
+            <option value="Transferencia">Declaração de Transferência</option>
+            <option value="Conclusão">Declaração de Conclusão</option>
+            <option value="Frequencia">Declaração de Frequência</option>
+          </select>
+        </div>
+
+        <div id="historico-container">
+          <legend>
+            <i class="fas fa-scroll"></i>
+            Histórico escolar
+          </legend>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="deve_historico"
+                   id="historico_sim" value="sim">
+            <label class="form-check-label" for="historico_sim">Deve histórico escolar</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="deve_historico"
+                   id="historico_nao" value="nao">
+            <label class="form-check-label" for="historico_nao">Não deve histórico escolar</label>
+          </div>
+        </div>
+
+        <div id="unidade-anterior-container">
+          <legend>
+            <i class="fas fa-school"></i>
+            Unidade escolar anterior
+          </legend>
+          <div class="form-group mb-2">
+            <label for="unidade_anterior" class="declaracao-compact-label">Buscar unidade (escolas.csv):</label>
+            <select id="unidade_anterior" name="unidade_anterior_select" class="declaracao-full-select"></select>
+          </div>
+          <div class="form-group mb-0">
+            <label for="unidade_anterior_manual" class="declaracao-compact-label">
+              Ou digite o nome da unidade:
+            </label>
+            <input type="text" id="unidade_anterior_manual"
+                   name="unidade_anterior_manual"
+                   class="form-control"
+                   placeholder="Ex: E.E. Nome da Escola">
+          </div>
+        </div>
+
+        {# BLOCO – FREQUÊNCIA POR MÊS #}
+        <div id="frequencia-container">
+          <legend>
+            <i class="fas fa-calendar-check"></i>
+            Frequência por mês (dias letivos x faltas)
+          </legend>
+          <p class="frequencia-help-text">
+            Preencha apenas os meses solicitados pelo responsável. Os meses em branco
+            serão ignorados na declaração ou poderão aparecer como
+            <strong>“Ainda não apurado”</strong>, conforme o modelo do documento.
+          </p>
+
+          {% set meses = [
+            ('jan', 'Janeiro'),
+            ('fev', 'Fevereiro'),
+            ('mar', 'Março'),
+            ('abr', 'Abril'),
+            ('mai', 'Maio'),
+            ('jun', 'Junho'),
+            ('jul', 'Julho'),
+            ('ago', 'Agosto'),
+            ('set', 'Setembro'),
+            ('out', 'Outubro'),
+            ('nov', 'Novembro'),
+            ('dez', 'Dezembro')
+          ] %}
+
+          {% for id, rotulo in meses %}
+          <div class="form-row freq-mes-row" data-mes="{{ id }}">
+            <div class="form-group col-md-4">
+              <label for="freq_{{ id }}_dias">Dias letivos em {{ rotulo }}:</label>
+              <input type="number" min="0"
+                     id="freq_{{ id }}_dias"
+                     name="freq_{{ id }}_dias"
+                     class="form-control freq-dias">
+            </div>
+            <div class="form-group col-md-4">
+              <label for="freq_{{ id }}_faltas">Faltas em {{ rotulo }}:</label>
+              <input type="number" min="0"
+                     id="freq_{{ id }}_faltas"
+                     name="freq_{{ id }}_faltas"
+                     class="form-control freq-faltas">
+            </div>
+            <div class="form-group col-md-4">
+              <label for="freq_{{ id }}_percent">Frequência em {{ rotulo }} (%):</label>
+              <input type="text"
+                     id="freq_{{ id }}_percent"
+                     name="freq_{{ id }}_percent"
+                     class="form-control freq-resultado"
+                     readonly
+                     placeholder="Ainda não apurado">
+            </div>
+          </div>
+          {% endfor %}
+
+          <small class="frequencia-footnote">
+            A frequência é calculada automaticamente pela fórmula
+            <em>((dias letivos - faltas) / dias letivos) × 100</em>. Meses com dados
+            inconsistentes (faltas maiores que dias letivos, por exemplo) serão
+            sinalizados para correção.
+          </small>
+        </div>
+
+        <div class="declaracao-actions">
+          {% if not tem_lista %}
+          <button type="button" id="btn-carregar-lista" class="btn-lote">
+            <i class="fas fa-cloud-upload-alt"></i> Carregar lista piloto
+          </button>
+          {% endif %}
+
+          <button type="submit" id="btn-gerar" class="btn-declaracao" formtarget="_blank" disabled>
+            <i class="fas fa-file-pdf"></i> Gerar declaração em PDF
+          </button>
+
+          {% if segmento == 'Fundamental' %}
+          <button type="button" id="btn-5ano-conclusao" class="btn-lote" style="display:none;">
+            <i class="fas fa-layer-group"></i> Conclusão - 5º ano (lote)
+          </button>
+          <button type="button" id="btn-5ano-escolaridade" class="btn-lote" style="display:none;">
+            <i class="fas fa-layer-group"></i> Escolaridade - 5º ano (lote)
+          </button>
+          {% endif %}
+
+          <button type="button" id="btn-limpar" class="btn-clear">
+            <i class="fas fa-eraser"></i> Limpar seleção
+          </button>
+
+          <a href="{{ dashboard_url }}" class="btn-voltar">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+          </a>
+        </div>
+      </form>
+    {% else %}
+      <div class="declaracao-actions">
+        <a href="{{ dashboard_url }}" class="btn-voltar">
+          <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Overlay de carregamento -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-box">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Gerando declaração, aguarde...</p>
+    </div>
+  </div>
+
+  <!-- Modal de confirmação (transferência / conclusão – fluxo padrão) -->
+  <div id="confirm-modal" class="confirm-modal-overlay">
+    <div class="confirm-modal-box">
+      <div class="confirm-modal-header">
+        <div class="confirm-modal-icon">
+          <i class="fas fa-info"></i>
+        </div>
+        <div class="confirm-modal-headline">
+          <span class="confirm-modal-tag">Confirmação</span>
+          <h3 class="confirm-modal-title">Confirmar tipo de declaração</h3>
+        </div>
+      </div>
+
+      <p class="confirm-modal-body">
+        Você está prestes a gerar uma declaração de
+        <strong>transferência</strong> ou <strong>conclusão</strong> para o aluno selecionado.
+      </p>
+      <p class="confirm-modal-body">
+        Essa é realmente a declaração correta a ser gerada?
+      </p>
+
+      <div class="confirm-modal-actions">
+        <button type="button" id="confirm-modal-cancel" class="confirm-btn confirm-btn-secondary">
+          Cancelar
+        </button>
+        <button type="button" id="confirm-modal-confirm" class="confirm-btn confirm-btn-primary">
+          Sim, gerar declaração
+        </button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  {{ super() }}
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+  <script src="{{ url_for('static', filename='js/declaracao_tipo.js') }}"></script>
+
+{% endblock %}

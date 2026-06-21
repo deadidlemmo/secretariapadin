@@ -1,0 +1,1512 @@
+/* Estilos da tela de carteirinhas. Extraido de templates/gerar_carteirinhas.html. */
+    @page {
+      size: A4 portrait;
+      margin: 0.25cm;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      margin: 0;
+      padding: 10px;
+      background-color: #f4f6f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ===== Spinner (sem depender de Bootstrap) ===== */
+    .spinner-border {
+      width: 1cm;
+      height: 1cm;
+      border: 0.14cm solid rgba(255,255,255,0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spinner-spin 0.9s linear infinite;
+      display: inline-block;
+      margin-bottom: 0.2cm;
+    }
+    @keyframes spinner-spin { to { transform: rotate(360deg); } }
+    .sr-only { display: none; }
+
+    #search-container { margin-top: 10px; }
+
+    #localizarAluno {
+      padding: 0.25cm;
+      font-size: 0.32cm;
+      width: 4.5cm;
+      border-radius: 0.25cm;
+      border: 0.05cm solid #b0bec5;
+    }
+
+    .carteirinhas-container {
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .page {
+      margin-bottom: 30px;
+      position: relative;
+    }
+
+    .page-number {
+      text-align: center;
+      font-size: 0.32cm;
+      font-weight: 600;
+      color: #455a64;
+      margin-bottom: 0.25cm;
+    }
+
+    /* ===== GRID ===== */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr); /* 2 por linha */
+      gap: 0.50cm 0.38cm;
+      justify-items: center;
+    }
+
+    .borda-pontilhada {
+      border: 0.03cm dashed #aab8c3;
+      padding: 0.10cm;
+      position: relative;
+      border-radius: 0.28cm;
+      background: #ffffff;
+    }
+
+    .borda-pontilhada::after {
+      content: "";
+      position: absolute;
+      top: -0.11cm;
+      right: -0.11cm;
+      width: 0.20cm;
+      height: 0.20cm;
+      border-radius: 999px;
+      background: #ffffff;
+      border: 0.03cm solid #aab8c3;
+    }
+
+    .carteirinha {
+      background: #ffffff;
+      border-radius: 0.24cm;
+      box-shadow: 0 0.10cm 0.22cm rgba(15, 48, 79, 0.15);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: 1.28cm minmax(0, 1fr) 1.24cm;
+      width: 10.15cm;
+      height: 8.55cm;
+      position: relative;
+      border: 0.035cm solid #b9c7d3;
+      color: #1d2d3a;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .carteirinha::before {
+      content: "PADIN";
+      position: absolute;
+      right: 0.22cm;
+      top: 1.38cm;
+      z-index: 0;
+      color: rgba(23, 49, 68, 0.035);
+      font-size: 1.78cm;
+      font-weight: 900;
+      letter-spacing: 0.05cm;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .carteirinha::after {
+      content: none;
+    }
+
+    /* Carteira horizontal de identificação, inspirada em documentos estudantis. */
+    .card-header-band {
+      position: relative;
+      z-index: 1;
+      padding: 0.16cm 0.30cm 0.13cm;
+      box-sizing: border-box;
+      background: #ffffff;
+      border-bottom: 0.03cm solid #d7e0e8;
+      display: grid;
+      grid-template-columns: 0.92cm minmax(0, 1fr) auto;
+      gap: 0.20cm;
+      align-items: center;
+      color: #173144;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .card-school-mark {
+      width: 0.88cm;
+      height: 0.88cm;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      border: 0.018cm solid #c8d4dd;
+      overflow: hidden;
+    }
+
+    .card-school-logo {
+      width: 0.82cm;
+      height: 0.82cm;
+      display: block;
+      object-fit: contain;
+    }
+
+    .card-school-text {
+      display: grid;
+      gap: 0.02cm;
+      min-width: 0;
+    }
+
+    .card-document-title {
+      color: #173144;
+      font-size: 0.29cm;
+      font-weight: 900;
+      letter-spacing: 0.045cm;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .card-school-name {
+      color: #526878;
+      font-size: 0.21cm;
+      font-weight: 900;
+      letter-spacing: 0.028cm;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .card-year-top {
+      align-self: center;
+      padding: 0.05cm 0.13cm;
+      border-radius: 0.10cm;
+      background: #f2f6f9;
+      border: 0.02cm solid #cfd9e1;
+      color: #173144;
+      font-size: 0.31cm;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .card-body {
+      display: grid;
+      grid-template-columns: 3.52cm minmax(0, 1fr);
+      position: relative;
+      z-index: 1;
+      padding: 0.30cm 0.34cm 0.18cm;
+      box-sizing: border-box;
+      align-items: stretch;
+      gap: 0.34cm;
+    }
+
+    /* FOTO */
+    .photo-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 0.06cm;
+      flex-shrink: 0;
+    }
+
+    .photo-shell {
+      padding: 0.05cm;
+      border-radius: 0.12cm;
+      background: #ffffff;
+      border: 0.025cm solid #173144;
+      box-shadow: none;
+    }
+
+    .foto {
+      display: flex;
+      width: 3.12cm;
+      height: 4.05cm;
+      border-radius: 0.06cm;
+      object-fit: cover;
+      border: 0;
+      cursor: pointer;
+      background-color: #eceff1;
+    }
+
+    .foto-placeholder {
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.06cm;
+      color: #455a64;
+      background: #f1f4f6;
+      text-align: center;
+    }
+
+    .foto-placeholder-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 0.68cm;
+      height: 0.68cm;
+      border-radius: 999px;
+      background: #dde5eb;
+      color: #455a64;
+      font-size: 0.32cm;
+    }
+
+    .foto-placeholder small {
+      color: #60727c;
+      font-size: 0.18cm;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+
+    .photo-caption {
+      width: fit-content;
+      padding: 0.025cm 0.13cm;
+      border-radius: 999px;
+      background: #ffffff;
+      border: 0.018cm solid #c8d4dd;
+      color: #4f6473;
+      font-size: 0.16cm;
+      font-weight: 900;
+      letter-spacing: 0.035cm;
+      text-transform: uppercase;
+    }
+
+    /* CARD DE INFORMAÇÕES */
+    .info-panel {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      padding: 0.04cm 0 0;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.13cm 0.16cm;
+      align-content: start;
+      box-sizing: border-box;
+      box-shadow: none;
+      height: 100%;
+    }
+
+    .info-name {
+      grid-column: 1 / -1;
+      margin: 0 0 0.02cm;
+      border-bottom: 0.02cm solid #dbe3ea;
+      padding-bottom: 0.10cm;
+    }
+
+    .info-name-label {
+      font-size: 0.17cm;
+      font-weight: 900;
+      color: #006f83;
+      letter-spacing: 0.03cm;
+      text-transform: uppercase;
+    }
+
+    .info-name-text {
+      font-size: 0.36cm;
+      font-weight: 900;
+      color: #061f3a;
+      text-transform: uppercase;
+      line-height: 1.04;
+    }
+
+    .info-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      font-size: 0.25cm;
+      margin: 0;
+      min-height: 0.68cm;
+      padding: 0.10cm 0.12cm;
+      align-items: start;
+      gap: 0.045cm;
+      border: 0.018cm solid #d6e1ea;
+      border-radius: 0.12cm;
+      background: #f8fbfd;
+      min-width: 0;
+    }
+
+    .info-row + .info-row { border-top: 0.018cm solid #d6e1ea; }
+
+    .info-row:nth-child(6) {
+      grid-column: 1 / -1;
+      grid-template-columns: minmax(0, 1fr);
+      align-items: center;
+      gap: 0.055cm;
+      min-height: 0.86cm;
+      padding: 0.11cm 0.16cm;
+      text-align: center;
+    }
+
+    .horario-row {
+      background: #f3f9fc;
+      border-color: #c7dbe8;
+    }
+
+    .info-label {
+      font-weight: 900;
+      color: #006f83;
+      min-width: 0;
+      text-transform: uppercase;
+      font-size: 0.19cm;
+      letter-spacing: 0.018cm;
+      line-height: 1;
+    }
+
+    .info-value {
+      flex: 1;
+      color: #061f3a;
+      padding-left: 0;
+      word-wrap: break-word;
+      line-height: 1.08;
+      font-size: 0.30cm;
+      font-weight: 900;
+    }
+
+    .info-row:nth-child(6) .info-label {
+      justify-self: center;
+    }
+
+    .info-row:nth-child(6) .info-value {
+      max-width: 100%;
+      justify-self: center;
+      font-size: 0.27cm;
+      font-weight: 900;
+      line-height: 1.14;
+    }
+
+    .horario-value {
+      display: grid;
+      justify-items: center;
+      gap: 0.03cm;
+    }
+
+    .horario-dia,
+    .horario-faixa {
+      display: block;
+    }
+
+    .horario-dia {
+      color: #006f83;
+      font-size: 0.26cm;
+      font-weight: 950;
+      line-height: 1.05;
+    }
+
+    .horario-faixa {
+      color: #061f3a;
+      font-size: 0.29cm;
+      font-weight: 950;
+      line-height: 1.06;
+    }
+
+    /* Rodapé técnico inspirado em faixa de documento, sem QR code. */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+      padding: 0.17cm 0.34cm 0.18cm;
+      box-sizing: border-box;
+      gap: 0;
+      border-top: 0.03cm solid #d7e0e8;
+      background: #f7fafc;
+    }
+
+    .status {
+      min-width: 0;
+      width: min(100%, 7.8cm);
+      padding: 0.13cm 0.26cm;
+      font-weight: 900;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.14cm;
+      text-align: center;
+      letter-spacing: 0.045cm;
+      font-size: 0.34cm;
+      box-shadow: none;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      white-space: nowrap;
+      border-radius: 999px;
+      border: 0.04cm solid currentColor;
+      background: #ffffff;
+    }
+
+    .status-symbol {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      width: 0.42cm;
+      height: 0.42cm;
+      border-radius: 999px;
+      font-family: Arial, sans-serif;
+      font-size: 0;
+      font-weight: 900;
+      line-height: 0;
+      border: 0.025cm solid rgba(255, 255, 255, 0.95);
+      background: #ffffff;
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    .status-symbol::before,
+    .status-symbol::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      display: block;
+      box-sizing: border-box;
+    }
+
+    .status-text {
+      min-width: 0;
+      font-weight: 950;
+      line-height: 1.05;
+    }
+
+    .status.verde {
+      color: #ffffff;
+      background: #087a55;
+      border-color: #056447;
+    }
+
+    .status.verde .status-symbol {
+      color: #087a55;
+    }
+
+    .status.verde .status-symbol::before {
+      width: 0.13cm;
+      height: 0.23cm;
+      border: solid currentColor;
+      border-width: 0 0.045cm 0.045cm 0;
+      transform: translate(-50%, -58%) rotate(45deg);
+    }
+
+    .status.verde .status-symbol::after {
+      display: none;
+    }
+
+    .status.vermelho {
+      color: #ffffff;
+      background: #c5161d;
+      border-color: #9f1117;
+    }
+
+    .status.vermelho .status-symbol {
+      color: #c5161d;
+    }
+
+    .status.vermelho .status-symbol::before {
+      width: 0.045cm;
+      height: 0.19cm;
+      border-radius: 999px;
+      background: currentColor;
+      transform: translate(-50%, -68%);
+    }
+
+    .status.vermelho .status-symbol::after {
+      width: 0.058cm;
+      height: 0.058cm;
+      border-radius: 999px;
+      background: currentColor;
+      transform: translate(-50%, 105%);
+    }
+
+    #loading-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .loading-overlay-content {
+      text-align: center;
+      color: #ffffff;
+      font-family: Montserrat, Arial, sans-serif;
+      font-weight: 800;
+    }
+
+    .loading-progress-text {
+      margin-top: 0.2cm;
+    }
+
+    #cards-success {
+      display: none;
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #d4edda;
+      color: #155724;
+      padding: 0.2cm;
+      border-radius: 0.2cm;
+      z-index: 10000;
+      box-shadow: 0 0.05cm 0.15cm rgba(0,0,0,0.3);
+    }
+
+    .no-print { }
+
+    .inline-upload {
+      display: none;
+    }
+
+    .filter-submit-noscript {
+      border: none;
+      background: linear-gradient(135deg, var(--card-screen-primary-dark, #174f45), var(--card-screen-primary, #1f6f5f));
+      color: #ffffff;
+      border-radius: 999px;
+      padding: 0.15cm 0.35cm;
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    .no-cards-message {
+      margin-top: 0.6cm;
+      color: var(--card-screen-muted, #455a64);
+      font-weight: 900;
+    }
+
+    .upload-success-toast {
+      display: none;
+      position: fixed;
+      top: 0.2cm;
+      right: 0.2cm;
+      z-index: 10001;
+      padding: 0.2cm 0.32cm;
+      border: 1px solid #b8dfc8;
+      border-radius: 999px;
+      background: #edf8f1;
+      color: #2f7d56;
+      font-weight: 900;
+      box-shadow: 0 0.08cm 0.22cm rgba(0,0,0,0.22);
+    }
+
+    /* ====== Impressão: MAIS ESPAÇO VERTICAL ENTRE AS LINHAS, SEM QUEBRAR 6 POR PÁGINA ====== */
+    @media print {
+      .no-print { display: none !important; }
+
+      body {
+        margin: 0;
+        padding: 0.05cm;
+        font-size: 16px;
+        background-color: #ffffff !important;
+      }
+
+      .page { page-break-after: always; margin-bottom: 0 !important; }
+
+      .page-number {
+        font-size: 0.26cm;
+        margin-bottom: 0.08cm;
+      }
+
+      .cards-grid {
+        gap: 0.22cm 0.10cm; /* vertical horizontal */
+      }
+
+      .borda-pontilhada { padding: 0.04cm; }
+
+      .carteirinha {
+        width: 10cm;
+        height: 8.45cm;
+      }
+
+      .card-header-band {
+        padding: 0.15cm 0.28cm 0.12cm;
+        grid-template-columns: 0.88cm minmax(0, 1fr) auto;
+        gap: 0.18cm;
+      }
+
+      .card-school-mark {
+        width: 0.84cm;
+        height: 0.84cm;
+      }
+
+      .card-school-logo {
+        width: 0.78cm;
+        height: 0.78cm;
+      }
+
+      .card-document-title {
+        font-size: 0.28cm;
+        letter-spacing: 0.04cm;
+      }
+
+      .card-school-name {
+        font-size: 0.19cm;
+        letter-spacing: 0.024cm;
+      }
+
+      .card-body {
+        padding: 0.28cm 0.32cm 0.16cm;
+        grid-template-columns: 3.42cm minmax(0, 1fr);
+        gap: 0.31cm;
+        align-items: stretch;
+      }
+
+      .photo-shell {
+        padding: 0.04cm;
+        border-radius: 0.09cm;
+      }
+
+      .foto {
+        width: 3.02cm;
+        height: 3.92cm;
+      }
+
+      .photo-caption {
+        font-size: 0.16cm;
+        padding: 0.025cm 0.11cm;
+      }
+
+      .info-panel {
+        padding: 0.02cm 0 0;
+        gap: 0.11cm 0.13cm;
+      }
+
+      .info-name-label { font-size: 0.15cm; }
+      .info-name-text  { font-size: 0.34cm; line-height: 1.04; }
+      .info-row {
+        font-size: 0.24cm;
+        grid-template-columns: minmax(0, 1fr);
+        min-height: 0.64cm;
+        padding: 0.09cm 0.11cm;
+      }
+      .info-row:nth-child(6) {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.05cm;
+        min-height: 0.80cm;
+        padding: 0.10cm 0.14cm;
+        text-align: center;
+      }
+      .info-label {
+        font-size: 0.18cm;
+      }
+      .info-value {
+        font-size: 0.285cm;
+        line-height: 1.08;
+      }
+      .info-row:nth-child(6) .info-value {
+        font-size: 0.255cm;
+        line-height: 1.14;
+      }
+      .horario-value {
+        gap: 0.025cm;
+      }
+      .horario-dia {
+        font-size: 0.245cm;
+      }
+      .horario-faixa {
+        font-size: 0.275cm;
+      }
+
+      .card-footer { padding: 0.16cm 0.32cm 0.17cm; }
+
+      .status {
+        width: min(100%, 7.6cm);
+        font-size: 0.32cm;
+        padding: 0.12cm 0.24cm;
+      }
+      .status-symbol { width: 0.42cm; height: 0.42cm; font-size: 0; }
+
+      .carteirinha,
+      .status,
+      .card-header-band,
+      .card-year-top,
+      .status-symbol {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      #relatorio-container { display: none !important; }
+    }
+
+    .imprimir-carteirinhas {
+      position: fixed;
+      bottom: 0.5cm;
+      right: 0.5cm;
+      background-color: #1976d2;
+      color: #fff;
+      padding: 0.2cm 0.5cm;
+      font-size: 0.3cm;
+      border-radius: 0.25cm;
+      cursor: pointer;
+      box-shadow: 0 0.1cm 0.2cm rgba(0,0,0,0.3);
+      border: none;
+    }
+    .imprimir-carteirinhas:hover { background-color: #0d47a1; }
+
+    .imprimir-pagina {
+      background-color: #a96427;
+      color: #fff;
+      padding: 0.2cm 0.4cm;
+      font-size: 0.3cm;
+      border-radius: 0.25cm;
+      cursor: pointer;
+      margin: 0.2cm auto;
+      display: block;
+      border: none;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.25);
+    }
+    .imprimir-pagina:hover { background-color: #e64a19; }
+
+    .alunos-sem-fotos-btn {
+      background-color: #4B79A1;
+      color: #fff;
+      border: none;
+      padding: 0.2cm 0.5cm;
+      font-size: 0.3cm;
+      border-radius: 0.25cm;
+      cursor: pointer;
+      margin-bottom: 0.2cm;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.2);
+    }
+    .alunos-sem-fotos-btn:hover { background-color: #3a5d78; }
+
+    /* ====== Filtros (server-side) ====== */
+    .filtro-foto-form {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25cm;
+      margin-bottom: 0.2cm;
+      background: #ffffff;
+      border: 1px solid #cfd8dc;
+      padding: 0.18cm 0.28cm;
+      border-radius: 999px;
+      box-shadow: 0 0.05cm 0.15cm rgba(0,0,0,0.10);
+      flex-wrap: wrap;
+    }
+    .filtro-foto-form label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.18cm;
+      font-size: 0.30cm;
+      font-weight: 700;
+      color: #37474f;
+      cursor: pointer;
+      user-select: none;
+      text-transform: uppercase;
+      letter-spacing: 0.03cm;
+    }
+    .filtro-foto-form input[type="checkbox"] {
+      width: 0.42cm;
+      height: 0.42cm;
+      accent-color: #1976d2;
+      cursor: pointer;
+    }
+    /* ====== RELATÓRIO ALUNOS SEM FOTO (MODAL) ====== */
+    #relatorio-container {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+
+    #relatorio-container .relatorio-inner {
+      background: #f5f7fa;
+      border-radius: 0.4cm;
+      max-width: 24cm;
+      width: 100%;
+      max-height: 85vh;
+      box-shadow: 0 0.15cm 0.4cm rgba(0,0,0,0.35);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #cfd8dc;
+      position: relative;
+    }
+
+    .relatorio-header {
+      background: linear-gradient(90deg, #283E51, #4B79A1);
+      padding: 0.4cm 0.6cm;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4cm;
+    }
+
+    .relatorio-title-area h2 {
+      margin: 0;
+      font-size: 0.42cm;
+      letter-spacing: 0.08cm;
+      text-transform: uppercase;
+    }
+
+    .badge-pendentes {
+      display: inline-block;
+      margin-top: 0.08cm;
+      padding: 0.12cm 0.35cm;
+      border-radius: 999px;
+      background-color: rgba(255,255,255,0.15);
+      font-size: 0.28cm;
+    }
+
+    #filtro-relatorio {
+      border-radius: 999px;
+      border: none;
+      padding: 0.2cm 0.5cm;
+      font-size: 0.28cm;
+      width: 7cm;
+      outline: none;
+    }
+
+    #relatorio-container button.close-relatorio {
+      position: absolute;
+      top: 0.25cm;
+      right: 0.35cm;
+      border: none;
+      background: transparent;
+      color: #ffffff;
+      font-size: 0.45cm;
+      cursor: pointer;
+    }
+
+    .relatorio-tabela-wrapper {
+      padding: 0.3cm 0.6cm 0.45cm 0.6cm;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .relatorio-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.30cm;
+    }
+
+    .relatorio-table thead th {
+      text-align: left;
+      padding: 0.18cm 0.15cm;
+      color: #607d8b;
+      font-weight: 700;
+      border-bottom: 0.03cm solid #cfd8dc;
+      font-size: 0.29cm;
+    }
+
+    .relatorio-table tbody td {
+      padding: 0.16cm 0.15cm;
+      vertical-align: middle;
+      border-bottom: 0.02cm solid #eceff1;
+    }
+
+    .relatorio-table tbody tr.relatorio-row:nth-child(even) { background-color: #f3f6f9; }
+
+    .serie-divider td {
+      padding: 0.18cm 0.15cm;
+      font-weight: 700;
+      color: #455a64;
+      background-color: #e3f2fd;
+      border-bottom: 0.03cm solid #bbdefb;
+      text-transform: uppercase;
+      letter-spacing: 0.04cm;
+      font-size: 0.29cm;
+    }
+
+    .badge-status {
+      display: inline-block;
+      padding: 0.06cm 0.25cm;
+      border-radius: 999px;
+      font-size: 0.26cm;
+    }
+
+    .badge-status.pendente {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+
+    .relatorio-acoes { width: 4cm; }
+
+    .relatorio-acao-link,
+    .relatorio-acao-primary {
+      display: block;
+      width: 100%;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.28cm;
+      padding: 0.12cm 0.25cm;
+      margin-bottom: 0.08cm;
+      text-align: center;
+    }
+
+    .relatorio-acao-link {
+      background: #eceff1;
+      color: #37474f;
+    }
+
+    .relatorio-acao-primary {
+      background: #1976d2;
+      color: #ffffff;
+    }
+
+    .relatorio-acao-link i,
+    .relatorio-acao-primary i { margin-right: 0.1cm; }
+
+    .card-highlight {
+      box-shadow: 0 0 0 0.15cm rgba(255, 193, 7, 0.9) !important;
+      transition: box-shadow 0.3s ease-in-out;
+    }
+
+    @media screen {
+      :root {
+        --card-screen-bg: linear-gradient(135deg, #e7f3ef 0%, #f7faf8 48%, #eff3f9 100%);
+        --card-screen-surface: #ffffff;
+        --card-screen-elevated: #f8fbfa;
+        --card-screen-text: #18312d;
+        --card-screen-muted: #526860;
+        --card-screen-border: #d9e4df;
+        --card-screen-primary: #1f6f5f;
+        --card-screen-primary-dark: #174f45;
+        --card-screen-field: #ffffff;
+        --card-screen-shadow: 0 16px 34px rgba(30, 53, 47, 0.14);
+        --card-screen-control-radius: 14px;
+        --card-screen-pill-radius: 999px;
+        --card-screen-control-height: 46px;
+        --card-screen-focus-ring: rgba(31, 111, 95, 0.18);
+      }
+
+      html[data-theme="dark"] {
+        --card-screen-bg: linear-gradient(135deg, #111614 0%, #171d1a 52%, #151a20 100%);
+        --card-screen-surface: #1b2420;
+        --card-screen-elevated: #202b26;
+        --card-screen-text: #e5eee9;
+        --card-screen-muted: #b1c0ba;
+        --card-screen-border: #35443e;
+        --card-screen-primary: #7fb8aa;
+        --card-screen-primary-dark: #a7cfc3;
+        --card-screen-field: #101a17;
+        --card-screen-shadow: 0 20px 48px rgba(0, 0, 0, 0.36);
+        --card-screen-focus-ring: rgba(127, 184, 170, 0.20);
+      }
+
+      body#carteirinhas-page {
+        background: var(--card-screen-bg);
+        color: var(--card-screen-text);
+        min-height: 100vh;
+        padding: 0 0 22px;
+        box-sizing: border-box;
+      }
+
+      #carteirinhas-page .theme-toggle {
+        position: fixed;
+        top: 14px;
+        right: 14px;
+        z-index: 90;
+        width: 42px;
+        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--card-screen-border);
+        border-radius: 8px;
+        background: var(--card-screen-surface);
+        color: var(--card-screen-primary-dark);
+        box-shadow: var(--card-screen-shadow);
+        cursor: pointer;
+      }
+
+      #carteirinhas-page .carteirinhas-container {
+        width: 100%;
+        max-width: none;
+      }
+
+      #carteirinhas-page .carteirinhas-screen-header {
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr);
+        gap: 16px;
+        align-items: center;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0 0 16px;
+        padding: 18px clamp(24px, 4vw, 56px);
+        background: var(--card-screen-surface);
+        border: 1px solid var(--card-screen-border);
+        border-left: 0;
+        border-right: 0;
+        border-top: 0;
+        border-bottom: 1px solid var(--card-screen-border);
+        border-radius: 0;
+        box-shadow: var(--card-screen-shadow);
+        color: var(--card-screen-text);
+      }
+
+      .screen-brand-mark {
+        width: 60px;
+        height: 60px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff;
+        border: 1px solid var(--card-screen-border);
+        overflow: hidden;
+      }
+
+      .screen-brand-mark img {
+        width: 54px;
+        height: 54px;
+        display: block;
+        object-fit: contain;
+      }
+
+      .carteirinhas-screen-header h1 {
+        margin: 0 0 4px;
+        color: var(--card-screen-primary-dark);
+        font-size: 1.72rem;
+        font-weight: 900;
+        line-height: 1.1;
+      }
+
+      .carteirinhas-screen-header p {
+        margin: 0;
+        color: var(--card-screen-muted);
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+
+      #carteirinhas-page .carteirinhas-toolbar {
+        position: relative;
+        top: auto;
+        z-index: 40;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 16px clamp(24px, 4vw, 56px);
+        margin-bottom: 20px !important;
+        background: var(--card-screen-surface);
+        border: 1px solid var(--card-screen-border);
+        border-top: 4px solid var(--card-screen-primary);
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
+        box-shadow: var(--card-screen-shadow);
+      }
+
+      #carteirinhas-page .toolbar-actions-row {
+        display: contents;
+      }
+
+      #search-container.no-print {
+        order: 4;
+        width: auto;
+        margin: 0;
+        display: inline-flex;
+        justify-content: center;
+        flex: 0 1 360px;
+        box-sizing: border-box;
+      }
+
+      #localizarAluno {
+        width: min(100%, 360px);
+        min-height: var(--card-screen-control-height);
+        padding: 0 16px;
+        border: 1px solid var(--card-screen-border);
+        border-radius: var(--card-screen-control-radius);
+        background: var(--card-screen-field);
+        color: var(--card-screen-text);
+        box-shadow: inset 0 1px 2px rgba(30, 53, 47, 0.05), 0 8px 18px rgba(30, 53, 47, 0.06);
+        outline: none;
+        font-weight: 700;
+        box-sizing: border-box;
+        transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+      }
+
+      #localizarAluno:focus {
+        border-color: var(--card-screen-primary);
+        box-shadow: 0 0 0 0.08cm var(--card-screen-focus-ring), inset 0 1px 2px rgba(30, 53, 47, 0.05);
+      }
+
+      #localizarAluno::placeholder {
+        color: var(--card-screen-muted);
+        opacity: 0.82;
+        font-weight: 600;
+      }
+
+      .alunos-sem-fotos-btn,
+      .imprimir-carteirinhas,
+      .imprimir-pagina,
+      .relatorio-acao-link,
+      .relatorio-acao-primary {
+        position: static;
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: var(--card-screen-control-radius);
+        font-weight: 800;
+        letter-spacing: 0;
+        box-shadow: 0 10px 20px rgba(30, 53, 47, 0.12);
+        margin: 0;
+        white-space: nowrap;
+      }
+
+      .carteirinhas-toolbar .imprimir-carteirinhas {
+        order: 2;
+        margin-left: 0;
+      }
+
+      .carteirinhas-toolbar .alunos-sem-fotos-btn {
+        order: 1;
+      }
+
+      .carteirinhas-toolbar .alunos-sem-fotos-btn,
+      .carteirinhas-toolbar .imprimir-carteirinhas {
+        min-height: var(--card-screen-control-height);
+        padding-top: 0;
+        padding-bottom: 0;
+      }
+
+      .alunos-sem-fotos-btn,
+      .imprimir-carteirinhas,
+      .relatorio-acao-primary {
+        background: linear-gradient(135deg, var(--card-screen-primary-dark), var(--card-screen-primary));
+      }
+
+      .alunos-sem-fotos-btn:hover,
+      .imprimir-carteirinhas:hover,
+      .relatorio-acao-primary:hover {
+        background: linear-gradient(135deg, #123f37, #1c6556);
+      }
+
+      .imprimir-pagina {
+        background: #c77c35;
+      }
+
+      .imprimir-pagina:hover {
+        background: #a96427;
+      }
+
+      .filtro-foto-form {
+        order: 3;
+        min-height: var(--card-screen-control-height);
+        border-radius: 0;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        gap: 10px;
+        padding: 0;
+        margin: 0;
+      }
+
+      .filtro-foto-form label {
+        min-height: var(--card-screen-control-height);
+        color: var(--card-screen-text);
+        padding: 0 14px;
+        letter-spacing: 0;
+        border: 1px solid var(--card-screen-border);
+        border-radius: var(--card-screen-control-radius);
+        background: var(--card-screen-elevated);
+        box-shadow: 0 10px 20px rgba(30, 53, 47, 0.08);
+        white-space: nowrap;
+      }
+
+      .filtro-foto-form input[type="checkbox"] {
+        accent-color: var(--card-screen-primary);
+      }
+
+      #cards-success {
+        background: #edf8f1;
+        color: #2f7d56;
+        border: 1px solid #b8dfc8;
+        border-radius: 8px;
+      }
+
+      #carteirinhas-page .page {
+        width: min(100%, 1280px);
+        margin-left: auto;
+        margin-right: auto;
+        box-sizing: border-box;
+      }
+
+      #carteirinhas-page .page .imprimir-pagina {
+        width: max-content;
+        min-width: 150px;
+        margin: 8px auto 16px;
+        display: flex;
+      }
+
+      #relatorio-container {
+        background: rgba(9, 20, 18, 0.68);
+        padding: 24px;
+      }
+
+      #relatorio-container .relatorio-inner {
+        background: var(--card-screen-surface);
+        border-radius: 8px;
+        border-color: var(--card-screen-border);
+        box-shadow: 0 24px 60px rgba(20, 35, 31, 0.25);
+        max-width: 1080px;
+        max-height: 88vh;
+      }
+
+      .relatorio-header {
+        background: linear-gradient(135deg, var(--card-screen-primary-dark), var(--card-screen-primary));
+        padding: 18px 22px;
+      }
+
+      .relatorio-title-area h2 {
+        color: #ffffff;
+        font-size: 1.15rem;
+        letter-spacing: 0.12em;
+      }
+
+      .badge-pendentes {
+        background-color: rgba(255, 255, 255, 0.18);
+        color: #ffffff;
+        font-weight: 800;
+      }
+
+      #filtro-relatorio {
+        border-radius: 8px;
+        background: #ffffff;
+        color: #18312d;
+        border: 1px solid rgba(255, 255, 255, 0.70);
+        font-weight: 700;
+      }
+
+      #filtro-relatorio::placeholder,
+      #localizarAluno::placeholder {
+        color: #6e8179;
+        opacity: 1;
+      }
+
+      #relatorio-container button.close-relatorio {
+        top: 12px;
+        right: 14px;
+        color: #ffffff;
+        font-size: 1.4rem;
+        width: 32px;
+        height: 32px;
+        line-height: 1;
+      }
+
+      .relatorio-tabela-wrapper {
+        background: var(--card-screen-surface);
+        padding: 18px 22px 22px;
+      }
+
+      .relatorio-table {
+        color: var(--card-screen-text);
+        font-size: 0.92rem;
+        border-collapse: separate;
+        border-spacing: 0;
+      }
+
+      .relatorio-table thead th {
+        color: var(--card-screen-muted);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border-bottom-color: var(--card-screen-border);
+      }
+
+      .relatorio-table tbody td {
+        color: var(--card-screen-text);
+        border-bottom-color: var(--card-screen-border);
+        font-weight: 650;
+        vertical-align: middle;
+      }
+
+      .relatorio-table .col-nome {
+        color: var(--card-screen-text);
+        font-weight: 800;
+      }
+
+      .serie-divider td {
+        background-color: #e3f3ef;
+        border-bottom-color: #b8cbc3;
+        color: #174f45;
+        font-weight: 900;
+      }
+
+      .relatorio-acao-link {
+        background: #eef5f2;
+        color: var(--card-screen-text);
+        border: 1px solid var(--card-screen-border);
+      }
+
+      .relatorio-acao-link:hover {
+        background: #e0ece8;
+      }
+
+      .badge-status.pendente {
+        background-color: #ffe7e7;
+        color: #b71920;
+        border: 1px solid #ffc2c2;
+        font-weight: 800;
+      }
+
+      .carteirinhas-footer {
+        width: min(100%, 1280px);
+        margin: 22px auto 0;
+        padding: 14px 18px 0;
+        border-top: 1px solid var(--card-screen-border);
+        color: var(--card-screen-muted);
+        text-align: center;
+        font-size: 0.86rem;
+        font-weight: 650;
+      }
+
+      html[data-theme="dark"] .page-number,
+      html[data-theme="dark"] .filtro-foto-form label,
+      html[data-theme="dark"] .relatorio-table,
+      html[data-theme="dark"] .relatorio-table thead th,
+      html[data-theme="dark"] .relatorio-table tbody td {
+        color: var(--card-screen-text);
+      }
+
+      html[data-theme="dark"] .relatorio-table tbody tr.relatorio-row:nth-child(even) {
+        background-color: #1a2924;
+      }
+
+      @media (min-width: 1024px) {
+        body#carteirinhas-page {
+          padding-inline: 0;
+        }
+
+        #carteirinhas-page .carteirinhas-container {
+          width: 100%;
+        }
+
+        #carteirinhas-page .carteirinhas-screen-header,
+        #carteirinhas-page .carteirinhas-toolbar {
+          width: 100%;
+        }
+
+        #carteirinhas-page .carteirinhas-screen-header {
+          margin-bottom: 18px;
+        }
+
+        #carteirinhas-page .toolbar-actions-row {
+          display: contents;
+        }
+
+        #carteirinhas-page .filtro-foto-form {
+          width: fit-content;
+          max-width: 100%;
+        }
+
+        #carteirinhas-page .carteirinhas-toolbar .imprimir-carteirinhas {
+          min-width: 190px;
+          margin-left: 0;
+        }
+
+        #search-container.no-print {
+          margin-top: 0;
+        }
+
+        #localizarAluno {
+          width: min(100%, 360px);
+        }
+      }
+    }
+
+    @media screen {
+      html[data-theme="dark"] .alunos-sem-fotos-btn,
+      html[data-theme="dark"] .imprimir-carteirinhas,
+      html[data-theme="dark"] .relatorio-acao-primary {
+        background: linear-gradient(135deg, #315f56, #407367);
+        color: #ffffff;
+        border: 1px solid #5a8f83;
+        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.22);
+      }
+
+      html[data-theme="dark"] .alunos-sem-fotos-btn:hover,
+      html[data-theme="dark"] .imprimir-carteirinhas:hover,
+      html[data-theme="dark"] .relatorio-acao-primary:hover {
+        background: linear-gradient(135deg, #294f48, #38675e);
+        color: #ffffff;
+      }
+
+      html[data-theme="dark"] .imprimir-pagina {
+        background: #9a642d;
+        color: #ffffff;
+        border: 1px solid #c9863c;
+      }
+
+      html[data-theme="dark"] .imprimir-pagina:hover {
+        background: #825326;
+      }
+
+      html[data-theme="dark"] .badge-status.pendente {
+        background: rgba(240, 140, 140, 0.16);
+        color: #e9baba;
+        border: 1px solid rgba(240, 140, 140, 0.34);
+      }
+
+      html[data-theme="dark"] .upload-success-toast {
+        background: #20352f;
+        border-color: #6fa987;
+        color: #b7dec3;
+      }
+
+      html[data-theme="dark"] .serie-divider td {
+        background-color: #20352f;
+        border-bottom-color: #40534c;
+        color: #d2e5de;
+      }
+
+      html[data-theme="dark"] #filtro-relatorio {
+        background: #101a17;
+        color: #e5eee9;
+        border: 1px solid #4e6960;
+      }
+
+      html[data-theme="dark"] #filtro-relatorio::placeholder,
+      html[data-theme="dark"] #localizarAluno::placeholder {
+        color: #9eb6ad;
+      }
+
+      html[data-theme="dark"] #relatorio-container {
+        background: rgba(0, 0, 0, 0.76);
+      }
+
+      html[data-theme="dark"] #relatorio-container .relatorio-inner,
+      html[data-theme="dark"] .relatorio-tabela-wrapper {
+        background: #17231f;
+      }
+
+      html[data-theme="dark"] .relatorio-header {
+        background: linear-gradient(135deg, #244e47, #426f64);
+        color: #ffffff;
+      }
+
+      html[data-theme="dark"] .relatorio-title-area h2,
+      html[data-theme="dark"] .badge-pendentes {
+        color: #ffffff;
+      }
+
+      html[data-theme="dark"] .relatorio-table tbody td {
+        border-bottom-color: #3a524a;
+      }
+
+      html[data-theme="dark"] .relatorio-acao-link {
+        background: #263a33;
+        color: #e5eee9;
+        border-color: #3e5a51;
+      }
+
+      html[data-theme="dark"] .relatorio-acao-link:hover {
+        background: #314940;
+      }
+    }

@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block title %}Quadro Quantitativo Mensal{% endblock %}
+
+{% block extra_styles %}
+  .quant-wrapper {
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 32px 28px 24px;
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    width: 100%;
+    max-width: 820px;
+    color: #283E51;
+  }
+
+  .quant-header h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .quant-header p {
+    font-size: 0.9rem;
+    color: #5d6c7a;
+    margin-bottom: 18px;
+  }
+
+  .flash-container {
+    margin-bottom: 14px;
+  }
+
+  .section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374a5a;
+    margin-bottom: 6px;
+  }
+
+  .helper-text {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+
+  .form-group label {
+    font-weight: 600;
+    color: #374a5a;
+  }
+
+  .dropzone {
+    position: relative;
+    border-radius: 12px;
+    border: 1px dashed #d0d7de;
+    padding: 16px 18px;
+    background: #f9fafb;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition:
+      border-color 0.18s ease,
+      background 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .dropzone:hover {
+    border-color: #4B79A1;
+    background: #f5f7ff;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.07);
+  }
+
+  .dropzone.dragover {
+    border-color: #4B79A1;
+    background: #eef2ff;
+  }
+
+  .dropzone-icon-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #283E51, #4B79A1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .dropzone-icon-circle i {
+    color: #ffffff;
+    font-size: 1.3rem;
+  }
+
+  .dropzone-text-block {
+    flex: 1;
+  }
+
+  .dropzone-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #283E51;
+  }
+
+  .dropzone-subtitle {
+    margin: 2px 0 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+
+  .dropzone-filename {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: #4b5563;
+    font-style: italic;
+    word-break: break-word;
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .btn-generate {
+    margin-top: 18px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    padding: 10px 18px;
+    font-weight: 600;
+  }
+
+  .back-links {
+    margin-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .back-links a {
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 768px) {
+    .quant-wrapper {
+      padding: 24px 18px 20px;
+    }
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="quant-wrapper">
+    <div class="quant-header">
+      <h2>Quadro Quantitativo Mensal</h2>
+      <p>
+        Gere o Quadro Quantitativo Mensal de transferências <strong>TE</strong> por série
+        (2º ao 5º ano), usando a Lista Piloto do Ensino Fundamental e um período de datas.
+        O sistema localiza as ocorrências de TE no intervalo informado e preenche automaticamente o modelo.
+      </p>
+    </div>
+
+    <div id="flash-container" class="flash-container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            {% set bs_class = 'danger' if category == 'error' else (category if category in ['success', 'info', 'warning', 'primary'] else 'info') %}
+            <div class="alert alert-{{ bs_class }} mb-2" role="alert">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <form id="form-quantitativo" method="POST" enctype="multipart/form-data" novalidate>
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label for="period_start">Data inicial do período</label>
+          <input
+            type="date"
+            class="form-control"
+            name="period_start"
+            id="period_start"
+            required
+          >
+          <small class="helper-text">
+            Ex.: início da semana/período de referência.
+          </small>
+        </div>
+
+        <div class="form-group col-md-6">
+          <label for="period_end">Data final do período</label>
+          <input
+            type="date"
+            class="form-control"
+            name="period_end"
+            id="period_end"
+            required
+          >
+          <small class="helper-text">
+            Ex.: final da semana/período a ser consolidado.
+          </small>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="responsavel">Responsável pelas informações</label>
+        <input
+          type="text"
+          class="form-control"
+          name="responsavel"
+          id="responsavel"
+          placeholder="Nome do responsável pelo quadro"
+          required
+        >
+        <small class="helper-text">
+          Este nome será inserido automaticamente no modelo Excel.
+        </small>
+      </div>
+
+      <!-- NOVO: MÊS/ANO -->
+      <div class="form-group">
+        <label for="mes_ano">MÊS/ANO (vai para A8 no modelo)</label>
+        <input
+          type="text"
+          class="form-control"
+          name="mes_ano"
+          id="mes_ano"
+          value="{{ default_mes_ano|default('') }}"
+          placeholder="Ex.: Janeiro/2026 ou 01/2026"
+          required
+        >
+        <small class="helper-text">
+          Informe exatamente como deseja que apareça no quadro (A8).
+        </small>
+      </div>
+
+      <div class="form-group mt-3">
+        <div class="section-title">Lista Piloto – Ensino Fundamental</div>
+
+        <div id="drop-fundamental" class="dropzone">
+          <div class="dropzone-icon-circle">
+            <i class="fas fa-file-excel"></i>
+          </div>
+
+          <div class="dropzone-text-block">
+            <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+            <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
+            <div class="dropzone-filename" id="fundamental-filename">
+              Nenhum arquivo selecionado.
+            </div>
+          </div>
+
+          <input
+            type="file"
+            id="lista_fundamental"
+            name="lista_fundamental"
+            accept=".xlsx,.xls,.xlsm"
+          >
+        </div>
+
+        <div class="helper-text">
+          Se nenhum arquivo for escolhido, o sistema tenta usar a última Lista Piloto FUNDAMENTAL salva na sessão.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-generate">
+        Gerar Quadro Quantitativo
+      </button>
+
+      <div class="back-links">
+        <a href="{{ url_for('quadros') }}" class="btn btn-light btn-sm">
+          <i class="fas fa-arrow-left"></i> Voltar para Quadros
+        </a>
+        <span class="helper-text">
+          O arquivo Excel será baixado automaticamente após a geração.
+        </span>
+      </div>
+    </form>
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function renderFlashMessages(messages) {
+    const container = document.getElementById('flash-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+    (messages || []).forEach(item => {
+      const div = document.createElement('div');
+      div.className = `alert alert-${item.bsClass || 'info'} mb-2`;
+      div.setAttribute('role', 'alert');
+      div.textContent = item.text || '';
+      container.appendChild(div);
+    });
+  }
+
+  function extractAlertsFromHTML(htmlText) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      const alerts = Array.from(doc.querySelectorAll('.alert'));
+      if (!alerts.length) return [];
+      return alerts.map(a => {
+        const classList = Array.from(a.classList);
+        const bs = (classList.find(c => c.startsWith('alert-')) || 'alert-info').replace('alert-', '');
+        return { bsClass: bs, text: (a.textContent || '').trim() };
+      }).filter(x => x.text);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function setupDropzone(inputId, dropId, labelId) {
+    const input = document.getElementById(inputId);
+    const drop = document.getElementById(dropId);
+    const label = document.getElementById(labelId);
+
+    if (!input || !drop || !label) return;
+
+    input.addEventListener('change', function () {
+      if (input.files && input.files.length > 0) {
+        label.textContent = input.files[0].name;
+      } else {
+        label.textContent = 'Nenhum arquivo selecionado.';
+      }
+    });
+
+    ['dragenter', 'dragover'].forEach(evtName => {
+      drop.addEventListener(evtName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evtName => {
+      drop.addEventListener(evtName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.remove('dragover');
+      });
+    });
+
+    drop.addEventListener('drop', function (e) {
+      const dt = e.dataTransfer;
+      if (!dt || !dt.files || !dt.files.length) return;
+
+      const file = dt.files[0];
+      const name = (file.name || '').toLowerCase();
+      const allowed = ['.xlsx', '.xls', '.xlsm'];
+      const isValid = allowed.some(ext => name.endsWith(ext));
+
+      if (!isValid) {
+        alert('Formato inválido. Use arquivos .xlsx, .xls ou .xlsm.');
+        return;
+      }
+
+      // Compatibilidade: DataTransfer para atribuir ao input
+      const newDt = new DataTransfer();
+      newDt.items.add(file);
+      input.files = newDt.files;
+
+      label.textContent = file.name;
+    });
+  }
+
+  function showLoading() {
+    const existing = document.getElementById('loading-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.className = 'app-loading-overlay';
+
+    overlay.innerHTML = `
+      <div class="app-loading-panel">
+        <div class="spinner-border app-loading-spinner" role="status">
+          <span class="sr-only">Carregando...</span>
+        </div>
+        <p class="app-loading-message">
+          Gerando Quadro Quantitativo Mensal, aguarde...
+        </p>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+  }
+
+  function hideLoading() {
+    const existing = document.getElementById('loading-overlay');
+    if (existing) existing.remove();
+  }
+
+  function validateForm(form) {
+    // validação simples (HTML5) + UX
+    const requiredIds = ['period_start', 'period_end', 'responsavel', 'mes_ano'];
+    const missing = requiredIds.filter(id => {
+      const el = document.getElementById(id);
+      return !el || !String(el.value || '').trim();
+    });
+
+    if (missing.length) {
+      renderFlashMessages([{
+        bsClass: 'warning',
+        text: 'Preencha todos os campos obrigatórios antes de gerar.'
+      }]);
+      return false;
+    }
+    return true;
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    setupDropzone('lista_fundamental', 'drop-fundamental', 'fundamental-filename');
+
+    const form = document.getElementById('form-quantitativo');
+    if (!form) return;
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      renderFlashMessages([]); // limpa flashes antigos
+      if (!validateForm(form)) return;
+
+      showLoading();
+
+      const formData = new FormData(form);
+
+      try {
+        const response = await fetch(form.action || window.location.href, {
+          method: 'POST',
+          body: formData
+        });
+
+        const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+
+        // sucesso: excel
+        if (response.ok && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+          const blob = await response.blob();
+
+          let filename = 'Quadro_Quantitativo_Fundamental.xlsx';
+          const disposition = response.headers.get('Content-Disposition');
+          if (disposition) {
+            const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+            if (filenameMatch && filenameMatch[1]) filename = filenameMatch[1].replace(/['"]/g, '');
+          }
+
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          return;
+        }
+
+        // erro: geralmente vem HTML com flash
+        const text = await response.text();
+        const extracted = extractAlertsFromHTML(text);
+
+        if (extracted.length) {
+          renderFlashMessages(extracted);
+        } else {
+          renderFlashMessages([{
+            bsClass: 'danger',
+            text: 'Erro ao gerar o Quadro Quantitativo Mensal. Verifique os dados e tente novamente.'
+          }]);
+        }
+      } catch (err) {
+        console.error(err);
+        renderFlashMessages([{
+          bsClass: 'danger',
+          text: 'Erro de rede ao gerar o Quadro Quantitativo Mensal.'
+        }]);
+      } finally {
+        hideLoading();
+      }
+    });
+  });
+</script>
+{% endblock %}

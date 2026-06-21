@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Sistema da Secretaria Escolar{% endblock %}</title>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+    <!-- Favicon (coloque o arquivo em /static/favicon.ico) -->
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+
+    <!-- Fonte e Bootstrap -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+    <!-- Ícones (Font Awesome) -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    {# Bloco para CSS/links extras por página (ex: Select2, estilos específicos) #}
+    {% block extra_css %}{% endblock %}
+
+    <style>
+      :root { --header-h: 0px; }
+
+      * { box-sizing: border-box; }
+
+      body {
+        background: radial-gradient(circle at top, #4B79A1 0, #283E51 45%, #161b22 100%);
+        font-family: 'Montserrat', sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        color: #fff;
+      }
+
+      /* ==========================================================
+         HEADER GLOBAL
+         ========================================================== */
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        padding: 14px 24px;
+        text-align: center;
+        color: #fff;
+        background: linear-gradient(135deg, rgba(40, 62, 81, 0.98), rgba(75, 121, 161, 0.98));
+        border-bottom: 1px solid rgba(255,255,255,0.10);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.28);
+      }
+
+      header h1 {
+        font-size: 1.55rem;
+        margin: 0;
+        font-weight: 600;
+        line-height: 1.1;
+      }
+
+      header span {
+        display: block;
+        font-size: 0.98rem;
+        opacity: 0.92;
+        margin-top: 4px;
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Bolhas de fundo */
+      main::before,
+      main::after {
+        content: "";
+        position: absolute;
+        border-radius: 50%;
+        opacity: 0.12;
+        filter: blur(2px);
+        pointer-events: none;
+      }
+
+      main::before {
+        width: 320px;
+        height: 320px;
+        background: #4B79A1;
+        top: -60px;
+        left: -40px;
+      }
+
+      main::after {
+        width: 260px;
+        height: 260px;
+        background: #283E51;
+        bottom: -80px;
+        right: -40px;
+      }
+
+      /* ==========================================================
+         LOGIN CARD (sofisticado, como no seu print)
+         - sem depender do header
+         ========================================================== */
+      .container-login {
+        position: relative;
+        z-index: 1;
+        background: rgba(255, 255, 255, 0.98);
+        padding: 34px 30px;
+        border-radius: 18px;
+        box-shadow:
+          0 18px 40px rgba(0, 0, 0, 0.35),
+          0 2px 0 rgba(255,255,255,0.35) inset;
+        width: 100%;
+        max-width: 420px;
+        color: #283E51;
+      }
+
+      .login-brand {
+        text-align: center;
+        margin-bottom: 18px;
+      }
+
+      .brand-circle {
+        width: 62px;
+        height: 62px;
+        border-radius: 999px;
+        margin: 0 auto 12px;
+        background: linear-gradient(135deg, #283E51, #4B79A1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-weight: 700;
+        font-size: 1.2rem;
+        letter-spacing: 0.02em;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.24);
+      }
+
+      .login-brand h2 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1.35rem;
+        color: #24384a;
+      }
+
+      .login-brand p {
+        margin: 6px 0 0;
+        font-size: 0.9rem;
+        color: #6b7a89;
+      }
+
+      label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #33485a;
+        margin-bottom: 8px;
+      }
+
+      .form-group { margin-bottom: 18px; }
+
+      /* Wrapper do campo + olho */
+      .password-wrapper { position: relative; }
+      .password-wrapper .form-control { padding-right: 44px; }
+
+      .form-control {
+        border-radius: 12px;
+        border: 1px solid #d0d7de;
+        height: 46px;
+        font-size: 0.95rem;
+      }
+
+      .form-control:focus {
+        border-color: #4B79A1;
+        box-shadow: 0 0 0 0.18rem rgba(75, 121, 161, 0.22);
+      }
+
+      .toggle-password {
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        transform: translateY(-50%);
+        border: none;
+        background: transparent;
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #4B79A1;
+        border-radius: 10px;
+      }
+
+      .toggle-password:hover {
+        background: rgba(75, 121, 161, 0.08);
+      }
+
+      .toggle-password:focus { outline: none; }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #283E51, #4B79A1);
+        border: none;
+        border-radius: 999px;
+        height: 46px;
+        font-weight: 600;
+        font-size: 0.98rem;
+        letter-spacing: 0.02em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 14px 28px rgba(0,0,0,0.18);
+      }
+
+      .btn-primary:hover {
+        background: linear-gradient(135deg, #1f3040, #3d6384);
+      }
+
+      .btn-primary:focus {
+        box-shadow: 0 0 0 0.18rem rgba(75, 121, 161, 0.28);
+      }
+
+      .error {
+        color: #d93025;
+        margin-top: 10px;
+        font-size: 0.85rem;
+        text-align: center;
+      }
+
+      .helper-box {
+        background: #f4f6fb;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-size: 0.82rem;
+        color: #4a5563;
+        margin-top: 18px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .helper-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 5px;
+        background: #4B79A1;
+        flex-shrink: 0;
+      }
+
+      footer {
+        background-color: rgba(0, 0, 0, 0.22);
+        color: #e5e5e5;
+        text-align: center;
+        padding: 10px 16px;
+        font-size: 0.8rem;
+      }
+
+      /* ==========================================================
+         ALERTAS DE PRAZO (FIXO NO CANTO DIREITO, NÃO EMPURRA CONTEÚDO)
+         - só aparece quando logado
+         - fechar NÃO persiste (volta a aparecer)
+         ========================================================== */
+      .deadline-wrap {
+        position: fixed;
+        top: calc(var(--header-h) + 14px);
+        right: 14px;
+        z-index: 60;
+        width: min(420px, calc(100% - 28px));
+        pointer-events: none;
+      }
+
+      .deadline-card {
+        pointer-events: auto;
+        background: rgba(255, 255, 255, 0.97);
+        color: #283E51;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 18px 45px rgba(0,0,0,0.26);
+        border: 1px solid rgba(255, 207, 90, 0.55);
+      }
+
+      .deadline-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        background: linear-gradient(180deg, #fff7dd 0%, #fff0be 100%);
+        border-bottom: 1px solid rgba(255, 207, 90, 0.65);
+      }
+
+      .deadline-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #1f3344;
+      }
+
+      .deadline-title .bell {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #ffcf5a;
+        color: #1f3344;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+        flex-shrink: 0;
+      }
+
+      .deadline-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .deadline-btn {
+        border: 1px solid rgba(40, 62, 81, 0.15);
+        background: rgba(255,255,255,0.92);
+        color: #283E51;
+        border-radius: 999px;
+        height: 32px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.82rem;
+        transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+      }
+
+      .deadline-btn:hover {
+        transform: translateY(-1px);
+        background: #fff;
+        border-color: rgba(75, 121, 161, 0.4);
+      }
+
+      .deadline-body {
+        padding: 12px 14px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 240px;
+        overflow: auto;
+        background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(250,252,255,1) 100%);
+      }
+
+      .deadline-item {
+        background: #fff;
+        border: 1px solid #e6edf5;
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+
+      .deadline-item-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .deadline-item-title {
+        margin: 0;
+        font-weight: 600;
+        font-size: 0.92rem;
+        color: #1f3344;
+      }
+
+      .deadline-pill {
+        margin: 0;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #375165;
+        background: #f4f6fb;
+        border: 1px solid #e0e6ed;
+        border-radius: 999px;
+        padding: 3px 10px;
+        white-space: nowrap;
+      }
+
+      .deadline-item-msg {
+        margin: 6px 0 0;
+        font-size: 0.86rem;
+        color: #374a5a;
+        line-height: 1.3;
+      }
+
+      .deadline-footer {
+        padding: 10px 14px 14px;
+        border-top: 1px solid #e6edf5;
+        background: rgba(255,255,255,0.98);
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .deadline-cta {
+        text-decoration: none !important;
+        color: #ffffff !important;
+        background: linear-gradient(135deg, #283E51, #4B79A1);
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-weight: 600;
+        font-size: 0.86rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid rgba(40, 62, 81, 0.12);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+        transition: transform 0.12s ease, filter 0.12s ease;
+      }
+
+      .deadline-cta:hover {
+        transform: translateY(-1px);
+        filter: brightness(0.98);
+        color: #ffffff !important;
+      }
+
+      .deadline-wrap.collapsed .deadline-body { display: none; }
+
+      @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(10px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      .deadline-card.animate-in {
+        animation: slideInRight 0.18s ease-out;
+      }
+
+      @media (max-width: 480px) {
+        header h1 { font-size: 1.35rem; }
+        header span { font-size: 0.95rem; }
+
+        .container-login { padding: 26px 20px; border-radius: 16px; }
+
+        .deadline-wrap {
+          left: 12px;
+          right: 12px;
+          width: auto;
+          top: calc(var(--header-h) + 12px);
+        }
+      }
+
+      {# CSS adicional específico de cada página (apenas declarações CSS, sem <style>) #}
+      {% block extra_styles %}{% endblock %}
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app_theme.css') }}">
+  </head>
+
+  <body>
+    <button type="button"
+            class="theme-toggle"
+            id="theme-toggle"
+            data-theme-toggle
+            aria-label="Alternar tema claro e escuro">
+      <i class="fas fa-moon" aria-hidden="true"></i>
+    </button>
+    {# Header global da aplicação #}
+    <header id="app-header">
+      <div class="app-header-inner">
+        <h1>E.M. José Padin Mouta</h1>
+        <span>Sistema da Secretaria Escolar</span>
+      </div>
+    </header>
+
+    {# ALERTA (FIXO, SÓ QUANDO LOGADO) #}
+    {% if session.get('logged_in') and deadline_alerts and deadline_alerts|length %}
+      <div id="deadline-wrap" class="deadline-wrap" aria-label="Alertas de prazo">
+        <div id="deadline-card" class="deadline-card">
+          <div class="deadline-topbar">
+            <p class="deadline-title">
+              <span class="bell"><i class="fas fa-bell"></i></span>
+              Prazos de envio
+            </p>
+
+            <div class="deadline-actions">
+              <button type="button" class="deadline-btn" id="deadlineToggleBtn" aria-label="Recolher/Expandir">
+                <i class="fas fa-chevron-up" id="deadlineToggleIcon"></i>
+              </button>
+              <button type="button" class="deadline-btn" id="deadlineCloseBtn" aria-label="Fechar">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="deadline-body" id="deadlineBody">
+            {% for a in deadline_alerts %}
+              <div class="deadline-item">
+                <div class="deadline-item-top">
+                  <p class="deadline-item-title">{{ a.title }}</p>
+                  <p class="deadline-pill">{{ a.status }}</p>
+                </div>
+                <p class="deadline-item-msg">{{ a.message }}</p>
+              </div>
+            {% endfor %}
+          </div>
+
+          <div class="deadline-footer">
+            <a class="deadline-cta" href="{{ url_for('quadros') }}">
+              <i class="fas fa-table"></i>
+              Acessar Quadros
+            </a>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+      Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
+    </footer>
+
+    <script>
+      (function () {
+        function setHeaderHeightVar() {
+          var header = document.getElementById('app-header');
+          var h = 0;
+          if (header) h = header.getBoundingClientRect().height || 76;
+          document.documentElement.style.setProperty('--header-h', h + 'px');
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+          setHeaderHeightVar();
+          window.addEventListener('resize', setHeaderHeightVar);
+
+          var wrap = document.getElementById('deadline-wrap');
+          var card = document.getElementById('deadline-card');
+          if (!wrap || !card) return;
+
+          card.classList.add('animate-in');
+
+          var closeBtn = document.getElementById('deadlineCloseBtn');
+          var toggleBtn = document.getElementById('deadlineToggleBtn');
+          var toggleIcon = document.getElementById('deadlineToggleIcon');
+
+          // Fechar: some apenas até recarregar/navegar (não persiste)
+          if (closeBtn) {
+            closeBtn.addEventListener('click', function () {
+              wrap.style.display = 'none';
+            });
+          }
+
+          // Recolher/expandir
+          if (toggleBtn && toggleIcon) {
+            toggleBtn.addEventListener('click', function () {
+              var collapsed = wrap.classList.toggle('collapsed');
+              toggleIcon.classList.toggle('fa-chevron-up', !collapsed);
+              toggleIcon.classList.toggle('fa-chevron-down', collapsed);
+            });
+          }
+        });
+      })();
+    </script>
+
+    {# Scripts extras por página (modo antigo) #}
+    {% block extra_scripts %}{% endblock %}
+    {# Scripts extras por página (novo, usado nas declarações) #}
+    {% block extra_js %}{% endblock %}
+  </body>
+</html>

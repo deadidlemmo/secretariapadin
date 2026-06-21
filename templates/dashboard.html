@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block title %}Painel da Secretaria{% endblock %}
+
+{% block extra_styles %}
+  .dashboard-wrapper.dashboard-page {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 1040px;
+    padding: 34px;
+  }
+
+  .dashboard-page .dashboard-page-header {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 26px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .dashboard-page .dashboard-page-icon {
+    width: 56px;
+    height: 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--app-control-radius);
+    background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
+    color: #ffffff;
+    box-shadow: 0 14px 28px rgba(31, 111, 95, 0.18);
+  }
+
+  .dashboard-page .dashboard-page-title {
+    min-width: 0;
+  }
+
+  .dashboard-page .dashboard-page-kicker {
+    margin: 0 0 3px;
+    color: var(--app-accent);
+    font-size: 0.76rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .dashboard-page .dashboard-header h2 {
+    margin: 0;
+    color: var(--app-primary-dark);
+    font-size: 1.52rem;
+    font-weight: 900;
+    line-height: 1.12;
+  }
+
+  .dashboard-page .dashboard-header p {
+    max-width: 68ch;
+    margin: 7px 0 0;
+    color: var(--app-muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .dashboard-page .dashboard-count-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-pill-radius);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-dark);
+    font-size: 0.78rem;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .dashboard-page .option-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .dashboard-page .option-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) 34px;
+    align-items: center;
+    gap: 16px;
+    min-height: 126px;
+    padding: 22px 20px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 7%, transparent), transparent 58%),
+      var(--app-card-gradient);
+    color: var(--app-text);
+    text-decoration: none !important;
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease,
+      border-color 0.15s ease,
+      background 0.15s ease;
+  }
+
+  .dashboard-page .option-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: linear-gradient(180deg, var(--app-primary), var(--app-accent));
+    opacity: 0.86;
+  }
+
+  .dashboard-page .option-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--app-shadow-soft);
+    border-color: var(--app-primary);
+    color: var(--app-text);
+  }
+
+  .dashboard-page .option-icon {
+    position: relative;
+    z-index: 1;
+    width: 52px;
+    height: 52px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--app-control-radius);
+    background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
+    color: #ffffff;
+    box-shadow: 0 12px 24px rgba(31, 111, 95, 0.18);
+  }
+
+  .dashboard-page .option-icon i {
+    color: #ffffff;
+    font-size: 1.2rem;
+  }
+
+  .dashboard-page .option-text {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+  }
+
+  .dashboard-page .option-text h3 {
+    margin: 0 0 4px;
+    color: var(--app-text);
+    font-size: 1.02rem;
+    font-weight: 900;
+    line-height: 1.22;
+  }
+
+  .dashboard-page .option-text p {
+    margin: 0;
+    color: var(--app-muted);
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  .dashboard-page .option-arrow {
+    position: relative;
+    z-index: 1;
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-pill-radius);
+    background: var(--app-surface);
+    color: var(--app-primary-dark);
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .dashboard-page .option-card:hover .option-arrow {
+    transform: translateX(2px);
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+  }
+
+  .dashboard-page .logout-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 22px;
+    padding-top: 22px;
+    border-top: 1px solid var(--app-border);
+  }
+
+  .dashboard-page .btn-logout {
+    min-height: 42px;
+    padding: 0 16px;
+    border: 1px solid color-mix(in srgb, var(--app-danger) 58%, var(--app-border));
+    border-radius: var(--app-pill-radius);
+    background: color-mix(in srgb, var(--app-danger) 14%, var(--app-surface));
+    color: var(--app-danger) !important;
+    font-size: 0.88rem;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: none;
+  }
+
+  .dashboard-page .btn-logout:hover {
+    background: var(--app-danger);
+    border-color: var(--app-danger);
+    color: #ffffff !important;
+  }
+
+  html[data-theme="dark"] .dashboard-page .dashboard-count-pill,
+  html[data-theme="dark"] .dashboard-page .option-arrow {
+    background: #26342f;
+    border-color: #40534c;
+    color: #d7e4de;
+  }
+
+  html[data-theme="dark"] .dashboard-page .option-card {
+    background:
+      linear-gradient(135deg, rgba(127, 184, 170, 0.08), transparent 58%),
+      var(--app-card-gradient);
+  }
+
+  html[data-theme="dark"] .dashboard-page .btn-logout {
+    background: rgba(159, 60, 60, 0.18);
+    border-color: #8c4545;
+    color: #e9baba !important;
+  }
+
+  html[data-theme="dark"] .dashboard-page .btn-logout:hover {
+    background: #9f3c3c;
+    border-color: #c95656;
+    color: #ffffff !important;
+  }
+
+  @media (max-width: 760px) {
+    .dashboard-wrapper.dashboard-page {
+      padding: 26px 18px 24px;
+    }
+
+    .dashboard-page .dashboard-page-header {
+      grid-template-columns: 48px minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .dashboard-page .dashboard-page-icon {
+      width: 46px;
+      height: 46px;
+    }
+
+    .dashboard-page .dashboard-count-pill {
+      grid-column: 1 / -1;
+      width: fit-content;
+    }
+
+    .dashboard-page .option-list {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-page .option-card {
+      grid-template-columns: 46px minmax(0, 1fr) 32px;
+      min-height: 112px;
+      padding: 18px 16px;
+    }
+
+    .dashboard-page .option-icon {
+      width: 44px;
+      height: 44px;
+    }
+
+    .dashboard-page .logout-container {
+      justify-content: stretch;
+    }
+
+    .dashboard-page .btn-logout {
+      width: 100%;
+    }
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="dashboard-wrapper dashboard-page">
+    <div class="dashboard-header dashboard-page-header">
+      <div class="dashboard-page-icon">
+        <i class="fas fa-table-columns" aria-hidden="true"></i>
+      </div>
+      <div class="dashboard-page-title">
+        <p class="dashboard-page-kicker">Área interna</p>
+        <h2>Painel da Secretaria</h2>
+        <p>
+          Acesse documentos, carteirinhas, quadros e conferências da unidade escolar.
+        </p>
+      </div>
+      <div class="dashboard-count-pill">
+        <i class="fas fa-layer-group" aria-hidden="true"></i>
+        4 ferramentas
+      </div>
+    </div>
+
+    <div class="option-list">
+      <a class="option-card" href="{{ url_for('declaracao_tipo') }}">
+        <div class="option-icon">
+          <i class="fas fa-file-lines" aria-hidden="true"></i>
+        </div>
+        <div class="option-text">
+          <h3>Declaração Escolar</h3>
+          <p>Gerar declaração escolar para os alunos.</p>
+        </div>
+        <span class="option-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
+      </a>
+
+      <a class="option-card" href="{{ url_for('carteirinhas') }}">
+        <div class="option-icon">
+          <i class="fas fa-id-card" aria-hidden="true"></i>
+        </div>
+        <div class="option-text">
+          <h3>Carteirinhas</h3>
+          <p>Emitir carteirinhas com foto e autorização de retirada.</p>
+        </div>
+        <span class="option-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
+      </a>
+
+      <a class="option-card" href="{{ url_for('quadros') }}">
+        <div class="option-icon">
+          <i class="fas fa-chalkboard-user" aria-hidden="true"></i>
+        </div>
+        <div class="option-text">
+          <h3>Quadros</h3>
+          <p>Gerar quadros para apoio à organização das turmas.</p>
+        </div>
+        <span class="option-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
+      </a>
+
+      <a class="option-card" href="{{ url_for('confere.index') }}">
+        <div class="option-icon">
+          <i class="fas fa-circle-check" aria-hidden="true"></i>
+        </div>
+        <div class="option-text">
+          <h3>Conferir Listas</h3>
+          <p>Comparar a Lista Piloto com os PDFs do SED.</p>
+        </div>
+        <span class="option-arrow" aria-hidden="true">
+          <i class="fas fa-arrow-right"></i>
+        </span>
+      </a>
+
+      {# Itens extras já deixei prontos, ainda comentados #}
+      {#
+      <div class="option-card"
+           onclick="window.location.href='{{ url_for('oficio') }}'">
+        <div class="option-icon">
+          <i class="fas fa-envelope"></i>
+        </div>
+        <div class="option-text">
+          <h3>Ofício</h3>
+          <p>Gerar ofícios da unidade escolar.</p>
+        </div>
+      </div>
+
+      <div class="option-card"
+           onclick="window.location.href='{{ url_for('acumulo') }}'">
+        <div class="option-icon">
+          <i class="fas fa-briefcase"></i>
+        </div>
+        <div class="option-text">
+          <h3>Acúmulo de Cargo</h3>
+          <p>Gerar formulário de acúmulo de cargos.</p>
+        </div>
+      </div>
+
+      <div class="option-card"
+           onclick="window.location.href='{{ url_for('documentos') }}'">
+        <div class="option-icon">
+          <i class="fas fa-folder-open"></i>
+        </div>
+        <div class="option-text">
+          <h3>Documentos</h3>
+          <p>Consultar documentos por segmento.</p>
+        </div>
+      </div>
+      #}
+    </div>
+
+    <div class="logout-container">
+      <a href="{{ url_for('logout_route') }}"
+         class="btn-logout">
+        <i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i>
+        Sair
+      </a>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {# Nenhum script extra por enquanto #}
+{% endblock %}

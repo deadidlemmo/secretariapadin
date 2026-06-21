@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <title>E.M José Padin Mouta - Carteirinhas</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link id="carteirinhas-css" rel="stylesheet" href="{{ url_for('static', filename='css/carteirinhas.css') }}">
+
+</head>
+
+<body id="carteirinhas-page" data-ano="{{ ano|default(2026) }}">
+  <button type="button"
+          class="theme-toggle no-print"
+          id="theme-toggle"
+          data-theme-toggle
+          aria-label="Alternar tema claro e escuro">
+    <i class="fas fa-moon" aria-hidden="true"></i>
+  </button>
+
+  <div id="loading-overlay">
+    <div class="loading-overlay-content">
+      <div class="spinner-border" role="status">
+        <span class="sr-only">Carregando...</span>
+      </div>
+      <p>Carregando carteirinhas...</p>
+    </div>
+  </div>
+  <div id="cards-success">Carteirinhas geradas com sucesso</div>
+
+  <div class="carteirinhas-container">
+    <header class="carteirinhas-screen-header no-print">
+      <div class="screen-brand-mark">
+        <img src="{{ url_for('static', filename='logos/escola.png', _external=True) }}" alt="Logo da escola">
+      </div>
+      <div>
+        <h1>Carteirinhas Escolares</h1>
+        <p>Pré-visualize, confira fotos e imprima os crachás dos alunos.</p>
+      </div>
+    </header>
+
+    <div class="carteirinhas-toolbar no-print">
+      <div class="toolbar-actions-row">
+      <button class="alunos-sem-fotos-btn" onclick="mostrarRelatorioAlunosSemFotos()">
+        <i class="fas fa-camera-retro" aria-hidden="true"></i>
+        Alunos sem fotos
+      </button>
+
+      <!-- Filtros -->
+      <form id="filtro-foto-form"
+            class="filtro-foto-form"
+            method="POST"
+            action="{{ url_for('carteirinhas') }}"
+            enctype="multipart/form-data">
+
+        <label title="Quando marcado, serão exibidas apenas as carteirinhas que já possuem foto.">
+          <input
+            type="checkbox"
+            name="somente_com_foto"
+            value="1"
+            {% if (somente_com_foto|default(false)) %}checked{% endif %}
+            onchange="document.getElementById('filtro-foto-form').submit();"
+          >
+          Somente com foto
+        </label>
+
+        <label title="Quando marcado, serão exibidas apenas as carteirinhas que ainda não foram registradas como impressas.">
+          <input
+            type="checkbox"
+            name="somente_nao_impressas"
+            value="1"
+            {% if (somente_nao_impressas|default(false)) %}checked{% endif %}
+            onchange="document.getElementById('filtro-foto-form').submit();"
+          >
+          Somente não impressas
+        </label>
+
+        <noscript>
+          <button type="submit" class="filter-submit-noscript">
+            Aplicar
+          </button>
+        </noscript>
+      </form>
+
+      <button class="imprimir-carteirinhas" onclick="imprimirCarteirinhas()">
+        <i class="fas fa-print" aria-hidden="true"></i>
+        Imprimir Carteirinhas
+      </button>
+      </div>
+
+      <div id="search-container" class="no-print">
+        <input type="text" id="localizarAluno" placeholder="Localizar Aluno">
+      </div>
+    </div>
+
+    {% if pages %}
+      {% for page in pages %}
+        <div class="page">
+          <div class="page-number">Página {{ loop.index }}</div>
+          <button class="imprimir-pagina no-print" onclick="imprimirPagina(this)">Imprimir Página</button>
+          <div class="cards-grid">
+            {% for aluno in page %}
+              <div class="borda-pontilhada" data-rm="{{ aluno.rm }}">
+                <div class="carteirinha">
+                  <div class="card-header-band">
+                    <div class="card-school-mark">
+                      <img class="card-school-logo" src="{{ url_for('static', filename='logos/escola.png', _external=True) }}" alt="Logo da escola">
+                    </div>
+                    <div class="card-school-text">
+                      <div class="card-document-title">Documento do Estudante</div>
+                      <div class="card-school-name">E.M JOSÉ PADIN MOUTA</div>
+                    </div>
+                    <div class="card-year-top">{{ ano|default(2026) }}</div>
+                  </div>
+
+                  <div class="card-body">
+                    <div class="photo-wrapper">
+                      <div class="photo-shell">
+                        {% if aluno.foto_url %}
+                          <img src="{{ aluno.foto_url }}" alt="Foto" class="foto uploadable" data-rm="{{ aluno.rm }}">
+                        {% else %}
+                          <div class="foto foto-placeholder uploadable" data-rm="{{ aluno.rm }}">
+                            <span class="foto-placeholder-icon"><i class="fas fa-camera" aria-hidden="true"></i></span>
+                            <small>Anexe uma foto</small>
+                          </div>
+                        {% endif %}
+                      </div>
+                      <div class="photo-caption">Foto do aluno</div>
+                      <input type="file" class="inline-upload" data-rm="{{ aluno.rm }}" accept="image/*">
+                    </div>
+
+                    <div class="info-panel">
+                      <div class="info-name">
+                        <div class="info-name-label">Nome</div>
+                        <div class="info-name-text">{{ aluno.nome }}</div>
+                      </div>
+
+                      <div class="info-row">
+                        <div class="info-label">RM:</div>
+                        <div class="info-value">{{ aluno.rm }}</div>
+                      </div>
+
+                      <div class="info-row">
+                        <div class="info-label">Série:</div>
+                        <div class="info-value">{{ aluno.serie }}</div>
+                      </div>
+
+                      <div class="info-row">
+                        <div class="info-label">Data nasc.:</div>
+                        <div class="info-value">{{ aluno.data_nasc }}</div>
+                      </div>
+
+                      <div class="info-row">
+                        <div class="info-label">RA:</div>
+                        <div class="info-value">{{ aluno.ra }}</div>
+                      </div>
+
+                      <div class="info-row horario-row">
+                        <div class="info-label">Horário:</div>
+                        <div class="info-value horario-value">
+                          {% if aluno.horario_dias %}
+                            <span class="horario-dia">{{ aluno.horario_dias }}</span>
+                            <span class="horario-faixa">{{ aluno.horario_faixa }}</span>
+                          {% else %}
+                            <span class="horario-faixa">{{ aluno.horario_faixa or aluno.horario }}</span>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="card-footer">
+                    <div class="status {{ aluno.classe_cor }}">
+                      <span class="status-symbol">{{ aluno.status_icon|safe }}</span>
+                      <span class="status-text">{{ aluno.status_texto }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="no-print no-cards-message">
+        Nenhuma carteirinha para exibir.
+        {% if (somente_com_foto|default(false)) or (somente_nao_impressas|default(false)) %}
+          (Verifique os filtros ativos.)
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div id="relatorio-container" class="no-print">
+    <div class="relatorio-inner">
+      <div class="relatorio-header">
+        <div class="relatorio-title-area">
+          <h2>Alunos sem foto</h2>
+          <span class="badge-pendentes" data-total="{{ total_sem_foto }}">{{ total_sem_foto }} pendente(s)</span>
+        </div>
+        <input type="text" id="filtro-relatorio" placeholder="Filtrar por nome, RM ou série">
+        <button class="close-relatorio" onclick="fecharRelatorio()">&times;</button>
+      </div>
+      <div class="relatorio-tabela-wrapper">
+        <table class="relatorio-table">
+          <thead>
+            <tr>
+              <th>RM</th>
+              <th>Nome</th>
+              <th>Série</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set grupos = alunos_sem_foto|groupby('serie') %}
+            {% for grupo in grupos|sort(attribute='grouper') %}
+              <tr class="serie-divider"><td colspan="5">{{ grupo.grouper }}</td></tr>
+              {% for aluno in grupo.list %}
+                <tr class="relatorio-row" data-rm="{{ aluno.rm }}" data-nome="{{ aluno.nome }}" data-serie="{{ aluno.serie }}">
+                  <td class="col-rm">{{ aluno.rm }}</td>
+                  <td class="col-nome">{{ aluno.nome }}</td>
+                  <td class="col-serie">{{ aluno.serie }}</td>
+                  <td class="col-status"><span class="badge-status pendente">Pendente</span></td>
+                  <td class="relatorio-acoes">
+                    <button type="button" class="relatorio-acao-link" onclick="verCarteirinha('{{ aluno.rm }}')">
+                      <i class="fas fa-eye"></i> Ver carteirinha
+                    </button>
+                    <button type="button" class="relatorio-acao-primary" onclick="abrirUploadFoto('{{ aluno.rm }}')">
+                      <i class="fas fa-camera"></i> Adicionar foto
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer class="carteirinhas-footer no-print">
+    Desenvolvido por Nilson Cruz &copy; 2025. Todos os direitos reservados.
+  </footer>
+
+<script src="{{ url_for('static', filename='js/carteirinhas.js') }}"></script>
+
+</body>
+</html>

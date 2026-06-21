@@ -1,0 +1,34 @@
+{% if prazo_alertas_count and prazo_alertas %}
+<div class="deadline-inline-panel">
+  <div class="deadline-inline-header">
+    <div class="deadline-inline-title">Alertas de prazo</div>
+    <div class="deadline-inline-date">Hoje: {{ prazo_alertas_today }}</div>
+  </div>
+
+  <div class="deadline-inline-list">
+    {% for a in prazo_alertas %}
+      <div class="deadline-inline-item">
+        <div class="deadline-inline-item-row">
+          <div>
+            <div class="deadline-inline-item-title">{{ a.title }}</div>
+            <div class="deadline-inline-meta">
+              Período: <strong>{{ a.period_key }}</strong> · Venc.: <strong>{{ a.due_date_br }}</strong> · <span>{{ a.status }}</span>
+            </div>
+            {% if a.action_url %}
+              <div class="deadline-inline-link-wrap">
+                <a class="deadline-inline-link" href="{{ a.action_url }}">Abrir quadro</a>
+              </div>
+            {% endif %}
+          </div>
+
+          <form class="deadline-inline-form" method="POST" action="{{ url_for('alerts_mark_sent') }}">
+            <input type="hidden" name="quadro_key" value="{{ a.quadro_key }}">
+            <input type="hidden" name="period_key" value="{{ a.period_key }}">
+            <button class="deadline-inline-button" type="submit">Já enviei</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}

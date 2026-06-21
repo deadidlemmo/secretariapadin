@@ -1,0 +1,2136 @@
+{% extends "base.html" %}
+
+{% block title %}Conferência Lista Piloto x SED{% endblock %}
+
+{% block extra_styles %}
+  main {
+    align-items: stretch;
+    justify-content: center;
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  .confere-page {
+    --confere-warning: rgb(208, 138, 31);
+    --confere-missing-sed: rgb(194, 65, 12);
+    --confere-missing-lista: rgb(29, 78, 216);
+    --confere-field-color: var(--confere-warning);
+    --confere-field-text: rgb(122, 77, 0);
+    --confere-field-strong-text: rgb(58, 40, 0);
+    width: min(calc(100vw - 56px), 1310px);
+    margin: 0 auto;
+    color: var(--app-text);
+  }
+
+  .confere-page .confere-shell {
+    display: grid;
+    gap: 18px;
+  }
+
+  .confere-page .confere-header,
+  .confere-page .confere-panel,
+  .confere-page .confere-results {
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    background: var(--app-surface-glass);
+    box-shadow: var(--app-shadow-soft);
+  }
+
+  .confere-page .confere-header {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+    border-left: 5px solid var(--app-primary);
+  }
+
+  .confere-page .confere-icon {
+    width: 56px;
+    height: 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--app-control-radius);
+    background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
+    color: #fff;
+    box-shadow: 0 14px 28px rgba(31, 111, 95, 0.18);
+  }
+
+  .confere-page h2,
+  .confere-page h3 {
+    margin: 0;
+    color: var(--app-primary-dark);
+    font-weight: 900;
+    line-height: 1.15;
+  }
+
+  .confere-page .confere-header p {
+    margin: 8px 0 0;
+    color: var(--app-muted);
+    line-height: 1.45;
+  }
+
+  .confere-page .confere-panel {
+    padding: 24px;
+  }
+
+  .confere-page .confere-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    align-items: start;
+    gap: 18px;
+  }
+
+  .confere-page .upload-card {
+    display: grid;
+    gap: 12px;
+    padding: 18px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface);
+  }
+
+  .confere-page .upload-card h3 {
+    font-size: 1rem;
+  }
+
+  .confere-page .upload-card p {
+    margin: 0;
+    color: var(--app-muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .confere-page .form-control[type="file"] {
+    min-height: var(--app-control-height);
+  }
+
+  .confere-page .confere-dropzone {
+    position: relative;
+    min-height: 190px;
+    display: grid;
+    place-items: center;
+    gap: 10px;
+    padding: 22px;
+    border: 2px dashed color-mix(in srgb, var(--app-primary) 52%, var(--app-border));
+    border-radius: var(--app-control-radius);
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 7%, transparent), transparent),
+      var(--app-surface-muted);
+    text-align: center;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    cursor: pointer;
+  }
+
+  .confere-page .confere-dropzone.is-dragging {
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+    transform: translateY(-1px);
+  }
+
+  .confere-page .excel-dropzone {
+    border-color: color-mix(in srgb, var(--confere-warning) 58%, var(--app-border));
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--confere-warning) 9%, transparent), transparent),
+      var(--app-surface-muted);
+  }
+
+  .confere-page .excel-dropzone.is-dragging {
+    border-color: var(--confere-warning);
+    background: color-mix(in srgb, var(--confere-warning) 11%, var(--app-surface));
+  }
+
+  .confere-page .dropzone-icon {
+    width: 54px;
+    height: 54px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--app-pill-radius);
+    background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
+    color: #fff;
+  }
+
+  .confere-page .excel-icon {
+    background: linear-gradient(135deg, #8a5a00, var(--confere-warning));
+  }
+
+  .confere-page .upload-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .confere-page .file-list-wrap {
+    display: grid;
+    gap: 10px;
+  }
+
+  .confere-page .file-count {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 11px;
+    border-radius: var(--app-pill-radius);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-dark);
+    font-size: 0.84rem;
+    font-weight: 900;
+  }
+
+  .confere-page .excel-count {
+    background: color-mix(in srgb, var(--confere-warning) 13%, var(--app-surface));
+    color: #8a5a00;
+  }
+
+  .confere-page .selected-files {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    max-height: 214px;
+    margin: 0;
+    padding: 2px 4px 2px 0;
+    list-style: none;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .confere-page .selected-files-single {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .confere-page .selected-files li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 46px;
+    padding: 8px 44px 8px 12px;
+    border: 1px solid var(--app-border);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--app-primary) 4%, var(--app-surface));
+    color: var(--app-text);
+    font-size: 0.84rem;
+  }
+
+  .confere-page .selected-file-icon {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    flex: 0 0 26px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--app-danger) 10%, var(--app-surface));
+    color: var(--app-danger);
+  }
+
+  .confere-page .selected-file-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--app-text);
+    font-weight: 750;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .confere-page .selected-files button {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border: 1px solid color-mix(in srgb, var(--app-danger) 55%, var(--app-border));
+    border-radius: var(--app-pill-radius);
+    background: color-mix(in srgb, var(--app-danger) 10%, var(--app-surface));
+    color: var(--app-danger);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .confere-page .scope-preview {
+    display: grid;
+    gap: 8px;
+    padding: 11px;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 28%, var(--app-border));
+    border-radius: var(--app-control-radius);
+    background: color-mix(in srgb, var(--app-primary) 5%, var(--app-surface));
+  }
+
+  .confere-page .scope-preview[hidden] {
+    display: none;
+  }
+
+  .confere-page .scope-preview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(86px, 0.5fr));
+    gap: 8px;
+  }
+
+  .confere-page .scope-preview-item {
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--app-border);
+    border-radius: 12px;
+    background: var(--app-surface);
+  }
+
+  .confere-page .scope-preview-item span {
+    display: block;
+    color: var(--app-muted);
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .confere-page .scope-preview-item strong {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--app-text);
+    font-size: 0.9rem;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .confere-page .scope-errors {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    color: var(--app-danger);
+    font-size: 0.82rem;
+    list-style: none;
+  }
+
+  .confere-page .confere-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--app-border);
+  }
+
+  .confere-page .btn-confere,
+  .confere-page .btn-export,
+  .confere-page .btn-secondary-action {
+    min-height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--app-pill-radius);
+    border: 1px solid var(--app-primary-dark);
+    background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
+    color: #fff !important;
+    padding: 0 18px;
+    font-weight: 900;
+    text-decoration: none !important;
+  }
+
+  .confere-page .btn-secondary-action {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-primary-dark) !important;
+  }
+
+  .confere-page button.btn-secondary-action {
+    cursor: pointer;
+  }
+
+  .confere-page .btn-confere:disabled {
+    opacity: 0.65;
+    cursor: wait;
+  }
+
+  .confere-page .confere-results {
+    padding: 18px 22px 22px;
+  }
+
+  .confere-page .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+    gap: 8px;
+    margin: 10px 0 12px;
+  }
+
+  .confere-page .summary-card {
+    min-height: 58px;
+    display: grid;
+    align-content: center;
+    padding: 8px 12px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface);
+    min-width: 0;
+  }
+
+  .confere-page .summary-card.is-focus {
+    border-color: color-mix(in srgb, var(--app-primary) 38%, var(--app-border));
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 7%, transparent), transparent),
+      var(--app-surface);
+  }
+
+  .confere-page .summary-card.is-alert {
+    border-color: color-mix(in srgb, var(--app-danger) 30%, var(--app-border));
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--app-danger) 7%, transparent), transparent),
+      var(--app-surface);
+  }
+
+  .confere-page .summary-card.is-success {
+    border-color: color-mix(in srgb, var(--app-success) 35%, var(--app-border));
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--app-success) 8%, transparent), transparent),
+      var(--app-surface);
+  }
+
+  .confere-page .summary-card span {
+    display: -webkit-box;
+    color: var(--app-muted);
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.12;
+    overflow: hidden;
+    text-transform: uppercase;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .confere-page .summary-card strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--app-text);
+    font-size: 1.22rem;
+    font-weight: 900;
+  }
+
+  .confere-page .summary-card .summary-text-value {
+    overflow: hidden;
+    font-size: 1rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .confere-page .result-header-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .confere-page .result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .confere-page .result-title-block h2 {
+    margin-bottom: 0;
+    font-size: clamp(1.55rem, 2.2vw, 2rem);
+  }
+
+  .confere-page .filter-row,
+  .confere-page .turma-filter-row {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin: 0;
+    min-width: 0;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+
+  .confere-page .turma-filter-row {
+    flex-wrap: wrap;
+    flex: 0 0 100%;
+    max-height: 72px;
+    margin: -6px 0 14px;
+    overflow: hidden;
+    padding-bottom: 4px;
+  }
+
+  .confere-page .filter-row button,
+  .confere-page .turma-filter-row button {
+    min-height: 34px;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-pill-radius);
+    background: var(--app-surface);
+    color: var(--app-text);
+    padding: 0 10px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .confere-page .turma-filter-row button {
+    min-height: 30px;
+    padding: 0 8px;
+    color: var(--app-primary-dark);
+    font-size: 0.86rem;
+  }
+
+  .confere-page .filter-count {
+    min-width: 24px;
+    min-height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    border-radius: var(--app-pill-radius);
+    background: var(--app-surface-muted);
+    color: var(--app-muted);
+    font-size: 0.76rem;
+    font-weight: 900;
+  }
+
+  .confere-page .filter-row button.is-active {
+    border-color: var(--app-primary);
+    background: var(--app-primary-dark);
+    color: #fff;
+  }
+
+  .confere-page .filter-row button.is-active .filter-count {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+  }
+
+  .confere-page .turma-filter-row button.is-active {
+    border-color: var(--app-primary);
+    background: color-mix(in srgb, var(--app-primary) 12%, var(--app-surface));
+    color: var(--app-primary-dark);
+  }
+
+  .confere-page .turma-filter-row button.is-active .filter-count {
+    background: var(--app-primary);
+    color: #fff;
+  }
+
+  .confere-page .result-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0 14px;
+  }
+
+  .confere-page .result-search {
+    position: relative;
+    flex: 0 0 clamp(280px, 31vw, 360px);
+    max-width: 100%;
+  }
+
+  .confere-page .result-search i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--app-muted);
+    pointer-events: none;
+  }
+
+  .confere-page .result-search input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 14px 0 40px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-pill-radius);
+    background: var(--app-surface);
+    color: var(--app-text);
+    font: inherit;
+    box-shadow: var(--app-control-shadow);
+  }
+
+  .confere-page .result-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .confere-page .result-group {
+    display: grid;
+    gap: 10px;
+  }
+
+  .confere-page .result-group-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--app-border);
+    border-left: 4px solid var(--app-primary);
+    border-radius: var(--app-control-radius);
+    background: color-mix(in srgb, var(--app-primary) 7%, var(--app-surface));
+    color: var(--app-primary-dark);
+    font-weight: 900;
+  }
+
+  .confere-page .result-group-count {
+    min-width: 28px;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    border-radius: var(--app-pill-radius);
+    background: var(--app-surface);
+    color: var(--app-muted);
+    font-size: 0.78rem;
+  }
+
+  .confere-page .result-group-items {
+    display: grid;
+    gap: 10px;
+  }
+
+  .confere-page .result-card {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: 12px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--app-border);
+    border-left: 5px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface);
+    box-shadow: 0 12px 28px rgba(22, 39, 34, 0.08);
+    --confere-field-color: var(--confere-warning);
+    --confere-field-text: rgb(122, 77, 0);
+    --confere-field-strong-text: rgb(58, 40, 0);
+  }
+
+  .confere-page .result-card[data-category="ok"] {
+    border-left-color: var(--app-success);
+    --confere-field-color: var(--app-success);
+    --confere-field-text: color-mix(in srgb, var(--app-success) 78%, var(--app-text));
+    --confere-field-strong-text: color-mix(in srgb, var(--app-success) 86%, var(--app-text));
+  }
+
+  .confere-page .result-card[data-category="inconsistencia_situacao"] {
+    border-left-color: var(--app-danger);
+    --confere-field-color: var(--app-danger);
+    --confere-field-text: color-mix(in srgb, var(--app-danger) 78%, var(--app-text));
+    --confere-field-strong-text: color-mix(in srgb, var(--app-danger) 86%, var(--app-text));
+  }
+
+  .confere-page .result-card[data-category="nao_encontrado_sed"] {
+    border-left-color: var(--confere-missing-sed);
+    --confere-field-color: var(--confere-missing-sed);
+    --confere-field-text: color-mix(in srgb, var(--confere-missing-sed) 78%, var(--app-text));
+    --confere-field-strong-text: color-mix(in srgb, var(--confere-missing-sed) 86%, var(--app-text));
+  }
+
+  .confere-page .result-card[data-category="nao_encontrado_lista"] {
+    border-left-color: var(--confere-missing-lista);
+    --confere-field-color: var(--confere-missing-lista);
+    --confere-field-text: color-mix(in srgb, var(--confere-missing-lista) 78%, var(--app-text));
+    --confere-field-strong-text: color-mix(in srgb, var(--confere-missing-lista) 86%, var(--app-text));
+  }
+
+  .confere-page .result-card[data-category="divergencia_cadastral"] {
+    border-left-color: var(--confere-warning);
+    --confere-field-color: var(--confere-warning);
+    --confere-field-text: rgb(122, 77, 0);
+    --confere-field-strong-text: rgb(58, 40, 0);
+  }
+
+  .confere-page .result-status-cell {
+    display: flex;
+    align-content: center;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    align-self: stretch;
+    padding: 8px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface-muted);
+  }
+
+  .confere-page .result-content {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .confere-page .comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .confere-page .comparison-box {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface-muted);
+  }
+
+  .confere-page .comparison-label {
+    color: var(--app-primary-dark);
+    font-size: 0.76rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .confere-page .comparison-name {
+    min-height: 24px;
+    color: var(--app-text);
+    font-size: 1rem;
+    font-weight: 900;
+    line-height: 1.25;
+  }
+
+  @keyframes confere-field-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--confere-field-color) 0%, transparent);
+    }
+
+    50% {
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--confere-field-color) 24%, transparent);
+    }
+  }
+
+  .confere-page .comparison-name.is-divergent-field {
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 0;
+    padding: 5px 8px;
+    border: 1px solid color-mix(in srgb, var(--confere-field-color) 72%, var(--app-border));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--confere-field-color) 20%, var(--app-surface));
+    color: var(--confere-field-text);
+    animation: confere-field-pulse 1.8s ease-in-out infinite;
+  }
+
+  .confere-page .comparison-meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1.34fr) minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 0.78fr);
+    gap: 6px;
+  }
+
+  .confere-page .meta-item {
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    background: var(--app-surface);
+  }
+
+  .confere-page .meta-item.is-divergent-field {
+    border-color: color-mix(in srgb, var(--confere-field-color) 72%, var(--app-border));
+    background: color-mix(in srgb, var(--confere-field-color) 20%, var(--app-surface));
+    animation: confere-field-pulse 1.8s ease-in-out infinite;
+  }
+
+  .confere-page .meta-item span {
+    display: block;
+    color: var(--app-muted);
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .confere-page .meta-item.is-divergent-field span {
+    color: var(--confere-field-text);
+  }
+
+  .confere-page .meta-item strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--app-text);
+    font-size: 0.84rem;
+    font-weight: 850;
+    line-height: 1.18;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .confere-page .meta-item.is-divergent-field strong {
+    color: var(--confere-field-strong-text);
+  }
+
+  .confere-page .meta-item:first-child strong {
+    font-size: 0.78rem;
+  }
+
+  .confere-page .result-observation {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 9px;
+    align-items: start;
+    padding: 10px 11px;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 20%, var(--app-border));
+    border-radius: var(--app-control-radius);
+    background: color-mix(in srgb, var(--app-primary) 7%, var(--app-surface));
+    color: var(--app-text);
+    line-height: 1.36;
+    font-weight: 750;
+  }
+
+  .confere-page .result-observation i {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--app-pill-radius);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-dark);
+  }
+
+  .confere-page .result-card[data-category="ok"] .result-observation {
+    border-color: color-mix(in srgb, var(--app-success) 36%, var(--app-border));
+    background: color-mix(in srgb, var(--app-success) 11%, var(--app-surface));
+    color: color-mix(in srgb, var(--app-success) 60%, var(--app-text));
+  }
+
+  .confere-page .result-card[data-category="ok"] .result-observation i {
+    background: color-mix(in srgb, var(--app-success) 18%, var(--app-surface));
+    color: var(--app-success);
+  }
+
+  .confere-page .result-card[data-category="inconsistencia_situacao"] .result-observation {
+    border-color: color-mix(in srgb, var(--app-danger) 38%, var(--app-border));
+    background: color-mix(in srgb, var(--app-danger) 10%, var(--app-surface));
+    color: color-mix(in srgb, var(--app-danger) 60%, var(--app-text));
+  }
+
+  .confere-page .result-card[data-category="inconsistencia_situacao"] .result-observation i {
+    background: color-mix(in srgb, var(--app-danger) 15%, var(--app-surface));
+    color: var(--app-danger);
+  }
+
+  .confere-page .result-card[data-category="nao_encontrado_sed"] .result-observation {
+    border-color: color-mix(in srgb, var(--confere-missing-sed) 38%, var(--app-border));
+    background: color-mix(in srgb, var(--confere-missing-sed) 10%, var(--app-surface));
+    color: color-mix(in srgb, var(--confere-missing-sed) 62%, var(--app-text));
+  }
+
+  .confere-page .result-card[data-category="nao_encontrado_sed"] .result-observation i {
+    background: color-mix(in srgb, var(--confere-missing-sed) 15%, var(--app-surface));
+    color: var(--confere-missing-sed);
+  }
+
+  .confere-page .result-card[data-category="nao_encontrado_lista"] .result-observation {
+    border-color: color-mix(in srgb, var(--confere-missing-lista) 36%, var(--app-border));
+    background: color-mix(in srgb, var(--confere-missing-lista) 9%, var(--app-surface));
+    color: color-mix(in srgb, var(--confere-missing-lista) 58%, var(--app-text));
+  }
+
+  .confere-page .result-card[data-category="nao_encontrado_lista"] .result-observation i {
+    background: color-mix(in srgb, var(--confere-missing-lista) 14%, var(--app-surface));
+    color: var(--confere-missing-lista);
+  }
+
+  .confere-page .result-card[data-category="divergencia_cadastral"] .result-observation {
+    border-color: color-mix(in srgb, var(--confere-warning) 44%, var(--app-border));
+    background: color-mix(in srgb, var(--confere-warning) 13%, var(--app-surface));
+    color: rgb(122, 77, 0);
+  }
+
+  .confere-page .result-card[data-category="divergencia_cadastral"] .result-observation i {
+    background: color-mix(in srgb, var(--confere-warning) 18%, var(--app-surface));
+    color: rgb(138, 90, 0);
+  }
+
+  .confere-page .no-filter-results {
+    display: none;
+    padding: 18px;
+    border: 1px dashed var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface-muted);
+    color: var(--app-muted);
+    text-align: center;
+    font-weight: 800;
+  }
+
+  .confere-page .status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 34px;
+    padding: 6px 8px;
+    border-radius: var(--app-pill-radius);
+    font-size: 0.78rem;
+    font-weight: 900;
+    line-height: 1.12;
+    text-align: center;
+  }
+
+  .confere-page .status-ok {
+    background: color-mix(in srgb, var(--app-success) 14%, var(--app-surface));
+    color: var(--app-success);
+  }
+
+  .confere-page .status-inconsistencia_situacao {
+    background: color-mix(in srgb, var(--app-danger) 13%, var(--app-surface));
+    color: var(--app-danger);
+  }
+
+  .confere-page .status-nao_encontrado_sed {
+    background: color-mix(in srgb, var(--confere-missing-sed) 14%, var(--app-surface));
+    color: var(--confere-missing-sed);
+  }
+
+  .confere-page .status-nao_encontrado_lista {
+    background: color-mix(in srgb, var(--confere-missing-lista) 12%, var(--app-surface));
+    color: var(--confere-missing-lista);
+  }
+
+  .confere-page .status-divergencia_cadastral {
+    background: color-mix(in srgb, var(--confere-warning) 18%, var(--app-surface));
+    color: #8a5a00;
+  }
+
+  .confere-page .pdf-errors {
+    margin-top: 18px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--confere-warning) 45%, var(--app-border));
+    border-radius: var(--app-control-radius);
+    background: color-mix(in srgb, var(--confere-warning) 10%, var(--app-surface));
+  }
+
+  .confere-page .pdf-errors h3 {
+    margin-bottom: 8px;
+    font-size: 1rem;
+  }
+
+  .confere-page .pdf-errors ul {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .confere-page .print-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(14, 29, 26, 0.56);
+    backdrop-filter: blur(8px);
+  }
+
+  .confere-page .print-modal[hidden] {
+    display: none !important;
+  }
+
+  .confere-page .print-modal-panel {
+    width: min(540px, calc(100vw - 32px));
+    display: grid;
+    gap: 16px;
+    padding: 22px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow-strong);
+  }
+
+  .confere-page .print-modal-header {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .confere-page .print-modal-header h3 {
+    margin: 0;
+    font-size: 1.18rem;
+  }
+
+  .confere-page .print-modal-header p {
+    margin: 5px 0 0;
+    color: var(--app-muted);
+    line-height: 1.4;
+  }
+
+  .confere-page .print-modal-close {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface-muted);
+    color: var(--app-text);
+  }
+
+  .confere-page .print-options {
+    display: grid;
+    gap: 8px;
+  }
+
+  .confere-page .print-option {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    padding: 12px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface-muted);
+  }
+
+  .confere-page .print-option input {
+    margin-top: 2px;
+  }
+
+  .confere-page .print-option strong {
+    display: block;
+    color: var(--app-text);
+    line-height: 1.2;
+  }
+
+  .confere-page .print-option span {
+    display: block;
+    margin-top: 3px;
+    color: var(--app-muted);
+    font-size: 0.86rem;
+    line-height: 1.3;
+  }
+
+  .confere-page .print-modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  @media (max-width: 980px) {
+    .confere-page .confere-grid,
+    .confere-page .summary-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .confere-page .result-controls,
+    .confere-page .result-card,
+    .confere-page .comparison-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .confere-page .result-controls {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .confere-page .result-search {
+      flex-basis: auto;
+      width: 100%;
+    }
+
+    .confere-page .comparison-meta {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .confere-page .scope-preview-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .confere-page .result-header-row {
+      grid-template-columns: 1fr;
+    }
+
+    .confere-page .selected-files {
+      grid-template-columns: 1fr;
+    }
+
+    .confere-page .confere-actions {
+      justify-content: stretch;
+    }
+
+    .confere-page .btn-confere,
+    .confere-page .btn-export,
+    .confere-page .print-modal-actions .btn-confere,
+    .confere-page .btn-secondary-action {
+      width: 100%;
+    }
+  }
+
+  @media print {
+    @page {
+      size: A4 landscape;
+      margin: 7mm;
+    }
+
+    html,
+    body {
+      width: auto !important;
+      min-width: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: visible !important;
+      background: rgb(255, 255, 255) !important;
+      color: rgb(0, 0, 0) !important;
+    }
+
+    body * {
+      visibility: hidden;
+    }
+
+    #resultado-conferencia,
+    #resultado-conferencia * {
+      visibility: visible;
+    }
+
+    #resultado-conferencia {
+      position: absolute;
+      inset: 0 auto auto 0;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: rgb(255, 255, 255) !important;
+      box-shadow: none !important;
+    }
+
+    #resultado-conferencia .is-print-hidden,
+    #resultado-conferencia .is-print-hidden * {
+      display: none !important;
+      visibility: hidden !important;
+    }
+
+    .confere-page {
+      width: 100% !important;
+      margin: 0 !important;
+    }
+
+    .confere-page .confere-header,
+    .confere-page .confere-panel,
+    .confere-page .result-actions,
+    .confere-page .result-header-row,
+    .confere-page .summary-grid,
+    .confere-page .result-controls,
+    .confere-page .turma-filter-row,
+    .confere-page .pdf-errors,
+    .confere-page .print-modal,
+    .confere-page .empty-filter-message {
+      display: none !important;
+    }
+
+    .confere-page .result-list,
+    .confere-page .result-group-items {
+      display: grid !important;
+      gap: 2.2mm !important;
+    }
+
+    .confere-page .result-group {
+      display: block !important;
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
+    .confere-page .result-group-header {
+      display: none !important;
+    }
+
+    .confere-page .result-card {
+      display: grid !important;
+      grid-template-columns: 27mm minmax(0, 1fr) !important;
+      gap: 2mm !important;
+      min-height: 42mm !important;
+      max-height: 42mm !important;
+      margin: 0 !important;
+      padding: 2mm !important;
+      border: 1px solid rgb(185, 185, 185) !important;
+      border-left: 4px solid rgb(100, 100, 100) !important;
+      border-radius: 0 !important;
+      background: rgb(255, 255, 255) !important;
+      box-shadow: none !important;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .confere-page .result-card[data-category="inconsistencia_situacao"] {
+      border-left-color: rgb(184, 54, 54) !important;
+    }
+
+    .confere-page .result-card[data-category="nao_encontrado_sed"] {
+      border-left-color: rgb(194, 65, 12) !important;
+    }
+
+    .confere-page .result-card[data-category="nao_encontrado_lista"] {
+      border-left-color: rgb(29, 78, 216) !important;
+    }
+
+    .confere-page .result-card[data-category="divergencia_cadastral"] {
+      border-left-color: rgb(208, 138, 31) !important;
+    }
+
+    .confere-page .result-status-cell {
+      align-items: start !important;
+      justify-content: stretch !important;
+      padding: 0 !important;
+      background: transparent !important;
+    }
+
+    .confere-page .status-pill {
+      width: 100% !important;
+      min-height: 0 !important;
+      padding: 1.4mm !important;
+      border: 1px solid rgb(170, 170, 170) !important;
+      border-radius: 0 !important;
+      background: rgb(246, 246, 246) !important;
+      color: rgb(0, 0, 0) !important;
+      font-family: Arial, sans-serif !important;
+      font-size: 7.4pt !important;
+      line-height: 1.15 !important;
+      text-align: center !important;
+      white-space: normal !important;
+    }
+
+    .confere-page .result-content {
+      gap: 1.6mm !important;
+      min-height: 0 !important;
+    }
+
+    .confere-page .result-observation {
+      grid-template-columns: 4.2mm minmax(0, 1fr) !important;
+      gap: 1.4mm !important;
+      padding: 1.4mm !important;
+      border: 1px solid rgb(180, 180, 180) !important;
+      border-radius: 0 !important;
+      background: rgb(248, 248, 248) !important;
+      color: rgb(0, 0, 0) !important;
+      font-family: Arial, sans-serif !important;
+      font-size: 7.8pt !important;
+      line-height: 1.15 !important;
+      font-weight: 700 !important;
+    }
+
+    .confere-page .result-observation i {
+      width: 4.2mm !important;
+      height: 4.2mm !important;
+      background: transparent !important;
+      color: rgb(0, 0, 0) !important;
+    }
+
+    .confere-page .comparison-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 2mm !important;
+      min-height: 0 !important;
+    }
+
+    .confere-page .comparison-box {
+      gap: 1.2mm !important;
+      padding: 1.4mm !important;
+      border: 1px solid rgb(205, 205, 205) !important;
+      border-radius: 0 !important;
+      background: rgb(255, 255, 255) !important;
+    }
+
+    .confere-page .comparison-label,
+    .confere-page .meta-item span {
+      color: rgb(70, 70, 70) !important;
+      font-family: Arial, sans-serif !important;
+      font-size: 6pt !important;
+      letter-spacing: 0 !important;
+    }
+
+    .confere-page .comparison-name {
+      color: rgb(0, 0, 0) !important;
+      font-family: Arial, sans-serif !important;
+      font-size: 8.4pt !important;
+      line-height: 1.1 !important;
+      min-height: 0 !important;
+    }
+
+    .confere-page .comparison-meta {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+      gap: 1mm !important;
+    }
+
+    .confere-page .meta-item {
+      padding: 1mm !important;
+      border: 1px solid rgb(205, 205, 205) !important;
+      border-radius: 0 !important;
+      background: rgb(255, 255, 255) !important;
+    }
+
+    .confere-page .meta-item strong,
+    .confere-page .meta-item:first-child strong {
+      overflow: visible !important;
+      color: rgb(0, 0, 0) !important;
+      font-family: Arial, sans-serif !important;
+      font-size: 7pt !important;
+      line-height: 1.08 !important;
+      text-overflow: clip !important;
+      white-space: normal !important;
+    }
+
+    .confere-page .comparison-name.is-divergent-field,
+    .confere-page .meta-item.is-divergent-field {
+      border-color: rgb(166, 111, 0) !important;
+      background: rgb(255, 246, 221) !important;
+      color: rgb(0, 0, 0) !important;
+      animation: none !important;
+      box-shadow: none !important;
+    }
+
+    .confere-page .comparison-name.is-divergent-field {
+      padding: 1mm 1.4mm !important;
+      border-radius: 2mm !important;
+    }
+
+    .confere-page .meta-item.is-divergent-field span,
+    .confere-page .meta-item.is-divergent-field strong {
+      color: rgb(0, 0, 0) !important;
+    }
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="confere-page">
+    <div class="confere-shell">
+      <section class="confere-header">
+        <div class="confere-icon" aria-hidden="true">
+          <i class="fas fa-clipboard-check"></i>
+        </div>
+        <div>
+          <h2>Conferência Lista Piloto x SED</h2>
+          <p>Anexe a Lista Piloto e todos os PDFs do SED em uma única operação para gerar a conferência consolidada.</p>
+        </div>
+      </section>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="confere-alerts">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="confere-panel">
+        <form method="POST" action="{{ url_for('confere.index') }}" enctype="multipart/form-data" id="confere-form">
+          <div class="confere-grid">
+            <div class="upload-card is-excel">
+              <h3>Lista Piloto</h3>
+              <p>Use a planilha oficial com a aba <strong>LISTA CORRIDA</strong>. A conferência lê turma, nome, nascimento, RA e situação.</p>
+              <label class="confere-dropzone excel-dropzone" id="excel-dropzone" for="lista_piloto">
+                <span class="dropzone-icon excel-icon" aria-hidden="true">
+                  <i class="fas fa-file-excel"></i>
+                </span>
+                <strong>Arraste a Lista Piloto aqui ou clique para selecionar</strong>
+                <span>Formatos aceitos: .xlsx, .xls e .xlsm.</span>
+                <input type="file"
+                       class="upload-hidden"
+                       id="lista_piloto"
+                       name="lista_piloto"
+                       accept=".xlsx,.xls,.xlsm"
+                       required>
+              </label>
+              <div class="file-list-wrap">
+                <span class="file-count excel-count" id="excel-file-count">Nenhum Excel selecionado</span>
+                <ul class="selected-files selected-files-single" id="excel-file-list" aria-live="polite"></ul>
+              </div>
+            </div>
+
+            <div class="upload-card is-pdf">
+              <h3>PDFs do SED</h3>
+              <p>Selecione ou arraste todos os arquivos “Alunos por Classe”. Os PDFs serão consolidados antes da comparação.</p>
+              <label class="confere-dropzone" id="sed-dropzone" for="sed_pdfs">
+                <span class="dropzone-icon" aria-hidden="true">
+                  <i class="fas fa-file-pdf"></i>
+                </span>
+                <strong>Arraste os PDFs aqui ou clique para selecionar</strong>
+                <span>É possível remover arquivos antes de executar a conferência.</span>
+                <input type="file"
+                       id="sed_pdfs"
+                       class="upload-hidden"
+                       name="sed_pdfs"
+                       accept=".pdf,application/pdf"
+                       multiple>
+              </label>
+              <div class="file-list-wrap">
+                <span class="file-count" id="sed-file-count">0 PDFs selecionados</span>
+                <ul class="selected-files" id="sed-file-list" aria-live="polite"></ul>
+                <div class="scope-preview" id="sed-scope-preview" hidden>
+                  <div class="scope-preview-grid">
+                    <div class="scope-preview-item">
+                      <span>Turmas detectadas</span>
+                      <strong id="sed-scope-turmas">-</strong>
+                    </div>
+                    <div class="scope-preview-item">
+                      <span>PDFs válidos</span>
+                      <strong id="sed-scope-validos">0</strong>
+                    </div>
+                    <div class="scope-preview-item">
+                      <span>PDFs ignorados</span>
+                      <strong id="sed-scope-ignorados">0</strong>
+                    </div>
+                  </div>
+                  <ul class="scope-errors" id="sed-scope-errors"></ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="confere-actions">
+            <button type="submit" class="btn-confere" id="btn-executar-conferencia">
+              <i class="fas fa-magnifying-glass-chart" aria-hidden="true"></i>
+              Executar conferência
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {% if result %}
+        <section class="confere-results" id="resultado-conferencia">
+          {% set total_inconsistencias = result.summary.get("total_inconsistencias_situacao", 0) %}
+          {% set total_nao_sed = result.summary.get("total_nao_encontrados_sed", 0) %}
+          {% set total_nao_lista = result.summary.get("total_nao_encontrados_lista", 0) %}
+          {% set total_divergencias = result.summary.get("total_divergencias_cadastrais", 0) %}
+          {% set total_pendencias = total_inconsistencias + total_nao_sed + total_nao_lista + total_divergencias %}
+          <div class="result-header-row">
+            <div class="result-title-block">
+              <h2>Resultado consolidado</h2>
+            </div>
+            <div class="result-actions">
+              <a class="btn-secondary-action" href="{{ url_for('confere.index') }}">
+                <i class="fas fa-rotate-left" aria-hidden="true"></i>
+                Nova conferência
+              </a>
+              <button type="button" class="btn-secondary-action" id="btn-print-current-results">
+                <i class="fas fa-print" aria-hidden="true"></i>
+                Imprimir visão atual
+              </button>
+              {% if result_id %}
+                <a class="btn-export" href="{{ url_for('confere.exportar_excel', result_id=result_id) }}">
+                  <i class="fas fa-file-excel" aria-hidden="true"></i>
+                  Exportar Excel
+                </a>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <div class="summary-card is-alert">
+              <span>Pendências</span>
+              <strong>{{ total_pendencias }}</strong>
+            </div>
+            <div class="summary-card is-success">
+              <span>OK</span>
+              <strong>{{ result.summary.get("total_ok", 0) }}</strong>
+            </div>
+            <div class="summary-card is-focus">
+              <span>PDFs lidos</span>
+              <strong>{{ result.summary.get("total_pdfs_lidos", 0) }}/{{ result.summary.get("total_pdfs_processados", 0) }}</strong>
+            </div>
+            <div class="summary-card">
+              <span>Inconsistências</span>
+              <strong>{{ total_inconsistencias }}</strong>
+            </div>
+            <div class="summary-card">
+              <span>Não encontrados no SED</span>
+              <strong>{{ total_nao_sed }}</strong>
+            </div>
+            <div class="summary-card">
+              <span>Não encontrados na Lista</span>
+              <strong>{{ total_nao_lista }}</strong>
+            </div>
+            <div class="summary-card">
+              <span>Divergências cadastrais</span>
+              <strong>{{ total_divergencias }}</strong>
+            </div>
+          </div>
+
+          <div class="result-controls">
+            <div class="filter-row" aria-label="Filtros de resultado">
+              <button type="button" class="is-active" data-confere-filter="pendencias">
+                Pendências <span class="filter-count">{{ total_pendencias }}</span>
+              </button>
+              <button type="button" data-confere-filter="todos">
+                Todos <span class="filter-count">{{ result.rows|length }}</span>
+              </button>
+              <button type="button" data-confere-filter="ok">
+                OK <span class="filter-count">{{ result.summary.get("total_ok", 0) }}</span>
+              </button>
+              <button type="button" data-confere-filter="inconsistencia_situacao">
+                Situação <span class="filter-count">{{ total_inconsistencias }}</span>
+              </button>
+              <button type="button" data-confere-filter="nao_encontrado_sed">
+                Sem SED <span class="filter-count">{{ total_nao_sed }}</span>
+              </button>
+              <button type="button" data-confere-filter="nao_encontrado_lista">
+                Sem Lista <span class="filter-count">{{ total_nao_lista }}</span>
+              </button>
+              <button type="button" data-confere-filter="divergencia_cadastral">
+                Cadastro <span class="filter-count">{{ total_divergencias }}</span>
+              </button>
+            </div>
+            <label class="result-search" for="confere-result-search">
+              <i class="fas fa-search" aria-hidden="true"></i>
+              <input type="search" id="confere-result-search" placeholder="Buscar por nome, RA, turma ou PDF">
+            </label>
+          </div>
+
+          <div class="turma-filter-row" aria-label="Filtrar resultado por turma">
+            <button type="button" class="is-active" data-turma-filter="todas">
+              Todas <span class="filter-count">{{ result.rows|length }}</span>
+            </button>
+            {% for group in result_groups %}
+              <button type="button" data-turma-filter="{{ group.key }}">
+                {{ group.label }} <span class="filter-count">{{ group.rows|length }}</span>
+              </button>
+            {% endfor %}
+          </div>
+
+          <div class="result-list" id="confere-result-list">
+            {% for group in result_groups %}
+              <section class="result-group" data-result-group data-turma-key="{{ group.key }}">
+                <header class="result-group-header">
+                  <span>{{ group.label }}</span>
+                  <span class="result-group-count" data-group-count>{{ group.rows|length }}</span>
+                </header>
+                <div class="result-group-items">
+                  {% for row in group.rows %}
+                    {% set campos_divergentes = row.campos_divergentes|default([]) %}
+                    <article class="result-card"
+                             data-category="{{ row.categoria }}"
+                             data-search="{{ (row.nome_lista ~ ' ' ~ row.nome_sed ~ ' ' ~ row.ra_lista ~ ' ' ~ row.ra_sed ~ ' ' ~ row.turma_lista ~ ' ' ~ row.turma_sed ~ ' ' ~ row.pdf_origem ~ ' ' ~ row.observacao)|lower }}">
+                      <div class="result-status-cell">
+                        <span class="status-pill status-{{ row.categoria }}">{{ row.status_conferencia }}</span>
+                      </div>
+
+                      <div class="result-content">
+                        <div class="result-observation">
+                          <i class="fas fa-circle-info" aria-hidden="true"></i>
+                          <span>{{ row.observacao }}</span>
+                        </div>
+
+                        <div class="comparison-grid">
+                          <section class="comparison-box">
+                            <span class="comparison-label">Lista Piloto</span>
+                            <strong class="comparison-name{% if 'nome' in campos_divergentes %} is-divergent-field{% endif %}">
+                              {{ row.nome_lista or "Não localizado" }}
+                            </strong>
+                            <div class="comparison-meta">
+                              <div class="meta-item{% if 'turma' in campos_divergentes %} is-divergent-field{% endif %}">
+                                <span>Turma</span>
+                                <strong>{{ row.turma_lista_display|default(row.turma_lista or "-") }}</strong>
+                              </div>
+                              <div class="meta-item{% if 'ra' in campos_divergentes %} is-divergent-field{% endif %}">
+                                <span>RA</span>
+                                <strong>{{ row.ra_lista or "-" }}</strong>
+                              </div>
+                              <div class="meta-item{% if 'data_nascimento' in campos_divergentes %} is-divergent-field{% endif %}">
+                                <span>Nascimento</span>
+                                <strong>{{ row.data_nascimento_lista or "-" }}</strong>
+                              </div>
+                              <div class="meta-item{% if 'situacao' in campos_divergentes %} is-divergent-field{% endif %}">
+                                <span>Situação</span>
+                                <strong>{{ row.situacao_lista_display|default(row.situacao_lista or "-") }}</strong>
+                              </div>
+                            </div>
+                          </section>
+
+                          <section class="comparison-box">
+                            <span class="comparison-label">SED</span>
+                            <strong class="comparison-name{% if 'nome' in campos_divergentes %} is-divergent-field{% endif %}">
+                              {{ row.nome_sed or "Não localizado" }}
+                            </strong>
+                            <div class="comparison-meta">
+                              <div class="meta-item{% if 'turma' in campos_divergentes %} is-divergent-field{% endif %}">
+                                <span>Turma</span>
+                                <strong>{{ row.turma_sed_display|default(row.turma_sed or "-") }}</strong>
+                              </div>
+                              <div class="meta-item{% if 'ra' in campos_divergentes %} is-divergent-field{% endif %}">
+                                <span>RA</span>
+                                <strong>{{ row.ra_sed or "-" }}</strong>
+                              </div>
+                              <div class="meta-item{% if 'data_nascimento' in campos_divergentes %} is-divergent-field{% endif %}">
+                                <span>Nascimento</span>
+                                <strong>{{ row.data_nascimento_sed or "-" }}</strong>
+                              </div>
+                              <div class="meta-item{% if 'situacao' in campos_divergentes %} is-divergent-field{% endif %}">
+                                <span>Situação</span>
+                                <strong>{{ row.situacao_sed_display|default(row.situacao_sed or "-") }}</strong>
+                              </div>
+                            </div>
+                          </section>
+                        </div>
+                      </div>
+                    </article>
+                  {% endfor %}
+                </div>
+              </section>
+            {% endfor %}
+          </div>
+
+          <div class="no-filter-results" id="confere-empty-filter">
+            Nenhum resultado encontrado com os filtros atuais.
+          </div>
+
+          {% if result.pdf_errors or result.duplicate_files %}
+            <div class="pdf-errors">
+              <h3>Ocorrências nos PDFs</h3>
+              <ul>
+                {% for error in result.pdf_errors %}
+                  <li><strong>{{ error.arquivo }}:</strong> {{ error.erro }}</li>
+                {% endfor %}
+                {% for duplicate in result.duplicate_files %}
+                  <li><strong>{{ duplicate }}:</strong> PDF duplicado ignorado na conferência.</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+        </section>
+      {% endif %}
+    </div>
+
+    <div id="loadingOverlay" class="app-loading-overlay" aria-hidden="true" style="display: none;">
+      <div class="app-loading-panel">
+        <div class="app-loading-spinner" aria-hidden="true"></div>
+        <p class="app-loading-message">
+          Conferindo listas... Aguarde enquanto o sistema lê os PDFs do SED e compara com a Lista Piloto.
+        </p>
+      </div>
+    </div>
+
+    {% if result %}
+      <div class="print-modal" id="print-options-modal" hidden aria-hidden="true">
+        <div class="print-modal-panel" role="dialog" aria-modal="true" aria-labelledby="print-modal-title">
+          <div class="print-modal-header">
+            <div>
+              <h3 id="print-modal-title">O que deseja imprimir?</h3>
+              <p>Escolha o tipo de divergência. A impressão respeita a turma e a busca aplicadas na tela.</p>
+            </div>
+            <button type="button" class="print-modal-close" id="btn-close-print-modal" aria-label="Fechar">
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </div>
+
+          <div class="print-options">
+            <label class="print-option">
+              <input type="radio" name="print_scope" value="divergencias" checked>
+              <span>
+                <strong>Todas as divergências</strong>
+                <span>Imprime todas as divergências: cadastro, situação, sem SED e sem Lista. Não imprime OK.</span>
+              </span>
+            </label>
+            <label class="print-option">
+              <input type="radio" name="print_scope" value="divergencia_cadastral">
+              <span>
+                <strong>Apenas divergências cadastrais</strong>
+                <span>Nome, RA, nascimento ou turma divergente.</span>
+              </span>
+            </label>
+            <label class="print-option">
+              <input type="radio" name="print_scope" value="inconsistencia_situacao">
+              <span>
+                <strong>Apenas situação divergente</strong>
+                <span>Ativo, transferido ou remanejado diferente entre Lista e SED.</span>
+              </span>
+            </label>
+            <label class="print-option">
+              <input type="radio" name="print_scope" value="nao_encontrado_sed">
+              <span>
+                <strong>Apenas sem constar no SED</strong>
+                <span>Alunos da Lista Piloto não localizados nos PDFs anexados.</span>
+              </span>
+            </label>
+            <label class="print-option">
+              <input type="radio" name="print_scope" value="nao_encontrado_lista">
+              <span>
+                <strong>Apenas sem constar na Lista</strong>
+                <span>Alunos do SED não localizados na Lista Piloto.</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="print-modal-actions">
+            <button type="button" class="btn-secondary-action" id="btn-cancel-print-modal">Cancelar</button>
+            <button type="button" class="btn-confere" id="btn-confirm-print-results">
+              <i class="fas fa-print" aria-hidden="true"></i>
+              Imprimir
+            </button>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script>
+    (function () {
+      const form = document.getElementById("confere-form");
+      const excelInput = document.getElementById("lista_piloto");
+      const excelDropzone = document.getElementById("excel-dropzone");
+      const excelFileList = document.getElementById("excel-file-list");
+      const excelFileCount = document.getElementById("excel-file-count");
+      const sedInput = document.getElementById("sed_pdfs");
+      const dropzone = document.getElementById("sed-dropzone");
+      const fileList = document.getElementById("sed-file-list");
+      const fileCount = document.getElementById("sed-file-count");
+      const sedScopePreview = document.getElementById("sed-scope-preview");
+      const sedScopeTurmas = document.getElementById("sed-scope-turmas");
+      const sedScopeValidos = document.getElementById("sed-scope-validos");
+      const sedScopeIgnorados = document.getElementById("sed-scope-ignorados");
+      const sedScopeErrors = document.getElementById("sed-scope-errors");
+      const submitButton = document.getElementById("btn-executar-conferencia");
+      const loadingOverlay = document.getElementById("loadingOverlay");
+      const filterButtons = document.querySelectorAll("[data-confere-filter]");
+      const turmaFilterButtons = document.querySelectorAll("[data-turma-filter]");
+      const resultSearch = document.getElementById("confere-result-search");
+      const emptyFilterMessage = document.getElementById("confere-empty-filter");
+      const printCurrentResultsButton = document.getElementById("btn-print-current-results");
+      const printOptionsModal = document.getElementById("print-options-modal");
+      const closePrintModalButton = document.getElementById("btn-close-print-modal");
+      const cancelPrintModalButton = document.getElementById("btn-cancel-print-modal");
+      const confirmPrintResultsButton = document.getElementById("btn-confirm-print-results");
+      const printableCategories = new Set([
+        "inconsistencia_situacao",
+        "nao_encontrado_sed",
+        "nao_encontrado_lista",
+        "divergencia_cadastral"
+      ]);
+      let activeResultFilter = "pendencias";
+      let activeTurmaFilter = "todas";
+      let selectedExcelFile = null;
+      let selectedFiles = [];
+      let sedPreviewRequestId = 0;
+      let printSelectionPrepared = false;
+
+      function syncExcelInput() {
+        const transfer = new DataTransfer();
+        if (selectedExcelFile) transfer.items.add(selectedExcelFile);
+        excelInput.files = transfer.files;
+      }
+
+      function syncInputFiles() {
+        const transfer = new DataTransfer();
+        selectedFiles.forEach((file) => transfer.items.add(file));
+        sedInput.files = transfer.files;
+      }
+
+      function renderExcelFile() {
+        excelFileList.innerHTML = "";
+        excelFileCount.textContent = selectedExcelFile ? "1 Excel selecionado" : "Nenhum Excel selecionado";
+
+        if (!selectedExcelFile) return;
+
+        const item = document.createElement("li");
+        const icon = document.createElement("span");
+        const name = document.createElement("span");
+        const remove = document.createElement("button");
+
+        icon.className = "selected-file-icon";
+        icon.innerHTML = '<i class="fas fa-file-excel" aria-hidden="true"></i>';
+        name.className = "selected-file-name";
+        name.textContent = selectedExcelFile.name;
+        name.title = selectedExcelFile.name;
+        remove.type = "button";
+        remove.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
+        remove.setAttribute("aria-label", "Remover " + selectedExcelFile.name);
+        remove.addEventListener("click", function () {
+          selectedExcelFile = null;
+          syncExcelInput();
+          renderExcelFile();
+        });
+
+        item.appendChild(icon);
+        item.appendChild(name);
+        item.appendChild(remove);
+        excelFileList.appendChild(item);
+      }
+
+      function renderSelectedFiles() {
+        fileList.innerHTML = "";
+        fileCount.textContent = selectedFiles.length === 1
+          ? "1 PDF selecionado"
+          : selectedFiles.length + " PDFs selecionados";
+
+        selectedFiles.forEach((file, index) => {
+          const item = document.createElement("li");
+          const icon = document.createElement("span");
+          const name = document.createElement("span");
+          const remove = document.createElement("button");
+
+          icon.className = "selected-file-icon";
+          icon.innerHTML = '<i class="fas fa-file-pdf" aria-hidden="true"></i>';
+          name.className = "selected-file-name";
+          name.textContent = file.name;
+          name.title = file.name;
+          remove.type = "button";
+          remove.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
+          remove.setAttribute("aria-label", "Remover " + file.name);
+          remove.addEventListener("click", function () {
+            selectedFiles.splice(index, 1);
+            syncInputFiles();
+            renderSelectedFiles();
+            previewSedScope();
+          });
+
+          item.appendChild(icon);
+          item.appendChild(name);
+          item.appendChild(remove);
+          fileList.appendChild(item);
+        });
+      }
+
+      function resetSedScopePreview() {
+        if (!sedScopePreview) return;
+        sedScopePreview.hidden = true;
+        sedScopeTurmas.textContent = "-";
+        sedScopeValidos.textContent = "0";
+        sedScopeIgnorados.textContent = "0";
+        sedScopeErrors.innerHTML = "";
+      }
+
+      function renderSedScopeLoading() {
+        if (!sedScopePreview) return;
+        sedScopePreview.hidden = false;
+        sedScopeTurmas.textContent = "Detectando...";
+        sedScopeValidos.textContent = "-";
+        sedScopeIgnorados.textContent = "-";
+        sedScopeErrors.innerHTML = "";
+      }
+
+      function renderSedScopePreview(data) {
+        if (!sedScopePreview) return;
+        const turmas = data.turmas && data.turmas.length ? data.turmas.join(", ") : "Nenhuma turma detectada";
+        sedScopePreview.hidden = false;
+        sedScopeTurmas.textContent = turmas;
+        sedScopeTurmas.title = turmas;
+        sedScopeValidos.textContent = data.pdfs_validos || 0;
+        sedScopeIgnorados.textContent = data.pdfs_ignorados || 0;
+        sedScopeErrors.innerHTML = "";
+
+        const details = []
+          .concat(data.errors || [])
+          .concat((data.duplicate_files || []).map((name) => ({
+            arquivo: name,
+            erro: "PDF duplicado ignorado na prévia."
+          })));
+
+        details.slice(0, 3).forEach((item) => {
+          const li = document.createElement("li");
+          li.textContent = (item.arquivo ? item.arquivo + ": " : "") + item.erro;
+          sedScopeErrors.appendChild(li);
+        });
+      }
+
+      function previewSedScope() {
+        if (!selectedFiles.length) {
+          resetSedScopePreview();
+          return;
+        }
+
+        const requestId = ++sedPreviewRequestId;
+        const formData = new FormData();
+        selectedFiles.forEach((file) => formData.append("sed_pdfs", file));
+        renderSedScopeLoading();
+
+        fetch("{{ url_for('confere.preview_pdfs') }}", {
+          method: "POST",
+          body: formData,
+          credentials: "same-origin"
+        })
+          .then((response) => {
+            if (!response.ok) throw new Error("Falha na prévia dos PDFs.");
+            return response.json();
+          })
+          .then((data) => {
+            if (requestId !== sedPreviewRequestId) return;
+            renderSedScopePreview(data);
+          })
+          .catch(() => {
+            if (requestId !== sedPreviewRequestId || !sedScopePreview) return;
+            sedScopePreview.hidden = false;
+            sedScopeTurmas.textContent = "Não foi possível detectar";
+            sedScopeValidos.textContent = "-";
+            sedScopeIgnorados.textContent = "-";
+            sedScopeErrors.innerHTML = "<li>Não foi possível gerar a prévia dos PDFs selecionados.</li>";
+          });
+      }
+
+      function addExcelFile(files) {
+        const incoming = Array.from(files || []);
+        const valid = incoming.find((file) => /\.(xlsx|xls|xlsm)$/i.test(file.name));
+        if (!valid && incoming.length) {
+          alert("A Lista Piloto precisa estar em formato .xlsx, .xls ou .xlsm.");
+          syncExcelInput();
+          renderExcelFile();
+          return;
+        }
+        if (valid) {
+          selectedExcelFile = valid;
+          syncExcelInput();
+          renderExcelFile();
+        }
+      }
+
+      function addFiles(files) {
+        const incoming = Array.from(files || []);
+        const invalid = incoming.filter((file) => !file.name.toLowerCase().endsWith(".pdf"));
+        if (invalid.length) {
+          alert("Apenas arquivos PDF podem ser anexados para a listagem do SED.");
+        }
+        incoming
+          .filter((file) => file.name.toLowerCase().endsWith(".pdf"))
+          .forEach((file) => {
+            const duplicate = selectedFiles.some((existing) =>
+              existing.name === file.name && existing.size === file.size
+            );
+            if (!duplicate) selectedFiles.push(file);
+          });
+        syncInputFiles();
+        renderSelectedFiles();
+        previewSedScope();
+      }
+
+      if (excelInput) {
+        excelInput.addEventListener("change", function () {
+          addExcelFile(excelInput.files);
+        });
+      }
+
+      if (sedInput) {
+        sedInput.addEventListener("change", function () {
+          addFiles(sedInput.files);
+        });
+      }
+
+      if (excelDropzone) {
+        ["dragenter", "dragover"].forEach((eventName) => {
+          excelDropzone.addEventListener(eventName, function (event) {
+            event.preventDefault();
+            excelDropzone.classList.add("is-dragging");
+          });
+        });
+
+        ["dragleave", "drop"].forEach((eventName) => {
+          excelDropzone.addEventListener(eventName, function (event) {
+            event.preventDefault();
+            excelDropzone.classList.remove("is-dragging");
+          });
+        });
+
+        excelDropzone.addEventListener("drop", function (event) {
+          addExcelFile(event.dataTransfer.files);
+        });
+      }
+
+      if (dropzone) {
+        ["dragenter", "dragover"].forEach((eventName) => {
+          dropzone.addEventListener(eventName, function (event) {
+            event.preventDefault();
+            dropzone.classList.add("is-dragging");
+          });
+        });
+
+        ["dragleave", "drop"].forEach((eventName) => {
+          dropzone.addEventListener(eventName, function (event) {
+            event.preventDefault();
+            dropzone.classList.remove("is-dragging");
+          });
+        });
+
+        dropzone.addEventListener("drop", function (event) {
+          addFiles(event.dataTransfer.files);
+        });
+      }
+
+      if (form) {
+        form.addEventListener("submit", function (event) {
+          if (!sedInput.files.length) {
+            event.preventDefault();
+            alert("Anexe pelo menos um PDF do SED antes de executar a conferência.");
+            return;
+          }
+          if (submitButton) submitButton.disabled = true;
+          if (loadingOverlay) {
+            loadingOverlay.style.display = "flex";
+            loadingOverlay.setAttribute("aria-hidden", "false");
+          }
+        });
+      }
+
+      function applyResultFilter(filter) {
+        activeResultFilter = filter || activeResultFilter;
+        const search = resultSearch ? resultSearch.value.trim().toLowerCase() : "";
+        let visibleCount = 0;
+
+        document.querySelectorAll("[data-result-group]").forEach((group) => {
+          const turmaVisible = activeTurmaFilter === "todas" || group.dataset.turmaKey === activeTurmaFilter;
+          let groupVisibleCount = 0;
+
+          group.querySelectorAll("[data-category]").forEach((row) => {
+            const category = row.dataset.category;
+            const categoryVisible = activeResultFilter === "todos" || category === activeResultFilter || (activeResultFilter === "pendencias" && category !== "ok");
+            const searchVisible = !search || (row.dataset.search || "").includes(search);
+            const visible = turmaVisible && categoryVisible && searchVisible;
+            row.style.display = visible ? "" : "none";
+            if (visible) groupVisibleCount += 1;
+          });
+
+          group.style.display = groupVisibleCount ? "" : "none";
+          const groupCount = group.querySelector("[data-group-count]");
+          if (groupCount) groupCount.textContent = groupVisibleCount;
+          visibleCount += groupVisibleCount;
+        });
+
+        if (emptyFilterMessage) {
+          emptyFilterMessage.style.display = visibleCount ? "none" : "block";
+        }
+      }
+
+      function openPrintModal() {
+        if (!printOptionsModal) return;
+        printOptionsModal.hidden = false;
+        printOptionsModal.setAttribute("aria-hidden", "false");
+        if (confirmPrintResultsButton) confirmPrintResultsButton.focus();
+      }
+
+      function closePrintModal() {
+        if (!printOptionsModal) return;
+        printOptionsModal.hidden = true;
+        printOptionsModal.setAttribute("aria-hidden", "true");
+        if (printCurrentResultsButton) printCurrentResultsButton.focus();
+      }
+
+      function clearPrintSelection() {
+        document.querySelectorAll(".is-print-hidden").forEach((element) => {
+          element.classList.remove("is-print-hidden");
+        });
+        printSelectionPrepared = false;
+      }
+
+      function categoryMatchesPrintScope(category, scope) {
+        if (scope === "divergencias") return printableCategories.has(category);
+        return category === scope;
+      }
+
+      function preparePrintSelection(scope) {
+        clearPrintSelection();
+        const search = resultSearch ? resultSearch.value.trim().toLowerCase() : "";
+        let printableCount = 0;
+
+        document.querySelectorAll("[data-result-group]").forEach((group) => {
+          const turmaVisible = activeTurmaFilter === "todas" || group.dataset.turmaKey === activeTurmaFilter;
+          let groupPrintableCount = 0;
+          group.querySelectorAll("[data-category]").forEach((row) => {
+            const searchVisible = !search || (row.dataset.search || "").includes(search);
+            const shouldPrint = turmaVisible && searchVisible && categoryMatchesPrintScope(row.dataset.category, scope);
+            row.classList.toggle("is-print-hidden", !shouldPrint);
+            if (shouldPrint) {
+              printableCount += 1;
+              groupPrintableCount += 1;
+            }
+          });
+          group.classList.toggle("is-print-hidden", groupPrintableCount === 0);
+        });
+
+        printSelectionPrepared = printableCount > 0;
+        return printableCount;
+      }
+
+      filterButtons.forEach((button) => {
+        button.addEventListener("click", function () {
+          const filter = button.dataset.confereFilter;
+          filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+          applyResultFilter(filter);
+        });
+      });
+
+      turmaFilterButtons.forEach((button) => {
+        button.addEventListener("click", function () {
+          activeTurmaFilter = button.dataset.turmaFilter || "todas";
+          turmaFilterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+          applyResultFilter(activeResultFilter);
+        });
+      });
+
+      if (resultSearch) {
+        resultSearch.addEventListener("input", function () {
+          applyResultFilter(activeResultFilter);
+        });
+      }
+
+      if (printCurrentResultsButton) {
+        printCurrentResultsButton.addEventListener("click", function () {
+          clearPrintSelection();
+          openPrintModal();
+        });
+      }
+
+      [closePrintModalButton, cancelPrintModalButton].forEach((button) => {
+        if (!button) return;
+        button.addEventListener("click", closePrintModal);
+      });
+
+      if (printOptionsModal) {
+        printOptionsModal.addEventListener("click", function (event) {
+          if (event.target === printOptionsModal) closePrintModal();
+        });
+      }
+
+      if (confirmPrintResultsButton) {
+        confirmPrintResultsButton.addEventListener("click", function () {
+          const selectedScope = document.querySelector("input[name='print_scope']:checked");
+          const scope = selectedScope ? selectedScope.value : "divergencias";
+          const printableCount = preparePrintSelection(scope);
+          if (!printableCount) {
+            alert("Nenhum card encontrado para essa opção. Ajuste os filtros ou escolha outro tipo.");
+            return;
+          }
+          closePrintModal();
+          setTimeout(function () {
+            window.print();
+          }, 60);
+        });
+      }
+
+      window.addEventListener("beforeprint", function () {
+        if (!document.getElementById("resultado-conferencia")) return;
+        if (!printSelectionPrepared) preparePrintSelection("divergencias");
+      });
+
+      window.addEventListener("afterprint", clearPrintSelection);
+
+      renderExcelFile();
+      renderSelectedFiles();
+      resetSedScopePreview();
+      const activeFilter = document.querySelector("[data-confere-filter].is-active");
+      if (activeFilter) applyResultFilter(activeFilter.dataset.confereFilter);
+    })();
+  </script>
+{% endblock %}

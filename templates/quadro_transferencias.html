@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Quadro de Transferências{% endblock %}
+
+{% block extra_css %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/quadro_transferencias.css') }}">
+{% endblock %}
+
+{% block content %}
+  {% set enable_eja = enable_eja|default(false) %}
+
+  <div class="transfer-wrapper">
+    <div class="transfer-header">
+      <h2>Quadro de Transferências</h2>
+      <p>
+        Gere o Quadro Informativo (TE, MC, MCC) a partir da aba <strong>LISTA CORRIDA</strong>
+        da Lista Piloto, filtrando por período.
+        {% if enable_eja %}
+          A EJA está habilitada e pode ser enviada opcionalmente.
+        {% else %}
+          A EJA está desativada no sistema no momento.
+        {% endif %}
+      </p>
+
+      <div class="info-box">
+        <strong>Dica:</strong> se você não selecionar a lista do Fundamental, o sistema tentará reutilizar a última
+        Lista Piloto FUNDAMENTAL salva em sessão (se existir).
+      </div>
+    </div>
+
+    <div id="missing-info-alert" class="missing-info-alert" role="alert" aria-live="polite">
+      <div class="title">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>Atenção</div>
+      </div>
+      <p class="desc">
+        O quadro foi gerado, mas foram encontradas <strong>informações importantes ausentes</strong>
+        em alguns registros. Revise os casos abaixo.
+      </p>
+      <ul id="missing-info-list" class="missing-info-list"></ul>
+      <div id="missing-info-note" class="alert-note-truncated" hidden>
+        A lista foi truncada por limite do cabeçalho da resposta. Revise a planilha para verificar todos os casos.
+      </div>
+    </div>
+
+    <div id="flash-container" class="flash-container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            {% set bs_class = 'danger' if category == 'error' else (category if category in ['success', 'info', 'warning', 'primary'] else 'info') %}
+            <div class="alert alert-{{ bs_class }} mb-2" role="alert">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <form id="form-transferencias" method="POST" enctype="multipart/form-data">
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label for="diretor_nome">Diretor(a) / Nome padrão (A8)</label>
+          <input
+            type="text"
+            class="form-control"
+            name="diretor_nome"
+            id="diretor_nome"
+            value="Luciana Rocha Augustinho"
+            placeholder="Nome do diretor(a) / responsável padrão"
+          >
+          <small class="helper-text">
+            Este nome é inserido no cabeçalho do quadro (campo A8). Você pode editar antes de gerar.
+          </small>
+        </div>
+
+        <div class="form-group col-md-6">
+          <label for="data_quadro">Data do quadro (J9)</label>
+          <input
+            type="date"
+            class="form-control"
+            name="data_quadro"
+            id="data_quadro"
+          >
+          <small class="helper-text">
+            Se não informar, o sistema usa a data de hoje automaticamente.
+          </small>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label for="period_start">Data inicial do período</label>
+          <input
+            type="date"
+            class="form-control"
+            name="period_start"
+            id="period_start"
+            required
+          >
+          <small class="helper-text">
+            Início do período de análise.
+          </small>
+        </div>
+        <div class="form-group col-md-6">
+          <label for="period_end">Data final do período</label>
+          <input
+            type="date"
+            class="form-control"
+            name="period_end"
+            id="period_end"
+            required
+          >
+          <small class="helper-text">
+            Fim do período de análise.
+          </small>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="responsavel">Responsável pelo preenchimento (B9)</label>
+        <input
+          type="text"
+          class="form-control"
+          name="responsavel"
+          id="responsavel"
+          placeholder="Nome do responsável pelo quadro"
+          required
+        >
+        <small class="helper-text">
+          Este nome será inserido automaticamente no modelo (B9).
+        </small>
+      </div>
+
+      <div class="upload-group">
+        <div class="section-title">Lista Piloto – Ensino Fundamental</div>
+        <div id="drop-fundamental" class="dropzone">
+          <div class="dropzone-icon-circle">
+            <i class="fas fa-file-excel"></i>
+          </div>
+          <div class="dropzone-text-block">
+            <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+            <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
+            <div class="dropzone-filename" id="fundamental-filename">
+              Nenhum arquivo selecionado.
+            </div>
+          </div>
+          <input
+            type="file"
+            id="lista_fundamental"
+            name="lista_fundamental"
+            accept=".xlsx,.xls,.xlsm"
+          >
+        </div>
+        <div class="helper-text">
+          Se você não selecionar nada, o sistema tentará usar a última Lista Piloto FUNDAMENTAL salva em sessão.
+        </div>
+      </div>
+
+      {% if enable_eja %}
+        <div class="upload-group">
+          <div class="section-title">
+            Lista Piloto – EJA
+            <span class="badge-optional">Opcional</span>
+          </div>
+          <div id="drop-eja" class="dropzone">
+            <div class="dropzone-icon-circle">
+              <i class="fas fa-file-excel"></i>
+            </div>
+            <div class="dropzone-text-block">
+              <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+              <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
+              <div class="dropzone-filename" id="eja-filename">
+                Nenhum arquivo selecionado.
+              </div>
+            </div>
+            <input
+              type="file"
+              id="lista_eja"
+              name="lista_eja"
+              accept=".xlsx,.xls,.xlsm"
+            >
+          </div>
+          <div class="helper-text">
+            Opcional. Se não enviar, o quadro será gerado apenas com o Fundamental.
+          </div>
+        </div>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary btn-block btn-generate">
+        Gerar Quadro de Transferências
+      </button>
+
+      <div class="back-links">
+        <a href="{{ url_for('quadros') }}" class="btn btn-light btn-sm">
+          <i class="fas fa-arrow-left"></i> Voltar para Quadros
+        </a>
+        <span class="helper-text">
+          O arquivo Excel será baixado automaticamente após a geração.
+        </span>
+      </div>
+    </form>
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{{ url_for('static', filename='js/quadro_transferencias.js') }}"></script>
+{% endblock %}

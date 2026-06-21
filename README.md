@@ -1,0 +1,333 @@
+# Sistema da Secretaria Escolar - E.M Jose Padin Mouta
+
+Aplicacao web interna em Flask para apoiar rotinas da secretaria escolar da E.M Jose Padin Mouta. O sistema trabalha principalmente com a Lista Piloto em Excel, fotos de alunos e modelos oficiais de planilhas/documentos para gerar declaracoes, carteirinhas e quadros de acompanhamento.
+
+> Este projeto manipula dados pessoais de alunos. Trate arquivos em `uploads/`, `static/fotos/`, planilhas e documentos gerados como informacao sensivel.
+
+## Funcionalidades
+
+- Login simples por token de acesso.
+- Upload da Lista Piloto do Ensino Fundamental e, opcionalmente, da Lista Piloto EJA.
+- Geracao de declaracoes escolares:
+  - Escolaridade.
+  - Transferencia.
+  - Conclusao.
+  - Frequencia.
+  - Declaracoes em lote para alunos do 5o ano.
+  - Declaracoes personalizadas de conclusao, matricula cancelada e NCOM.
+- Geracao de carteirinhas com foto, dados do aluno e controle de carteirinhas ja impressas.
+- Upload individual, multiplo e inline de fotos de alunos.
+- Geracao de quadros em Excel a partir da Lista Piloto:
+  - Quadro Quantitativo de Inclusao.
+  - Quadro de Atendimento Mensal.
+  - Informativo Semanal / transferencias.
+  - Quadro Quantitativo Mensal de Transferencias Expedidas.
+- Conferencia de listas por blueprint em `/confere`, comparando dados da Lista Piloto com PDFs do SED.
+- Alertas de prazo calculados a partir de feriados em `modelos/feriados.json`.
+
+## Stack
+
+- Python 3.
+- Flask 3.
+- Jinja2.
+- pandas.
+- openpyxl e xlrd para leitura e escrita de Excel.
+- pdfplumber para leitura de PDF no modulo de conferencia.
+- Bootstrap, Font Awesome e CSS nos templates.
+- Gunicorn para deploy.
+
+As dependencias estao em `requirements.txt`.
+
+## Estrutura do Projeto
+
+```text
+.
+|-- app.py                         # Aplicacao Flask principal
+|-- config.py                      # Configuracoes por ambiente e seguranca basica
+|-- confere.py                     # Blueprint de conferencia de listas
+|-- requirements.txt               # Dependencias Python
+|-- Procfile                       # Comando de deploy com Gunicorn
+|-- gunicorn.conf.py               # Configuracao alternativa do Gunicorn
+|-- services/
+|   |-- carteirinhas_log.py        # Log SQLite das carteirinhas impressas
+|   |-- declaracoes.py             # Helpers de dados/texto das declaracoes
+|   |-- fotos.py                   # Busca e salvamento de fotos por RM
+|   |-- prazos.py                  # Regras de feriados e alertas de prazo
+|   |-- quadros_atendimento.py     # Helpers do quadro de atendimento mensal
+|   |-- quadros_inclusao.py        # Helpers do quadro quantitativo de inclusao
+|   |-- quadros_transferencias.py  # Helpers de transferencia e quantitativo mensal
+|   `-- upload_sessions.py         # Salvamento de Excel e persistencia na sessao
+|-- utils/                         # Helpers reutilizaveis de Excel e uploads
+|   |-- dates.py                   # Parsing e formatacao de datas
+|   |-- excel.py                   # Escrita segura em celulas mescladas
+|   |-- text.py                    # Normalizacao de texto/cabecalhos
+|   `-- uploads.py                 # Validacao e nomes seguros de uploads
+|-- tests/                         # Testes unitarios/estaticos basicos
+|-- templates/                     # Telas Jinja2
+|   |-- declaracao_print.html      # Template de impressao das declaracoes unitarias
+|-- static/
+|   |-- logos/                     # Logos usadas nas telas/declaracoes
+|   `-- fotos/                     # Fotos dos alunos, nomeadas por RM
+|-- modelos/                       # Modelos oficiais em Excel, DOC, DOCX e PDF
+|-- uploads/                       # Arquivos enviados e logs gerados em runtime
+`-- README.md
+```
+
+## Preparando o Ambiente
+
+No Windows PowerShell, a partir da raiz do projeto:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Se o ambiente virtual ja existir, basta ativar e instalar/atualizar as dependencias:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+## Rodando Localmente
+
+Copie `.env.example` para `.env` e ajuste ao menos:
+
+```text
+FLASK_SECRET_KEY=uma-chave-longa-e-segura
+ACCESS_TOKEN=token-usado-no-login
+MAX_CONTENT_LENGTH_MB=50
+SCHOOL_YEAR=2026
+CONCLUSAO_5ANO_DATE_TEXT=Praia Grande, 22 de dezembro de 2026
+```
+
+```powershell
+python app.py
+```
+
+Por padrao, o Flask sobe em:
+
+```text
+http://127.0.0.1:5000
+```
+
+Tambem e possivel usar:
+
+```powershell
+flask --app app run --debug
+```
+
+## Fluxo de Uso
+
+1. Acesse a tela de login.
+2. Informe o token de acesso configurado em `ACCESS_TOKEN` no `.env`.
+3. Envie a Lista Piloto do Ensino Fundamental.
+4. Envie a Lista Piloto da EJA somente se for usar fluxos que dependem dela.
+5. Use o painel principal para acessar Declaracoes, Carteirinhas, Quadros ou Conferencia de Listas.
+
+O app guarda os caminhos das listas carregadas na sessao Flask. Ao trocar de navegador, limpar sessao ou reiniciar com outro ambiente, pode ser necessario reenviar a Lista Piloto.
+
+## Arquivos Esperados
+
+### Lista Piloto Fundamental
+
+Varios fluxos esperam uma planilha Excel com a aba `LISTA CORRIDA`. Dependendo da funcionalidade, sao usadas colunas como:
+
+- `RM`
+- `NOME`
+- `DATA NASC.`
+- `RA`
+- `SAI SOZINHO?`
+- `SERIE` / `SERIE`
+- `HORARIO`
+- `OBS`
+- `LOCAL TE`
+- `TIPO TE`
+
+O Quadro de Atendimento Mensal tambem espera a aba `Total de Alunos`.
+
+### Lista Piloto EJA
+
+A EJA e opcional no fluxo geral. Algumas rotinas mantem suporte a EJA quando ha arquivo carregado e, em certos quadros, quando `ENABLE_EJA` esta ativo.
+
+### Fotos dos Alunos
+
+As fotos ficam em `static/fotos/` e sao associadas pelo RM do aluno. O sistema aceita extensoes como `.jpg`, `.jpeg`, `.png`, `.bmp` e `.gif`.
+
+### Modelos
+
+Os modelos ficam em `modelos/` e sao usados como base para os arquivos gerados:
+
+- `Quadro Quantitativo Mensal - Modelo.xlsx`
+- `Quadro Quantitativo de Inclusao - Modelo.xlsx`
+- `Quadro Informativo - Modelo.xlsx`
+- `Quadro de Atendimento Mensal - Modelo.xlsx`
+- `Quadro de Alunos com Deficiencia - Modelo.xlsx`
+- Modelos de matricula, ata, prontuario e estagio em subpastas.
+
+Evite renomear ou mover esses arquivos sem atualizar os caminhos em `app.py`.
+
+## Rotas Principais
+
+| Rota | Descricao |
+| --- | --- |
+| `/login` | Login por token |
+| `/logout` | Encerra a sessao |
+| `/upload_listas` | Upload das listas piloto |
+| `/` | Painel principal |
+| `/declaracao/tipo` | Tela principal de declaracoes |
+| `/declaracao/conclusao_5ano` | Declaracoes de conclusao em lote para 5o ano |
+| `/declaracao/escolaridade_5ano` | Declaracoes de escolaridade em lote para 5o ano |
+| `/carteirinhas` | Geracao de carteirinhas |
+| `/carteirinhas/marcar_impressas` | Marca carteirinhas como impressas |
+| `/upload_foto` | Upload individual de foto |
+| `/upload_multiplas_fotos` | Upload em lote de fotos |
+| `/upload_inline_foto` | Upload de foto durante o fluxo de carteirinha |
+| `/quadros` | Menu de quadros |
+| `/quantinclusao` | Quadro Quantitativo de Inclusao |
+| `/quadros/atendimento_mensal` | Quadro de Atendimento Mensal |
+| `/quadros/transferencias` | Informativo Semanal / transferencias |
+| `/quadros/quantitativo_mensal` | Quadro Quantitativo Mensal de Transferencias |
+| `/conferir-listas` | Atalho interno para Conferencia de Listas |
+| `/confere/` | Conferencia de listas |
+| `/confere/resultado/<id>` | Resultado temporario da conferencia |
+| `/confere/exportar/excel/<id>` | Exportacao Excel do relatorio de conferencia |
+| `/escolas/search` | Busca de escolas para Select2 |
+
+## Configuracoes Importantes
+
+As principais configuracoes por variavel de ambiente sao:
+
+- `FLASK_SECRET_KEY`: chave de sessao do Flask.
+- `ACCESS_TOKEN`: token usado na tela de login.
+- `MAX_CONTENT_LENGTH_MB`: limite global de upload, em MB.
+- `SCHOOL_YEAR`: ano letivo usado em documentos gerados.
+- `CONCLUSAO_5ANO_DATE_TEXT`: texto da data usado nas declaracoes em lote do 5o ano.
+- `INFORMATIVO_WEEKDAY_DUE`: dia da semana do Informativo Semanal (`0` segunda, `4` sexta).
+- `ENABLE_EJA`: ativa trechos opcionais de EJA em quadros suportados.
+- `SESSION_COOKIE_SECURE`: marque `1` apenas quando servido exclusivamente via HTTPS.
+
+Tambem existe suporte a:
+
+```powershell
+$env:ENABLE_EJA="1"
+```
+
+Quando `ENABLE_EJA=1`, os trechos de quadros que suportam EJA tentam considerar a lista EJA carregada.
+
+## Deploy
+
+O `Procfile` define o comando:
+
+```text
+web: gunicorn app:app --bind 0.0.0.0:$PORT --workers 3 --timeout 180 --graceful-timeout 180
+```
+
+Esse formato e compativel com plataformas como Render, que fornecem a variavel `$PORT`.
+
+### Render com PDF de Declaracoes
+
+A geracao oficial das declaracoes em PDF usa Chrome/Chromium em modo headless. Em deploy Python nativo, o Render instala as dependencias Python, mas nao garante automaticamente um navegador do sistema. Para evitar falha em `Gerar declaracao em PDF`, o caminho recomendado neste projeto e usar Docker.
+
+Arquivos adicionados para esse fluxo:
+
+```text
+Dockerfile
+.dockerignore
+scripts/check_pdf_environment.py
+```
+
+O `Dockerfile` usa `python:3.12-slim-bookworm`, instala `chromium` e define:
+
+```text
+DECLARACAO_PDF_BROWSER_PATH=/usr/bin/chromium
+```
+
+No Render:
+
+1. Crie ou ajuste o Web Service para usar Docker.
+2. Configure as variaveis obrigatorias:
+
+```text
+FLASK_SECRET_KEY=...
+ACCESS_TOKEN=...
+MAX_CONTENT_LENGTH_MB=50
+SCHOOL_YEAR=2026
+SESSION_COOKIE_SECURE=1
+```
+
+3. Nao e necessario configurar `DECLARACAO_PDF_BROWSER_PATH` se usar o `Dockerfile`, pois ele ja define `/usr/bin/chromium`.
+4. Apos o deploy, teste login, upload da Lista Piloto e geracao de uma declaracao em PDF.
+
+Para validar a imagem localmente, quando Docker estiver instalado:
+
+```powershell
+docker build -t secretariapadin .
+docker run --env-file .env -p 5000:10000 secretariapadin
+```
+
+Depois acesse:
+
+```text
+http://127.0.0.1:5000
+```
+
+Para testar somente o Chromium/PDF dentro do container:
+
+```powershell
+docker run --env-file .env secretariapadin python scripts/check_pdf_environment.py
+```
+
+Antes de publicar, revise:
+
+- Token e chave secreta.
+- Persistencia da pasta `uploads/`, caso voce espere manter arquivos enviados apos restart/redeploy.
+- Persistencia da pasta `static/fotos/`, caso fotos sejam enviadas pelo sistema em producao. Fotos ja versionadas no repositorio entram na imagem Docker.
+- Disponibilidade dos modelos em `modelos/`.
+- Limites de upload e tempo de resposta para planilhas grandes.
+- Funcionamento da geracao PDF com Chromium.
+
+## Cuidados com Dados
+
+Este repositorio contem arquivos que podem identificar alunos, como fotos, planilhas, PDFs e documentos gerados. Boas praticas:
+
+- Nao publique dados reais em repositorios publicos.
+- Nao envie `uploads/` e `static/fotos/` para ambientes desnecessarios.
+- Remova arquivos temporarios e planilhas antigas quando nao forem mais necessarios.
+- Evite colocar tokens, senhas ou chaves diretamente no codigo.
+
+## Manutencao e Verificacao
+
+Para uma checagem rapida de sintaxe:
+
+```powershell
+python -m py_compile app.py confere.py
+```
+
+Para rodar os testes estaticos de seguranca:
+
+```powershell
+python -m unittest discover -s tests
+```
+
+Ao alterar fluxos de planilha, teste manualmente com uma Lista Piloto representativa, porque boa parte das regras depende da estrutura das abas e colunas.
+
+## Removendo Dados Sensíveis do Git
+
+O `.gitignore` protege novos arquivos em `uploads/`, `static/fotos/`, ambientes virtuais e caches. Para deixar de versionar arquivos ja rastreados sem apagar do disco, use comandos como:
+
+```powershell
+git rm --cached -r uploads static/fotos __pycache__
+```
+
+Revise o resultado com `git status` antes de commitar.
+
+## Pontos de Atencao
+
+- `app.py` concentra quase toda a aplicacao. Mudancas pequenas devem ser bem localizadas.
+- `confere.py` processa a Lista Piloto e multiplos PDFs do SED em lote, salvando resultados temporarios em `uploads/conferencias/`.
+- `templates/prazos_alertas.html` referencia `alerts_mark_sent`, mas nao ha rota correspondente encontrada no codigo atual.
+- A rota `/quadros/inclusao` esta desativada e redireciona para o menu de quadros.
+- As dependencias incluem pacotes de banco de dados/migracao, mas o codigo atual nao usa modelos SQLAlchemy.
