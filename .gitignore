@@ -22,9 +22,9 @@ uploads/*
 *.sqlite
 *.sqlite3
 *.db
-carteirinhas.html
-carteirinhas.pdf
-temp_image.jpg
+/carteirinhas.html
+/carteirinhas.pdf
+/temp_image.jpg
 
 # Office lock files and OS metadata
 ~$*
