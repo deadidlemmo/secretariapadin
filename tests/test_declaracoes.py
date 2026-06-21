@@ -190,7 +190,7 @@ class DeclaracoesServiceTests(unittest.TestCase):
         self.assertEqual(context["nome"], "Aluno Fundamental")
         self.assertEqual(context["serie"], "5\u00ba ano A")
         self.assertEqual(context["data_nasc"], "02/01/2020")
-        self.assertIn("As notas do aluno", context["notas_tabela_html"])
+        self.assertEqual(context["notas_tabela_html"], "")
         self.assertEqual(alunos, [{"rm": "123", "nome": "Aluno Fundamental"}])
 
     def test_load_declaracao_aluno_context_eja_from_lista(self):
@@ -355,7 +355,7 @@ class DeclaracoesServiceTests(unittest.TestCase):
 
         self.assertEqual(context["titulo"], "Declara\u00e7\u00e3o de Transfer\u00eancia")
         self.assertIn("4\u00ba ano", context["declaracao_text"])
-        self.assertIn("Notas", context["declaracao_text"])
+        self.assertNotIn("Notas", context["declaracao_text"])
         self.assertIn("ESCOLA ORIGEM", context["declaracao_text"])
         self.assertIn("Bolsa Fam\u00edlia", context["declaracao_text"])
         self.assertIn("Observa\u00e7\u00f5es:", context["declaracao_text"])

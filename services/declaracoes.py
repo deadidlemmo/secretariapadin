@@ -70,6 +70,10 @@ NOTAS_MATERIAS = [
     ("Arte", "ARTE_1T", "ARTE_2T", "ARTE_3T"),
 ]
 
+# Mantem a rotina de notas pronta para uso futuro, mas oculta a saida na
+# declaracao de transferencia enquanto o documento nao usar essa informacao.
+EXIBIR_NOTAS_TRANSFERENCIA = False
+
 
 def format_rm(value) -> str:
     try:
@@ -167,7 +171,7 @@ def load_declaracao_aluno_context(file_path, rm, segmento, tipo):
             horario = str(horario).strip()
 
         notas_tabela_html = ""
-        if tipo == "Transferencia":
+        if tipo == "Transferencia" and EXIBIR_NOTAS_TRANSFERENCIA:
             notas_tabela_html = build_notas_tabela_html(file_path, rm_num)
 
         return {
@@ -1249,7 +1253,7 @@ def build_declaracao_escolar_context(
             semestre_texto=semestre_texto,
             observacoes_adicionais=observacoes_siae,
         )
-        if tipo == "Transferencia" and notas_tabela_html:
+        if tipo == "Transferencia" and EXIBIR_NOTAS_TRANSFERENCIA and notas_tabela_html:
             declaracao_text += '<div class="declaracao-extra declaracao-notas">'
             declaracao_text += notas_tabela_html
             declaracao_text += "</div>"

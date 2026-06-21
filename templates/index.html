@@ -283,6 +283,11 @@
     background: color-mix(in srgb, var(--app-primary) 5%, var(--app-surface));
   }
 
+  .confere-page .scope-preview.is-detecting {
+    border-color: color-mix(in srgb, var(--app-primary) 50%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary) 9%, var(--app-surface));
+  }
+
   .confere-page .scope-preview[hidden] {
     display: none;
   }
@@ -318,6 +323,40 @@
     font-weight: 900;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .confere-page .scope-preview.is-detecting #sed-scope-turmas {
+    color: var(--app-primary-dark);
+  }
+
+  .confere-page .scope-preview.is-detecting #sed-scope-turmas::after {
+    content: "...";
+    display: inline-block;
+    width: 1.2em;
+    text-align: left;
+    animation: scope-detect-dots 1.2s steps(4, end) infinite;
+  }
+
+  @keyframes scope-detect-dots {
+    0% {
+      content: "";
+    }
+    25% {
+      content: ".";
+    }
+    50% {
+      content: "..";
+    }
+    75%,
+    100% {
+      content: "...";
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .confere-page .scope-preview.is-detecting #sed-scope-turmas::after {
+      animation: none;
+    }
   }
 
   .confere-page .scope-errors {
@@ -1636,14 +1675,14 @@
         <div class="app-loading-orb app-loading-spinner" aria-hidden="true">
           <i class="fas fa-clipboard-check"></i>
         </div>
-        <p class="app-loading-kicker">ConferÃªncia em andamento</p>
+        <p class="app-loading-kicker">Confer&ecirc;ncia em andamento</p>
         <p class="app-loading-message" id="loadingStatusMessage">
           Conferindo listas... Aguarde enquanto o sistema lê os PDFs do SED e compara com a Lista Piloto.
         </p>
         <div class="app-loading-progress" aria-hidden="true">
           <span></span>
         </div>
-        <ol class="app-loading-steps" aria-label="Etapas da conferÃªncia">
+        <ol class="app-loading-steps" aria-label="Etapas da confer&ecirc;ncia">
           <li class="is-active" data-loading-step="0">Ler PDFs</li>
           <li data-loading-step="1">Extrair alunos</li>
           <li data-loading-step="2">Comparar bases</li>
@@ -1775,12 +1814,36 @@
       let loadingStepTimer = null;
       let loadingStepIndex = 0;
       let activeConferenceController = null;
+      let sedScopePending = false;
+      let conferenceSubmitting = false;
+      const submitButtonReadyHtml = submitButton ? submitButton.innerHTML : "";
+      const submitButtonDetectingHtml = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Detectando turmas...';
       const loadingMessages = [
         "Lendo os PDFs do SED e preparando os dados da Lista Piloto.",
-        "Extraindo alunos, RAs, turmas e situacoes dos arquivos anexados.",
-        "Comparando Lista Piloto com SED e identificando divergencias.",
-        "Organizando o resultado final para exibicao."
+        "Extraindo alunos, RAs, turmas e situa\u00e7\u00f5es dos arquivos anexados.",
+        "Comparando Lista Piloto com SED e identificando diverg\u00eancias.",
+        "Organizando o resultado final para exibi\u00e7\u00e3o."
       ];
+
+      function updateSubmitButtonState() {
+        if (!submitButton) return;
+        const hasPdfs = selectedFiles.length > 0;
+        submitButton.disabled = conferenceSubmitting || sedScopePending || !hasPdfs;
+
+        if (sedScopePending) {
+          submitButton.innerHTML = submitButtonDetectingHtml;
+          submitButton.title = "Aguarde a detec\u00e7\u00e3o das turmas dos PDFs terminar.";
+          return;
+        }
+
+        submitButton.innerHTML = submitButtonReadyHtml;
+        submitButton.title = hasPdfs ? "" : "Anexe pelo menos um PDF do SED.";
+      }
+
+      function setSedScopePending(isPending) {
+        sedScopePending = Boolean(isPending);
+        updateSubmitButtonState();
+      }
 
       function resetLoadingOverlay() {
         window.clearTimeout(loadingLongTimer);
@@ -1814,7 +1877,8 @@
 
       function showLoadingOverlay() {
         resetLoadingOverlay();
-        if (submitButton) submitButton.disabled = true;
+        conferenceSubmitting = true;
+        updateSubmitButtonState();
         if (loadingOverlay) {
           loadingOverlay.style.display = "flex";
           loadingOverlay.setAttribute("aria-hidden", "false");
@@ -1823,12 +1887,13 @@
         loadingLongTimer = window.setTimeout(function () {
           if (loadingLongHint) loadingLongHint.hidden = false;
           if (loadingActions) loadingActions.hidden = false;
-        }, 25000);
+        }, 60000);
       }
 
       function hideLoadingOverlay() {
         resetLoadingOverlay();
-        if (submitButton) submitButton.disabled = false;
+        conferenceSubmitting = false;
+        updateSubmitButtonState();
         if (loadingOverlay) {
           loadingOverlay.style.display = "none";
           loadingOverlay.setAttribute("aria-hidden", "true");
@@ -1840,7 +1905,8 @@
         window.clearInterval(loadingStepTimer);
         loadingLongTimer = null;
         loadingStepTimer = null;
-        if (submitButton) submitButton.disabled = false;
+        conferenceSubmitting = false;
+        updateSubmitButtonState();
         if (loadingLongHint) loadingLongHint.hidden = true;
         if (loadingOverlay) {
           loadingOverlay.style.display = "flex";
@@ -1928,35 +1994,44 @@
           item.appendChild(remove);
           fileList.appendChild(item);
         });
+        updateSubmitButtonState();
       }
 
       function resetSedScopePreview() {
         if (!sedScopePreview) return;
         sedScopePreview.hidden = true;
+        sedScopePreview.classList.remove("is-detecting");
         sedScopeTurmas.textContent = "-";
+        sedScopeTurmas.title = "";
         sedScopeValidos.textContent = "0";
         sedScopeIgnorados.textContent = "0";
         sedScopeErrors.innerHTML = "";
+        setSedScopePending(false);
       }
 
       function renderSedScopeLoading() {
         if (!sedScopePreview) return;
         sedScopePreview.hidden = false;
-        sedScopeTurmas.textContent = "Detectando...";
+        sedScopePreview.classList.add("is-detecting");
+        sedScopeTurmas.textContent = "Detectando turmas dos PDFs";
+        sedScopeTurmas.title = "Detectando turmas dos PDFs";
         sedScopeValidos.textContent = "-";
         sedScopeIgnorados.textContent = "-";
         sedScopeErrors.innerHTML = "";
+        setSedScopePending(true);
       }
 
       function renderSedScopePreview(data) {
         if (!sedScopePreview) return;
         const turmas = data.turmas && data.turmas.length ? data.turmas.join(", ") : "Nenhuma turma detectada";
         sedScopePreview.hidden = false;
+        sedScopePreview.classList.remove("is-detecting");
         sedScopeTurmas.textContent = turmas;
         sedScopeTurmas.title = turmas;
         sedScopeValidos.textContent = data.pdfs_validos || 0;
         sedScopeIgnorados.textContent = data.pdfs_ignorados || 0;
         sedScopeErrors.innerHTML = "";
+        setSedScopePending(false);
 
         const details = []
           .concat(data.errors || [])
@@ -1973,12 +2048,13 @@
       }
 
       function previewSedScope() {
+        const requestId = ++sedPreviewRequestId;
+
         if (!selectedFiles.length) {
           resetSedScopePreview();
           return;
         }
 
-        const requestId = ++sedPreviewRequestId;
         const formData = new FormData();
         selectedFiles.forEach((file) => formData.append("sed_pdfs", file));
         renderSedScopeLoading();
@@ -1999,10 +2075,13 @@
           .catch(() => {
             if (requestId !== sedPreviewRequestId || !sedScopePreview) return;
             sedScopePreview.hidden = false;
+            sedScopePreview.classList.remove("is-detecting");
             sedScopeTurmas.textContent = "Não foi possível detectar";
+            sedScopeTurmas.title = "Não foi possível detectar";
             sedScopeValidos.textContent = "-";
             sedScopeIgnorados.textContent = "-";
             sedScopeErrors.innerHTML = "<li>Não foi possível gerar a prévia dos PDFs selecionados.</li>";
+            setSedScopePending(false);
           });
       }
 
@@ -2098,6 +2177,11 @@
           if (!sedInput.files.length) {
             event.preventDefault();
             alert("Anexe pelo menos um PDF do SED antes de executar a conferência.");
+            return;
+          }
+          if (sedScopePending) {
+            event.preventDefault();
+            alert("Aguarde a detecção das turmas dos PDFs terminar antes de executar a conferência.");
             return;
           }
           event.preventDefault();
@@ -2332,6 +2416,7 @@
       renderExcelFile();
       renderSelectedFiles();
       resetSedScopePreview();
+      updateSubmitButtonState();
       const activeFilter = document.querySelector("[data-confere-filter].is-active");
       if (activeFilter) applyResultFilter(activeFilter.dataset.confereFilter);
     })();

@@ -549,8 +549,8 @@ body:not(#carteirinhas-page) .btn-danger,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 24, 21, 0.64);
-  backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--app-bg) 76%, transparent);
+  backdrop-filter: blur(6px);
 }
 
 .app-loading-panel {
@@ -558,15 +558,15 @@ body:not(#carteirinhas-page) .btn-danger,
   display: grid;
   gap: 16px;
   padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid color-mix(in srgb, var(--app-primary) 24%, var(--app-border));
   border-radius: var(--app-radius);
   background:
-    radial-gradient(circle at 18% 0%, rgba(127, 184, 170, 0.16), transparent 36%),
-    rgba(15, 24, 21, 0.90);
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--app-primary) 12%, transparent), transparent 36%),
+    var(--app-surface);
   text-align: center;
-  color: #ffffff;
+  color: var(--app-text);
   font-family: Montserrat, Arial, sans-serif;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+  box-shadow: var(--app-shadow);
 }
 
 .app-loading-orb,
@@ -577,18 +577,18 @@ body:not(#carteirinhas-page) .btn-danger,
   align-items: center;
   justify-content: center;
   justify-self: center;
-  border: 1px solid rgba(167, 207, 195, 0.44);
+  border: 1px solid color-mix(in srgb, var(--app-primary) 34%, var(--app-border));
   border-radius: 50%;
-  background: linear-gradient(135deg, rgb(38, 115, 101), rgb(117, 178, 164));
+  background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
   color: #ffffff;
   font-size: 1.25rem;
-  box-shadow: 0 0 0 0 rgba(127, 184, 170, 0.36);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-primary) 34%, transparent);
   animation: app-loading-pulse 1.7s ease-in-out infinite;
 }
 
 .app-loading-kicker {
   margin: 0 0 4px;
-  color: rgb(167, 207, 195);
+  color: var(--app-primary);
   font-size: 0.76rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -607,7 +607,7 @@ body:not(#carteirinhas-page) .btn-danger,
   height: 9px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--app-border) 70%, var(--app-surface-muted));
 }
 
 .app-loading-progress span {
@@ -615,7 +615,7 @@ body:not(#carteirinhas-page) .btn-danger,
   inset: 0 auto 0 0;
   width: 46%;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgb(117, 178, 164), rgb(232, 185, 96), rgb(117, 178, 164));
+  background: linear-gradient(90deg, var(--app-primary), var(--app-accent), var(--app-primary));
   animation: app-loading-bar 1.35s ease-in-out infinite;
 }
 
@@ -634,22 +634,23 @@ body:not(#carteirinhas-page) .btn-danger,
   align-items: center;
   justify-content: center;
   padding: 6px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--app-border);
   border-radius: var(--app-pill-radius);
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.72);
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
   font-size: 0.72rem;
   font-weight: 850;
 }
 
 .app-loading-steps li.is-active {
-  border-color: rgba(167, 207, 195, 0.72);
-  background: rgba(127, 184, 170, 0.18);
-  color: #ffffff;
+  border-color: color-mix(in srgb, var(--app-primary) 64%, var(--app-border));
+  background: color-mix(in srgb, var(--app-primary) 14%, var(--app-surface));
+  color: var(--app-primary-dark);
 }
 
 .app-loading-steps li.is-done {
-  color: rgb(167, 207, 195);
+  border-color: color-mix(in srgb, var(--app-primary) 30%, var(--app-border));
+  color: var(--app-primary);
 }
 
 .app-loading-hint,
@@ -660,15 +661,15 @@ body:not(#carteirinhas-page) .btn-danger,
 }
 
 .app-loading-hint {
-  color: #dbeae4;
+  color: var(--app-muted);
 }
 
 .app-loading-error {
   padding: 10px 12px;
-  border: 1px solid rgba(239, 153, 126, 0.5);
+  border: 1px solid color-mix(in srgb, var(--app-danger) 42%, var(--app-border));
   border-radius: var(--app-control-radius);
-  background: rgba(122, 38, 38, 0.32);
-  color: #ffe1dc;
+  background: color-mix(in srgb, var(--app-danger) 12%, var(--app-surface));
+  color: var(--app-danger);
   font-weight: 800;
 }
 
@@ -680,20 +681,20 @@ body:not(#carteirinhas-page) .btn-danger,
 
 .app-loading-actions .btn-secondary-action {
   min-height: 40px;
-  border-color: rgba(167, 207, 195, 0.52);
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff !important;
+  border-color: color-mix(in srgb, var(--app-primary) 36%, var(--app-border));
+  background: var(--app-surface-muted);
+  color: var(--app-primary-dark) !important;
 }
 
 @keyframes app-loading-pulse {
   0%,
   100% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(127, 184, 170, 0.34);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-primary) 34%, transparent);
   }
   50% {
     transform: scale(1.04);
-    box-shadow: 0 0 0 12px rgba(127, 184, 170, 0);
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--app-primary) 0%, transparent);
   }
 }
 
@@ -807,8 +808,8 @@ body:not(#carteirinhas-page) .btn-danger,
 }
 
 .confere-page #loadingOverlay {
-  background: rgba(15, 24, 21, 0.70);
-  backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--app-bg) 78%, transparent);
+  backdrop-filter: blur(6px);
 }
 
 @media (max-width: 768px) {
