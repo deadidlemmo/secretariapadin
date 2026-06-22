@@ -157,9 +157,9 @@ def escolas_search():
         df_filtered = df_filtered.head(50)
 
         for _, row in df_filtered.iterrows():
-            nome = str(row[3]).strip()
-            municipio = str(row[2]).strip()
-            uf = str(row[1]).strip()
+            nome = str(row.iloc[3]).strip()
+            municipio = str(row.iloc[2]).strip()
+            uf = str(row.iloc[1]).strip()
             text = f"{nome} - {municipio}/{uf}"
             results.append({"id": nome, "text": text})
 
@@ -329,11 +329,6 @@ def gerar_declaracao_escolar(
 
     # Se um segundo caminho foi informado (lista reenviada), ele tem prioridade.
     effective_path = file_path2 if file_path2 is not None else file_path
-    if file_path2 is not None:
-        print("[DEBUG] gerar_declaracao_escolar: usando file_path2 =", effective_path)
-    else:
-        print("[DEBUG] gerar_declaracao_escolar: usando file_path  =", effective_path)
-
     segmento_declaracao = session.get("declaracao_tipo")
     aluno_context = load_declaracao_aluno_context(
         effective_path,
