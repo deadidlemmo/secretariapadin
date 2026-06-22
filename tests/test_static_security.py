@@ -421,7 +421,7 @@ class StaticSecurityTests(unittest.TestCase):
             "order: 4",
             "order: 3",
             "width: min(100%, 1280px)",
-            "width: min(100%, 360px)",
+            "width: min(100%, 300px)",
             "min-width: 150px",
             ".status-symbol::after",
             "border-width: 0 0.045cm 0.045cm 0",

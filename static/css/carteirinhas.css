@@ -1086,11 +1086,11 @@
         flex-direction: row;
         align-items: center;
         justify-content: center;
-        gap: 12px;
-        flex-wrap: wrap;
+        gap: 8px;
+        flex-wrap: nowrap;
         width: 100%;
         box-sizing: border-box;
-        padding: 16px clamp(24px, 4vw, 56px);
+        padding: 14px clamp(16px, 3vw, 40px);
         margin-bottom: 20px !important;
         background: var(--card-screen-surface);
         border: 1px solid var(--card-screen-border);
@@ -1111,14 +1111,14 @@
         margin: 0;
         display: inline-flex;
         justify-content: center;
-        flex: 0 1 360px;
+        flex: 0 1 300px;
         box-sizing: border-box;
       }
 
       #localizarAluno {
-        width: min(100%, 360px);
+        width: min(100%, 300px);
         min-height: var(--card-screen-control-height);
-        padding: 0 16px;
+        padding: 0 14px;
         border: 1px solid var(--card-screen-border);
         border-radius: var(--card-screen-control-radius);
         background: var(--card-screen-field);
@@ -1152,9 +1152,10 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 7px;
         border-radius: var(--card-screen-control-radius);
         font-weight: 800;
+        font-size: 12px;
         letter-spacing: 0;
         box-shadow: 0 10px 20px rgba(30, 53, 47, 0.12);
         margin: 0;
@@ -1204,7 +1205,7 @@
         background: transparent;
         border: 0;
         box-shadow: none;
-        gap: 10px;
+        gap: 8px;
         padding: 0;
         margin: 0;
       }
@@ -1212,13 +1213,14 @@
       .filtro-foto-form label {
         min-height: var(--card-screen-control-height);
         color: var(--card-screen-text);
-        padding: 0 14px;
+        padding: 0 12px;
         letter-spacing: 0;
         border: 1px solid var(--card-screen-border);
         border-radius: var(--card-screen-control-radius);
         background: var(--card-screen-elevated);
         box-shadow: 0 10px 20px rgba(30, 53, 47, 0.08);
         white-space: nowrap;
+        font-size: 12px;
       }
 
       .filtro-foto-form input[type="checkbox"] {
@@ -1230,14 +1232,15 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        flex-wrap: wrap;
+        gap: 7px;
+        flex-wrap: nowrap;
         min-height: var(--card-screen-control-height);
+        flex: 0 0 auto;
       }
 
       .selection-action-btn {
         min-height: var(--card-screen-control-height);
-        padding: 0 14px;
+        padding: 0 12px;
         border: 1px solid var(--card-screen-border);
         color: var(--card-screen-text);
         background: var(--card-screen-elevated);
@@ -1249,6 +1252,7 @@
         color: #ffffff;
         background: linear-gradient(135deg, var(--card-screen-primary-dark), var(--card-screen-primary));
         border-color: transparent;
+        min-width: 196px;
       }
 
       .selection-action-btn:hover:not(:disabled) {
@@ -1495,7 +1499,7 @@
         }
 
         #carteirinhas-page .carteirinhas-toolbar .imprimir-carteirinhas {
-          min-width: 190px;
+          min-width: 172px;
           margin-left: 0;
         }
 
@@ -1504,7 +1508,7 @@
         }
 
         #localizarAluno {
-          width: min(100%, 360px);
+          width: min(100%, 300px);
         }
       }
     }

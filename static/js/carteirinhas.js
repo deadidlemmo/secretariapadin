@@ -125,27 +125,54 @@ function imprimirCarteirinhas() {
     var cssHref = cssLink ? cssLink.href : '';
 
     var printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Nao foi possivel abrir a janela de impressao. Verifique se o navegador bloqueou pop-ups.');
+      return;
+    }
+
     printWindow.document.open();
     printWindow.document.write(
       '<!DOCTYPE html><html lang="pt-br"><head>' +
       '<meta charset="utf-8"><title>Carteirinhas - Impressão</title>' +
+      '<style>' +
+        'html,body{margin:0;min-height:100%;background:#eef6f3;color:#173144;font-family:Arial,sans-serif;}' +
+        'body.print-preparing .carteirinhas-container{visibility:hidden;}' +
+        '.print-preload{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#eef6f3;color:#173144;font:700 15px Arial,sans-serif;}' +
+        '.print-preload-box{display:flex;align-items:center;gap:12px;padding:16px 20px;border:1px solid #d9e4df;border-radius:12px;background:#fff;box-shadow:0 12px 32px rgba(30,53,47,.16);}' +
+        '.print-preload-spinner{width:22px;height:22px;border:3px solid #d9e4df;border-top-color:#1f6f5f;border-radius:50%;animation:printSpin .8s linear infinite;}' +
+        '@keyframes printSpin{to{transform:rotate(360deg)}}' +
+        '@media print{.print-preload{display:none!important}body.print-preparing .carteirinhas-container{visibility:visible}}' +
+      '</style>' +
       (cssHref ? '<link rel="stylesheet" href="' + cssHref + '">' : '') +
-      '</head><body>' +
+      '</head><body id="carteirinhas-page" class="print-preparing">' +
+      '<div class="print-preload" id="print-preload"><div class="print-preload-box"><span class="print-preload-spinner"></span><span>Preparando impressao...</span></div></div>' +
       container.outerHTML +
       '<script>' +
         'window.onafterprint = function(){' +
           'try{ if(window.opener && window.opener._marcarImpressas){ window.opener._marcarImpressas(' + JSON.stringify(rms) + '); } }catch(e){}' +
         '};' +
+        'window.addEventListener("load", function(){' +
+          'setTimeout(function(){' +
+            'document.body.classList.remove("print-preparing");' +
+            'var loader = document.getElementById("print-preload");' +
+            'if(loader){ loader.remove(); }' +
+            'setTimeout(function(){' +
+              'window.focus();' +
+              'window.print();' +
+              'setTimeout(function(){ try{ window.close(); }catch(e){} }, 700);' +
+            '}, 120);' +
+          '}, 120);' +
+        '});' +
       '<\/script>' +
       '</body></html>'
     );
     printWindow.document.close();
     printWindow.focus();
-    printWindow.onload = function() {
+    /*
       printWindow.print();
       // não fecha imediatamente para garantir afterprint em alguns navegadores
       setTimeout(function(){ try{ printWindow.close(); }catch(e){} }, 700);
-    };
+    */
 }
 
 function imprimirPagina(botao) {
@@ -290,26 +317,50 @@ function imprimirCarteirinhasSelecionadas() {
   printWindow.document.write(
     '<!DOCTYPE html><html lang="pt-br"><head>' +
     '<meta charset="utf-8"><title>Carteirinhas selecionadas</title>' +
+    '<style>' +
+      'html,body{margin:0;min-height:100%;background:#eef6f3;color:#173144;font-family:Arial,sans-serif;}' +
+      'body.print-preparing .selected-print-container{visibility:hidden;}' +
+      '.print-preload{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#eef6f3;color:#173144;font:700 15px Arial,sans-serif;}' +
+      '.print-preload-box{display:flex;align-items:center;gap:12px;padding:16px 20px;border:1px solid #d9e4df;border-radius:12px;background:#fff;box-shadow:0 12px 32px rgba(30,53,47,.16);}' +
+      '.print-preload-spinner{width:22px;height:22px;border:3px solid #d9e4df;border-top-color:#1f6f5f;border-radius:50%;animation:printSpin .8s linear infinite;}' +
+      '@keyframes printSpin{to{transform:rotate(360deg)}}' +
+      '@media print{.print-preload{display:none!important}body.print-preparing .selected-print-container{visibility:visible}}' +
+    '</style>' +
     (cssHref ? '<link rel="stylesheet" href="' + cssHref + '">' : '') +
-    '</head><body id="carteirinhas-page" class="selected-print-window">' +
+    '</head><body id="carteirinhas-page" class="selected-print-window print-preparing">' +
+    '<div class="print-preload" id="print-preload"><div class="print-preload-box"><span class="print-preload-spinner"></span><span>Preparando impressao...</span></div></div>' +
     montarHtmlCarteirinhasSelecionadas(selecionados) +
     '<script>' +
       'window.onafterprint = function(){' +
         'try{ if(window.opener && window.opener._marcarImpressas){ window.opener._marcarImpressas(' + JSON.stringify(rms) + '); } }catch(e){}' +
       '};' +
+      'window.addEventListener("load", function(){' +
+        'setTimeout(function(){' +
+          'document.body.classList.remove("print-preparing");' +
+          'var loader = document.getElementById("print-preload");' +
+          'if(loader){ loader.remove(); }' +
+          'setTimeout(function(){' +
+            'window.focus();' +
+            'window.print();' +
+            'setTimeout(function(){ try{ window.close(); }catch(e){} }, 700);' +
+          '}, 120);' +
+        '}, 120);' +
+      '});' +
     '<\/script>' +
     '</body></html>'
   );
   printWindow.document.close();
   printWindow.focus();
-  printWindow.onload = function() {
-    printWindow.print();
-    setTimeout(function(){ try{ printWindow.close(); }catch(e){} }, 700);
-  };
 }
 
 function inicializarSelecaoCarteirinhas() {
   document.querySelectorAll('.card-select-checkbox').forEach(function(input) {
+    input.checked = false;
+    var initialCard = input.closest('.borda-pontilhada');
+    if (initialCard) {
+      initialCard.classList.remove('selected-card');
+    }
+
     input.addEventListener('change', function() {
       var card = input.closest('.borda-pontilhada');
       if (card) {
