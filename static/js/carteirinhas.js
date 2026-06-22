@@ -173,6 +173,170 @@ function imprimirPagina(botao) {
     }, 100);
 }
 
+function cardEstaVisivel(card) {
+  if (!card) return false;
+  var page = card.closest('.page');
+  if (page && window.getComputedStyle(page).display === 'none') return false;
+  if (window.getComputedStyle(card).display === 'none') return false;
+  return Boolean(card.offsetWidth || card.offsetHeight || card.getClientRects().length);
+}
+
+function obterCardsSelecionados() {
+  return Array.prototype.slice.call(document.querySelectorAll('.borda-pontilhada.selected-card'));
+}
+
+function coletarRMsDeCards(cards) {
+  var seen = {};
+  var rms = [];
+  (cards || []).forEach(function(card) {
+    var rm = card && card.getAttribute ? card.getAttribute('data-rm') : null;
+    if (!rm) return;
+    var valor = parseInt(rm, 10);
+    if (isNaN(valor) || valor <= 0 || seen[valor]) return;
+    seen[valor] = true;
+    rms.push(valor);
+  });
+  return rms;
+}
+
+function atualizarSelecaoCarteirinhas() {
+  var selecionados = obterCardsSelecionados();
+  var total = selecionados.length;
+  var printButton = document.getElementById('btn-imprimir-selecionadas');
+  var clearButton = document.getElementById('btn-limpar-selecao');
+
+  if (printButton) {
+    printButton.disabled = total === 0;
+    printButton.innerHTML = '<i class="fas fa-print" aria-hidden="true"></i> Imprimir selecionadas (' + total + ')';
+  }
+
+  if (clearButton) {
+    clearButton.disabled = total === 0;
+  }
+}
+
+function limparSelecaoCarteirinhas() {
+  document.querySelectorAll('.card-select-checkbox').forEach(function(input) {
+    input.checked = false;
+    var card = input.closest('.borda-pontilhada');
+    if (card) card.classList.remove('selected-card');
+  });
+  atualizarSelecaoCarteirinhas();
+}
+
+function selecionarCarteirinhasVisiveis() {
+  var total = 0;
+  document.querySelectorAll('.borda-pontilhada').forEach(function(card) {
+    if (!cardEstaVisivel(card)) return;
+    var input = card.querySelector('.card-select-checkbox');
+    if (!input) return;
+    input.checked = true;
+    card.classList.add('selected-card');
+    total += 1;
+  });
+
+  atualizarSelecaoCarteirinhas();
+  if (!total) {
+    alert('Nenhuma carteirinha visivel para selecionar.');
+  }
+}
+
+function prepararCloneCarteirinhaParaImpressao(card) {
+  var clone = card.cloneNode(true);
+  clone.style.display = '';
+  clone.classList.remove('selected-card', 'card-highlight');
+  clone.querySelectorAll('.no-print, .card-select-control, .inline-upload').forEach(function(el) {
+    el.remove();
+  });
+  return clone.outerHTML;
+}
+
+function montarHtmlCarteirinhasSelecionadas(cards) {
+  var html = '<div class="carteirinhas-container selected-print-container">';
+
+  for (var i = 0; i < cards.length; i += 6) {
+    var pageCards = cards.slice(i, i + 6);
+    html += '<div class="page selected-print-page">';
+    html += '<div class="page-number">Selecionadas - Pagina ' + (Math.floor(i / 6) + 1) + '</div>';
+    html += '<div class="cards-grid">';
+    pageCards.forEach(function(card) {
+      html += prepararCloneCarteirinhaParaImpressao(card);
+    });
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function imprimirCarteirinhasSelecionadas() {
+  var selecionados = obterCardsSelecionados();
+  if (!selecionados.length) {
+    alert('Selecione ao menos uma carteirinha para imprimir.');
+    return;
+  }
+
+  var rms = coletarRMsDeCards(selecionados);
+  var cssLink = document.getElementById('carteirinhas-css');
+  var cssHref = cssLink ? cssLink.href : '';
+  var printWindow = window.open('', '_blank');
+
+  if (!printWindow) {
+    alert('Nao foi possivel abrir a janela de impressao. Verifique se o navegador bloqueou pop-ups.');
+    return;
+  }
+
+  printWindow.document.open();
+  printWindow.document.write(
+    '<!DOCTYPE html><html lang="pt-br"><head>' +
+    '<meta charset="utf-8"><title>Carteirinhas selecionadas</title>' +
+    (cssHref ? '<link rel="stylesheet" href="' + cssHref + '">' : '') +
+    '</head><body id="carteirinhas-page" class="selected-print-window">' +
+    montarHtmlCarteirinhasSelecionadas(selecionados) +
+    '<script>' +
+      'window.onafterprint = function(){' +
+        'try{ if(window.opener && window.opener._marcarImpressas){ window.opener._marcarImpressas(' + JSON.stringify(rms) + '); } }catch(e){}' +
+      '};' +
+    '<\/script>' +
+    '</body></html>'
+  );
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.onload = function() {
+    printWindow.print();
+    setTimeout(function(){ try{ printWindow.close(); }catch(e){} }, 700);
+  };
+}
+
+function inicializarSelecaoCarteirinhas() {
+  document.querySelectorAll('.card-select-checkbox').forEach(function(input) {
+    input.addEventListener('change', function() {
+      var card = input.closest('.borda-pontilhada');
+      if (card) {
+        card.classList.toggle('selected-card', input.checked);
+      }
+      atualizarSelecaoCarteirinhas();
+    });
+  });
+
+  var selectVisibleButton = document.getElementById('btn-selecionar-visiveis');
+  if (selectVisibleButton) {
+    selectVisibleButton.addEventListener('click', selecionarCarteirinhasVisiveis);
+  }
+
+  var clearButton = document.getElementById('btn-limpar-selecao');
+  if (clearButton) {
+    clearButton.addEventListener('click', limparSelecaoCarteirinhas);
+  }
+
+  var printSelectedButton = document.getElementById('btn-imprimir-selecionadas');
+  if (printSelectedButton) {
+    printSelectedButton.addEventListener('click', imprimirCarteirinhasSelecionadas);
+  }
+
+  atualizarSelecaoCarteirinhas();
+}
+
 function mostrarRelatorioAlunosSemFotos() {
     var container = document.getElementById('relatorio-container');
     if (container) {
@@ -342,6 +506,8 @@ if (localizarInput) {
 
 var flashTimeout = null;
 document.addEventListener('DOMContentLoaded', function() {
+    inicializarSelecaoCarteirinhas();
+
     document.querySelectorAll('.uploadable').forEach(function(element) {
       element.addEventListener('click', function() {
         var rm = element.getAttribute('data-rm');

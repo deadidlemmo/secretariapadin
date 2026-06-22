@@ -88,6 +88,21 @@
         <i class="fas fa-print" aria-hidden="true"></i>
         Imprimir Carteirinhas
       </button>
+
+      <div class="selection-toolbar-group" aria-label="Selecao de carteirinhas">
+        <button type="button" class="selection-action-btn secondary" id="btn-selecionar-visiveis">
+          <i class="fas fa-check-square" aria-hidden="true"></i>
+          Selecionar visiveis
+        </button>
+        <button type="button" class="selection-action-btn secondary" id="btn-limpar-selecao" disabled>
+          <i class="fas fa-eraser" aria-hidden="true"></i>
+          Limpar selecao
+        </button>
+        <button type="button" class="selection-action-btn primary" id="btn-imprimir-selecionadas" disabled>
+          <i class="fas fa-print" aria-hidden="true"></i>
+          Imprimir selecionadas (0)
+        </button>
+      </div>
       </div>
 
       <div id="search-container" class="no-print">
@@ -103,6 +118,13 @@
           <div class="cards-grid">
             {% for aluno in page %}
               <div class="borda-pontilhada" data-rm="{{ aluno.rm }}">
+                <label class="card-select-control no-print" title="Selecionar esta carteirinha">
+                  <input type="checkbox"
+                         class="card-select-checkbox"
+                         data-rm="{{ aluno.rm }}"
+                         aria-label="Selecionar carteirinha de {{ aluno.nome }}">
+                  <span aria-hidden="true"><i class="fas fa-check"></i></span>
+                </label>
                 <div class="carteirinha">
                   <div class="card-header-band">
                     <div class="card-school-mark">
