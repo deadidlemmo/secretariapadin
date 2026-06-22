@@ -526,6 +526,36 @@
     color: #fff;
   }
 
+  html[data-theme="dark"] .confere-page .btn-confere,
+  html[data-theme="dark"] .confere-page .btn-export,
+  html[data-theme="dark"] .confere-page .print-modal-actions .btn-confere {
+    border-color: rgb(91, 154, 141);
+    background: linear-gradient(135deg, rgb(31, 102, 89), rgb(43, 128, 113));
+    color: rgb(248, 255, 252) !important;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+  }
+
+  html[data-theme="dark"] .confere-page .btn-confere:hover,
+  html[data-theme="dark"] .confere-page .btn-export:hover,
+  html[data-theme="dark"] .confere-page .print-modal-actions .btn-confere:hover {
+    border-color: rgb(119, 184, 170);
+    background: linear-gradient(135deg, rgb(37, 118, 103), rgb(52, 145, 129));
+    color: rgb(255, 255, 255) !important;
+  }
+
+  html[data-theme="dark"] .confere-page .filter-row button.is-active,
+  html[data-theme="dark"] .confere-page .turma-filter-row button.is-active {
+    border-color: rgb(111, 174, 160);
+    background: linear-gradient(135deg, rgb(28, 91, 80), rgb(39, 115, 101));
+    color: rgb(248, 255, 252);
+  }
+
+  html[data-theme="dark"] .confere-page .filter-row button.is-active .filter-count,
+  html[data-theme="dark"] .confere-page .turma-filter-row button.is-active .filter-count {
+    background: rgba(255, 255, 255, 0.16);
+    color: rgb(255, 255, 255);
+  }
+
   .confere-page .result-controls {
     display: flex;
     align-items: center;
@@ -1984,6 +2014,42 @@
         });
       }
 
+      function categoryMatchesResultFilter(category, filter) {
+        return filter === "todos" || category === filter || (filter === "pendencias" && category !== "ok");
+      }
+
+      function updateTurmaFilterCounts(search) {
+        const countsByTurma = new Map();
+        let totalCount = 0;
+
+        document.querySelectorAll("[data-result-group]").forEach((group) => {
+          const turmaKey = group.dataset.turmaKey || "";
+          let groupCount = 0;
+
+          group.querySelectorAll("[data-category]").forEach((row) => {
+            const category = row.dataset.category;
+            const categoryVisible = categoryMatchesResultFilter(category, activeResultFilter);
+            const searchVisible = !search || (row.dataset.search || "").includes(search);
+
+            if (categoryVisible && searchVisible) {
+              groupCount += 1;
+            }
+          });
+
+          countsByTurma.set(turmaKey, groupCount);
+          totalCount += groupCount;
+        });
+
+        turmaFilterButtons.forEach((button) => {
+          const countElement = button.querySelector(".filter-count");
+          if (!countElement) return;
+
+          const turmaKey = button.dataset.turmaFilter || "todas";
+          const count = turmaKey === "todas" ? totalCount : (countsByTurma.get(turmaKey) || 0);
+          countElement.textContent = count;
+        });
+      }
+
       function applyResultFilter(filter) {
         activeResultFilter = filter || activeResultFilter;
         const search = resultSearch ? resultSearch.value.trim().toLowerCase() : "";
@@ -1995,7 +2061,7 @@
 
           group.querySelectorAll("[data-category]").forEach((row) => {
             const category = row.dataset.category;
-            const categoryVisible = activeResultFilter === "todos" || category === activeResultFilter || (activeResultFilter === "pendencias" && category !== "ok");
+            const categoryVisible = categoryMatchesResultFilter(category, activeResultFilter);
             const searchVisible = !search || (row.dataset.search || "").includes(search);
             const visible = turmaVisible && categoryVisible && searchVisible;
             row.style.display = visible ? "" : "none";
@@ -2011,6 +2077,8 @@
         if (emptyFilterMessage) {
           emptyFilterMessage.style.display = visibleCount ? "none" : "block";
         }
+
+        updateTurmaFilterCounts(search);
       }
 
       function openPrintModal() {

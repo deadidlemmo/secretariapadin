@@ -1106,7 +1106,7 @@
       }
 
       #search-container.no-print {
-        order: 4;
+        order: 5;
         width: auto;
         margin: 0;
         display: inline-flex;
@@ -1144,6 +1144,7 @@
       .alunos-sem-fotos-btn,
       .imprimir-carteirinhas,
       .imprimir-pagina,
+      .selection-action-btn,
       .relatorio-acao-link,
       .relatorio-acao-primary {
         position: static;
@@ -1222,6 +1223,93 @@
 
       .filtro-foto-form input[type="checkbox"] {
         accent-color: var(--card-screen-primary);
+      }
+
+      .selection-toolbar-group {
+        order: 4;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        min-height: var(--card-screen-control-height);
+      }
+
+      .selection-action-btn {
+        min-height: var(--card-screen-control-height);
+        padding: 0 14px;
+        border: 1px solid var(--card-screen-border);
+        color: var(--card-screen-text);
+        background: var(--card-screen-elevated);
+        cursor: pointer;
+        transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, color 0.16s ease;
+      }
+
+      .selection-action-btn.primary {
+        color: #ffffff;
+        background: linear-gradient(135deg, var(--card-screen-primary-dark), var(--card-screen-primary));
+        border-color: transparent;
+      }
+
+      .selection-action-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px rgba(30, 53, 47, 0.14);
+      }
+
+      .selection-action-btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.52;
+        box-shadow: none;
+        transform: none;
+      }
+
+      .card-select-control {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 20;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transform: translate(-28%, -28%);
+        cursor: pointer;
+      }
+
+      .card-select-control input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .card-select-control span {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        border: 2px solid var(--card-screen-border);
+        background: var(--card-screen-surface);
+        color: transparent;
+        box-shadow: 0 10px 18px rgba(30, 53, 47, 0.18);
+        transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+      }
+
+      .card-select-control:hover span,
+      .card-select-control input:focus-visible + span {
+        border-color: var(--card-screen-primary);
+        transform: scale(1.04);
+      }
+
+      .card-select-control input:checked + span {
+        background: var(--card-screen-primary);
+        border-color: var(--card-screen-primary);
+        color: #ffffff;
+      }
+
+      .borda-pontilhada.selected-card {
+        border-color: var(--card-screen-primary);
+        box-shadow: 0 0 0 3px var(--card-screen-focus-ring), 0 14px 30px rgba(30, 53, 47, 0.16);
       }
 
       #cards-success {
@@ -1424,6 +1512,7 @@
     @media screen {
       html[data-theme="dark"] .alunos-sem-fotos-btn,
       html[data-theme="dark"] .imprimir-carteirinhas,
+      html[data-theme="dark"] .selection-action-btn.primary,
       html[data-theme="dark"] .relatorio-acao-primary {
         background: linear-gradient(135deg, #315f56, #407367);
         color: #ffffff;
@@ -1433,9 +1522,28 @@
 
       html[data-theme="dark"] .alunos-sem-fotos-btn:hover,
       html[data-theme="dark"] .imprimir-carteirinhas:hover,
+      html[data-theme="dark"] .selection-action-btn.primary:hover:not(:disabled),
       html[data-theme="dark"] .relatorio-acao-primary:hover {
         background: linear-gradient(135deg, #294f48, #38675e);
         color: #ffffff;
+      }
+
+      html[data-theme="dark"] .selection-action-btn.secondary {
+        background: #20302a;
+        color: #e5eee9;
+        border-color: #3e5a51;
+      }
+
+      html[data-theme="dark"] .card-select-control span {
+        background: #17231f;
+        border-color: #4e6960;
+        box-shadow: 0 10px 18px rgba(0, 0, 0, 0.34);
+      }
+
+      html[data-theme="dark"] .card-select-control input:checked + span {
+        background: #7fb8aa;
+        border-color: #7fb8aa;
+        color: #10201c;
       }
 
       html[data-theme="dark"] .imprimir-pagina {
