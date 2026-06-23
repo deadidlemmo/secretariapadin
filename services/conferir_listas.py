@@ -195,6 +195,40 @@ def normalize_ra_digits_only(value):
     return re.sub(r"\D+", "", text)
 
 
+def _format_ra_base_for_display(base):
+    base = normalize_ra_digits_only(base).lstrip("0")
+    if not base:
+        return ""
+    groups = []
+    while base:
+        groups.append(base[-3:])
+        base = base[:-3]
+    return ".".join(reversed(groups))
+
+
+def format_ra_display(value, digito=None):
+    text = clean_display(value)
+    if not text:
+        return ""
+    text = re.sub(r"\s*/\s*[A-Z]{2}\b.*$", "", text, flags=re.IGNORECASE).strip()
+    dig = normalize_ra(digito)
+    if dig:
+        base = _format_ra_base_for_display(text)
+        return f"{base}-{dig}" if base else dig
+    if "-" in text:
+        base_text, suffix_text = text.split("-", 1)
+        base = _format_ra_base_for_display(base_text)
+        suffix = normalize_ra(suffix_text)
+        if base and suffix:
+            return f"{base}-{suffix}"
+        return base or suffix
+    normalized = normalize_ra(text)
+    if normalized.endswith("X") and len(normalized) > 1:
+        base = _format_ra_base_for_display(normalized[:-1])
+        return f"{base}-X" if base else normalized
+    return _format_ra_base_for_display(normalized) or text
+
+
 def ra_keys(ra, digito=None):
     raw_ra = "" if ra is None else str(ra).upper()
     base = normalize_ra(ra)
@@ -245,7 +279,7 @@ def _display_lista_ra_por_escola(value, school_config):
     text = clean_display(value)
     if getattr(school_config, "strip_ra_uf_suffix", False):
         text = re.sub(r"\s*/\s*[A-Z]{2}\b.*$", "", text, flags=re.IGNORECASE).strip()
-    return text
+    return format_ra_display(text) or text
 
 
 def normalize_turma_lista(value):
@@ -482,6 +516,17 @@ def _normalizar_status_lista_por_escola(value, school_config):
     return normalizar_status_lista_piloto(value)
 
 
+SED_TABLE_SETTINGS = {
+    "vertical_strategy": "lines",
+    "horizontal_strategy": "lines",
+    "snap_tolerance": 3,
+    "join_tolerance": 3,
+    "intersection_tolerance": 5,
+    "text_x_tolerance": 2,
+    "text_y_tolerance": 3,
+}
+
+
 def _safe_row_value(row, index):
     if index is None or index < 0 or index >= len(row):
         return ""
@@ -549,12 +594,71 @@ def read_lista_piloto(file_obj, school_config=None):
     return records
 
 
-def _extract_turma_from_page(page):
-    text = page.extract_text() or ""
-    match = re.search(r"Turma:\s*(.+)", text)
+def _clean_sed_turma_from_line(line):
+    match = re.search(r"Turma\s*:\s*(.+)", line, flags=re.IGNORECASE)
     if not match:
         return ""
-    return clean_display(match.group(1).splitlines()[0])
+    turma = match.group(1)
+    turma = re.split(
+        r"\s+(?:Ativos?|Transferidos?|Abandonos?|Outros?|Cadastrados?|Total|Ano\s+Letivo|Diretoria|Escola|Sala)\s*:",
+        turma,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    return clean_display(turma)
+
+
+def _extract_turma_marks_from_page(page):
+    words = page.extract_words(x_tolerance=2, y_tolerance=3) or []
+    lines = []
+    for word in sorted(words, key=lambda item: (float(item.get("top", 0)), float(item.get("x0", 0)))):
+        top = float(word.get("top", 0))
+        for line in lines:
+            if abs(line["top"] - top) <= 3:
+                line["words"].append(word)
+                line["top"] = min(line["top"], top)
+                break
+        else:
+            lines.append({"top": top, "words": [word]})
+
+    marks = []
+    seen = set()
+    for line in lines:
+        line_words = sorted(line["words"], key=lambda item: float(item.get("x0", 0)))
+        line_text = clean_display(" ".join(word.get("text", "") for word in line_words))
+        turma = _clean_sed_turma_from_line(line_text)
+        if not turma:
+            continue
+        marker = (round(line["top"], 2), turma)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        marks.append({"top": line["top"], "turma": turma})
+    return sorted(marks, key=lambda item: item["top"])
+
+
+def _extract_turma_from_page(page):
+    marks = _extract_turma_marks_from_page(page)
+    if marks:
+        return marks[0]["turma"]
+    text = page.extract_text() or ""
+    for line in text.splitlines():
+        turma = _clean_sed_turma_from_line(line)
+        if turma:
+            return turma
+    return ""
+
+
+def _turma_for_page_position(turma_marks, top, fallback_turma):
+    if top is None:
+        return fallback_turma
+    turma = fallback_turma
+    for mark in turma_marks:
+        if mark["top"] <= top + 1:
+            turma = mark["turma"]
+        else:
+            break
+    return turma
 
 
 def _extract_status_from_sed_cells(*cells):
@@ -629,10 +733,11 @@ def extract_sed_pdf_records(pdf_bytes, filename):
     pending_page_tail_number = None
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for page_number, page in enumerate(pdf.pages, 1):
-            page_turma = _extract_turma_from_page(page)
-            if page_turma:
-                current_turma = page_turma
-            turma = page_turma or current_turma
+            turma_marks = _extract_turma_marks_from_page(page)
+            page_turma = turma_marks[0]["turma"] if turma_marks else ""
+            if turma_marks:
+                current_turma = turma_marks[-1]["turma"]
+            page_default_turma = page_turma or current_turma
             page_last_record = None
             continuation_target = (
                 pending_page_tail_record
@@ -640,21 +745,23 @@ def extract_sed_pdf_records(pdf_bytes, filename):
                 else None
             )
             merged_continuation = False
-            tables = page.extract_tables(
-                table_settings={
-                    "vertical_strategy": "lines",
-                    "horizontal_strategy": "lines",
-                    "snap_tolerance": 3,
-                    "join_tolerance": 3,
-                    "intersection_tolerance": 5,
-                    "text_x_tolerance": 2,
-                    "text_y_tolerance": 3,
-                }
-            )
-            for table in tables:
+            tables = page.find_tables(table_settings=SED_TABLE_SETTINGS)
+            for table_obj in tables:
+                table = table_obj.extract()
                 if not table or len(table) < 2:
                     continue
-                for raw_row in table[1:]:
+                table_rows = getattr(table_obj, "rows", [])
+                if len(table_rows) == len(table):
+                    body_rows = zip(table_rows[1:], table[1:])
+                else:
+                    body_rows = ((None, raw_row) for raw_row in table[1:])
+                for table_row, raw_row in body_rows:
+                    row_top = None
+                    if table_row is not None and getattr(table_row, "bbox", None):
+                        row_top = table_row.bbox[1]
+                    elif getattr(table_obj, "bbox", None):
+                        row_top = table_obj.bbox[1]
+                    turma = _turma_for_page_position(turma_marks, row_top, page_default_turma)
                     row = [clean_display(cell) for cell in raw_row]
                     if len(row) < 9:
                         continue
@@ -678,13 +785,16 @@ def extract_sed_pdf_records(pdf_bytes, filename):
                         data_movimentacao_original,
                         situacao,
                     ):
-                        if continuation_target is not None:
+                        if (
+                            continuation_target is not None
+                            and (not turma or turma == continuation_target.get("turma"))
+                        ):
                             _append_sed_name_continuation(continuation_target, nome)
                             merged_continuation = True
                         continue
                     if not nome or not ra_original:
                         continue
-                    ra_display = ra_original
+                    ra_display = format_ra_display(ra_original, digito) or ra_original
                     record_ra_keys = sorted(ra_keys(ra_original, digito))
                     if not record_ra_keys:
                         continue
@@ -1019,6 +1129,8 @@ def _record_divergence_fields(lista_record, sed_record):
     sed_keys = set(sed_record.get("ra_keys", []))
     if lista_keys and sed_keys and lista_keys.isdisjoint(sed_keys):
         fields.append("ra")
+    elif _mesmo_ra_alunos_diferentes(lista_record, sed_record):
+        fields.append("ra")
     return fields
 
 
@@ -1081,8 +1193,36 @@ def _identidade_divergente(lista_record, sed_record):
     return nome_divergente or nascimento_divergente
 
 
+def _mesmo_ra_alunos_diferentes(lista_record, sed_record):
+    if not _mesmo_ra(lista_record, sed_record):
+        return False
+    lista_nome_match = lista_record.get("nome_match_norm") or lista_record.get("nome_norm")
+    sed_nome_match = sed_record.get("nome_match_norm") or sed_record.get("nome_norm")
+    nome_divergente = bool(
+        lista_nome_match
+        and sed_nome_match
+        and lista_nome_match != sed_nome_match
+        and not names_probably_same(lista_record.get("nome"), sed_record.get("nome"))
+    )
+    nascimento_divergente = bool(
+        lista_record.get("data_nascimento_norm")
+        and sed_record.get("data_nascimento_norm")
+        and lista_record["data_nascimento_norm"] != sed_record["data_nascimento_norm"]
+    )
+    return nome_divergente and nascimento_divergente
+
+
+def _mesmo_ra_alunos_diferentes_observation(lista_record, sed_record):
+    return (
+        f"Mesmo RA em alunos diferentes: Lista {_turma_curta(lista_record)}; "
+        f"SED {_turma_curta(sed_record)}. Confira qual RA esta correto."
+    )
+
+
 def _lista_duplicate_observation(lista_record, sed_record):
     if _mesmo_ra(lista_record, sed_record):
+        if _mesmo_ra_alunos_diferentes(lista_record, sed_record):
+            return _mesmo_ra_alunos_diferentes_observation(lista_record, sed_record)
         if _identidade_divergente(lista_record, sed_record):
             return f"Mesmo RA com dados diferentes: Lista {_turma_curta(lista_record)}; SED {_turma_curta(sed_record)}. Confira RA, nome e nascimento."
         return f"Aluno duplicado em turmas diferentes: Lista {_turma_curta(lista_record)}; SED {_turma_curta(sed_record)}. Verifique duplicidade na Lista Piloto."
@@ -1129,6 +1269,8 @@ def _find_lista_candidate_for_sed(sed_record, lista_records, lista_by_ra, lista_
 
 def _sed_turma_mismatch_observation(lista_record, sed_record):
     if _mesmo_ra(lista_record, sed_record):
+        if _mesmo_ra_alunos_diferentes(lista_record, sed_record):
+            return _mesmo_ra_alunos_diferentes_observation(lista_record, sed_record)
         if _identidade_divergente(lista_record, sed_record):
             return f"Mesmo RA com dados diferentes: Lista {_turma_curta(lista_record)}; SED {_turma_curta(sed_record)}. Confira RA, nome e nascimento."
         return f"Aluno em turma diferente: Lista {_turma_curta(lista_record)}; SED {_turma_curta(sed_record)}. Confira a turma correta."
@@ -1202,13 +1344,18 @@ def compare_lista_piloto_sed(lista_records, sed_records, pdf_info):
                 )
             )
         elif data_divergences:
+            if _mesmo_ra_alunos_diferentes(lista, sed):
+                observacao = _mesmo_ra_alunos_diferentes_observation(lista, sed)
+                data_divergence_fields = sorted(set(["ra", *data_divergence_fields]))
+            else:
+                observacao = " ".join(data_divergences)
             rows.append(
                 _result_row(
                     "divergencia_cadastral",
                     "Divergencia cadastral",
                     lista=lista,
                     sed=sed,
-                    observacao=" ".join(data_divergences),
+                    observacao=observacao,
                     campos_divergentes=data_divergence_fields,
                 )
             )

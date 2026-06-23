@@ -108,7 +108,7 @@ class ConferirListasServiceTests(unittest.TestCase):
 
         self.assertEqual(records[0]["turma"], "2\u00baA")
         self.assertEqual(records[0]["nome"], "ANTHONY BONELLO SANTOS")
-        self.assertEqual(records[0]["ra"], "121074859")
+        self.assertEqual(records[0]["ra"], "121.074.859")
         self.assertEqual(records[0]["data_nascimento"], "09/04/2018")
         self.assertEqual(records[0]["situacao"], "MA")
 
@@ -158,7 +158,7 @@ class ConferirListasServiceTests(unittest.TestCase):
         self.assertEqual(records[0]["row_number"], 8)
         self.assertEqual(records[0]["turma"], "4\u00baB")
         self.assertEqual(records[0]["nome"], "ALUNA CONFIG")
-        self.assertEqual(records[0]["ra"], "121371103-34")
+        self.assertEqual(records[0]["ra"], "121.371.103-34")
         self.assertEqual(records[0]["data_nascimento"], "03/07/2016")
         self.assertEqual(records[0]["situacao"], "MA")
 
@@ -587,8 +587,9 @@ class ConferirListasServiceTests(unittest.TestCase):
         self.assertEqual(row["categoria"], "divergencia_cadastral")
         self.assertEqual(
             row["observacao"],
-            "Mesmo RA com dados diferentes: Lista 4\u00baC; SED 2\u00baD. Confira RA, nome e nascimento.",
+            "Mesmo RA em alunos diferentes: Lista 4\u00baC; SED 2\u00baD. Confira qual RA esta correto.",
         )
+        self.assertEqual(row["campos_divergentes"], ["data_nascimento", "nome", "ra", "turma"])
 
     def test_reports_duplicate_lista_piloto_turma_instead_of_missing_sed(self):
         lista = [
@@ -681,6 +682,7 @@ class ConferirListasServiceTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["turma_key"], "2A")
         self.assertEqual(records[0]["nome"], "ALUNO FICTICIO TESTE")
+        self.assertEqual(records[0]["ra"], "123.456-X")
         self.assertIn("123456X", records[0]["ra_keys"])
         self.assertEqual(records[0]["situacao"], "ATIVO")
 
@@ -699,6 +701,59 @@ class ConferirListasServiceTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_extracts_multiple_turmas_from_single_sed_pdf(self):
+        output = io.BytesIO()
+        doc = SimpleDocTemplate(output, pagesize=landscape(A4), leftMargin=18, rightMargin=18)
+        styles = getSampleStyleSheet()
+        header = [
+            "S\u00e9rie",
+            "N\u00ba",
+            "Nome do Aluno",
+            "RA",
+            "D\u00edgito do RA",
+            "UF RA",
+            "Data de Nascimento",
+            "Data Movimenta\u00e7\u00e3o",
+            "Situa\u00e7\u00e3o",
+            "Condi\u00e7\u00f5es educacionais especiais",
+            "Transtornos",
+        ]
+
+        def build_table(row):
+            table = Table([header, row], colWidths=[34, 24, 150, 58, 44, 36, 72, 72, 52, 110, 90])
+            table.setStyle(
+                TableStyle(
+                    [
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                        ("FONTSIZE", (0, 0), (-1, -1), 6),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ]
+                )
+            )
+            return table
+
+        doc.build(
+            [
+                Paragraph("Turma: 2\u00b0 ANO AI TARDE ANUAL Ativos: 1", styles["Normal"]),
+                Spacer(1, 6),
+                build_table(["2", "1", "ALUNO TURMA A", "000111111111", "", "SP", "10/03/2018", "", "ATIVO", "", ""]),
+                Spacer(1, 18),
+                Paragraph("Turma: 3\u00b0 ANO BI TARDE ANUAL Ativos: 1", styles["Normal"]),
+                Spacer(1, 6),
+                build_table(["3", "1", "ALUNO TURMA B", "000222222222", "", "SP", "11/04/2017", "", "ATIVO", "", ""]),
+            ]
+        )
+
+        records = extract_sed_pdf_records(output.getvalue(), "sed_multiturmas.pdf")
+
+        self.assertEqual(len(records), 2)
+        self.assertEqual([(record["nome"], record["turma_key"]) for record in records], [("ALUNO TURMA A", "2A"), ("ALUNO TURMA B", "3B")])
+
+        preview = preview_sed_pdf_scope([{"filename": "sed_multiturmas.pdf", "content": output.getvalue()}])
+        self.assertEqual(preview["turmas"], ["2\u00baA", "3\u00baB"])
+        self.assertEqual(preview["file_scopes"][0]["turma_keys"], ["2A", "3B"])
+        self.assertEqual(preview["file_scopes"][0]["alunos"], 2)
 
     def test_reuses_last_sed_turma_on_continuation_pages(self):
         output = io.BytesIO()
