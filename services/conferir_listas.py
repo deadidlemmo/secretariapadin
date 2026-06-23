@@ -188,6 +188,13 @@ def normalize_ra(value):
     return text
 
 
+def normalize_ra_digits_only(value):
+    text = "" if value is None else str(value).upper()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return re.sub(r"\D+", "", text)
+
+
 def ra_keys(ra, digito=None):
     raw_ra = "" if ra is None else str(ra).upper()
     base = normalize_ra(ra)
@@ -206,6 +213,39 @@ def ra_keys(ra, digito=None):
         keys.add(base_without_digit)
         keys.add(base_without_digit.lstrip("0") or "0")
     return {key for key in keys if key}
+
+
+def ra_keys_digits_only(ra, digito=None):
+    raw_ra = "" if ra is None else str(ra).upper()
+    base = normalize_ra_digits_only(ra)
+    dig = normalize_ra_digits_only(digito)
+    keys = set()
+    for value in [base, base + dig if base and dig else ""]:
+        if value:
+            keys.add(value)
+            keys.add(value.lstrip("0") or "0")
+    if base and "-" in raw_ra and len(base) > 1:
+        base_before_suffix = normalize_ra_digits_only(raw_ra.split("-", 1)[0])
+        if base_before_suffix:
+            keys.add(base_before_suffix)
+            keys.add(base_before_suffix.lstrip("0") or "0")
+        base_without_digit = base[:-1]
+        keys.add(base_without_digit)
+        keys.add(base_without_digit.lstrip("0") or "0")
+    return {key for key in keys if key}
+
+
+def _ra_keys_for_school(ra, school_config):
+    if getattr(school_config, "ra_digits_only", False):
+        return ra_keys_digits_only(ra)
+    return ra_keys(ra)
+
+
+def _display_lista_ra_por_escola(value, school_config):
+    text = clean_display(value)
+    if getattr(school_config, "strip_ra_uf_suffix", False):
+        text = re.sub(r"\s*/\s*[A-Z]{2}\b.*$", "", text, flags=re.IGNORECASE).strip()
+    return text
 
 
 def normalize_turma_lista(value):
@@ -268,6 +308,38 @@ def _mesmo_ra(lista_record, sed_record):
     lista_keys = set(lista_record.get("ra_keys", []))
     sed_keys = set(sed_record.get("ra_keys", []))
     return bool(lista_keys and sed_keys and not lista_keys.isdisjoint(sed_keys))
+
+
+def _identidade_compativel(lista_record, sed_record):
+    if _mesmo_ra(lista_record, sed_record):
+        return True
+    lista_nome_match = lista_record.get("nome_match_norm") or lista_record.get("nome_norm")
+    sed_nome_match = sed_record.get("nome_match_norm") or sed_record.get("nome_norm")
+    mesma_data = bool(
+        lista_record.get("data_nascimento_norm")
+        and sed_record.get("data_nascimento_norm")
+        and lista_record.get("data_nascimento_norm") == sed_record.get("data_nascimento_norm")
+    )
+    mesmo_nome = bool(
+        lista_nome_match
+        and sed_nome_match
+        and (
+            lista_nome_match == sed_nome_match
+            or names_probably_same(lista_record.get("nome"), sed_record.get("nome"))
+        )
+    )
+    return mesmo_nome and mesma_data
+
+
+def _remanejamento_sed_historico_valido(lista_record, sed_record):
+    return (
+        normalizar_status_lista_piloto(lista_record.get("situacao")) == "MA"
+        and normalizar_status_sed(sed_record.get("situacao")) == "REMA"
+        and lista_record.get("turma_key")
+        and sed_record.get("turma_key")
+        and lista_record.get("turma_key") != sed_record.get("turma_key")
+        and _identidade_compativel(lista_record, sed_record)
+    )
 
 
 def normalizar_status_lista_piloto(status):
@@ -442,6 +514,7 @@ def read_lista_piloto(file_obj, school_config=None):
         nome = clean_display(_safe_row_value(row, columns["nome"]))
         data_nascimento = normalize_date(_safe_row_value(row, columns["data_nascimento"]))
         ra_original = clean_display(_safe_row_value(row, columns["ra"]))
+        ra_display = _display_lista_ra_por_escola(ra_original, school_config)
         situacao = _normalizar_status_lista_por_escola(_safe_row_value(row, columns["situacao"]), school_config)
         observacoes = clean_display(_safe_row_value(row, columns.get("observacoes", -1)))
 
@@ -467,8 +540,8 @@ def read_lista_piloto(file_obj, school_config=None):
                 "nome_match_norm": normalize_name_for_match(nome),
                 "data_nascimento": data_nascimento,
                 "data_nascimento_norm": data_nascimento,
-                "ra": ra_original,
-                "ra_keys": sorted(ra_keys(ra_original)),
+                "ra": ra_display,
+                "ra_keys": sorted(_ra_keys_for_school(ra_original, school_config)),
                 "situacao": situacao,
                 "observacoes": observacoes,
             }
@@ -895,7 +968,12 @@ def _data_divergence_details(lista, sed, match_method):
         and lista["data_nascimento_norm"] != sed["data_nascimento_norm"]
     ):
         divergences.append(("data_nascimento", "Data de nascimento divergente entre as bases."))
-    if lista.get("turma_key") and sed.get("turma_key") and lista["turma_key"] != sed["turma_key"]:
+    if (
+        lista.get("turma_key")
+        and sed.get("turma_key")
+        and lista["turma_key"] != sed["turma_key"]
+        and not _remanejamento_sed_historico_valido(lista, sed)
+    ):
         divergences.append(("turma", "Turma divergente entre as bases."))
     if match_method in {"fallback", "probable_identity"}:
         lista_keys = set(lista.get("ra_keys", []))
@@ -934,6 +1012,7 @@ def _record_divergence_fields(lista_record, sed_record):
         lista_record.get("turma_key")
         and sed_record.get("turma_key")
         and lista_record["turma_key"] != sed_record["turma_key"]
+        and not _remanejamento_sed_historico_valido(lista_record, sed_record)
     ):
         fields.append("turma")
     lista_keys = set(lista_record.get("ra_keys", []))
@@ -1108,7 +1187,8 @@ def compare_lista_piloto_sed(lista_records, sed_records, pdf_info):
         used_sed.add(sed_idx)
         data_divergences = _data_divergences(lista, sed, match_method)
         data_divergence_fields = _data_divergence_fields(lista, sed, match_method)
-        compatible = status_compativel(lista.get("situacao"), sed.get("situacao"))
+        remanejamento_historico_valido = _remanejamento_sed_historico_valido(lista, sed)
+        compatible = status_compativel(lista.get("situacao"), sed.get("situacao")) or remanejamento_historico_valido
 
         if not compatible:
             rows.append(
@@ -1133,7 +1213,12 @@ def compare_lista_piloto_sed(lista_records, sed_records, pdf_info):
                 )
             )
         else:
-            rows.append(_result_row("ok", "OK", lista=lista, sed=sed, observacao="Dados compativeis."))
+            observacao_ok = (
+                "Aluno ativo na Lista Piloto e com registro de remanejamento no SED. Sem divergencia."
+                if remanejamento_historico_valido
+                else "Dados compativeis."
+            )
+            rows.append(_result_row("ok", "OK", lista=lista, sed=sed, observacao=observacao_ok))
 
     scoped_lista_ids = {id(record) for record in lista_scope_records}
     for lista in lista_records:
@@ -1143,6 +1228,18 @@ def compare_lista_piloto_sed(lista_records, sed_records, pdf_info):
         if sed_idx is None:
             continue
         sed = sed_records[sed_idx]
+        if _remanejamento_sed_historico_valido(lista, sed):
+            rows.append(
+                _result_row(
+                    "ok",
+                    "OK",
+                    lista=lista,
+                    sed=sed,
+                    observacao="Aluno ativo na Lista Piloto e com registro de remanejamento no SED. Sem divergencia.",
+                )
+            )
+            used_sed.add(sed_idx)
+            continue
         if _lista_has_duplicate_record(lista, lista_by_ra, lista_by_name_birth):
             observacao = _lista_duplicate_observation(lista, sed)
         else:

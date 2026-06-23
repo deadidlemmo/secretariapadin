@@ -253,6 +253,48 @@ class ConferirListasServiceTests(unittest.TestCase):
         self.assertEqual([record["nome"] for record in records], ["ALUNA ATIVA", "ALUNA PNEE", "ALUNO TR", "ALUNO TE", "ALUNO REM"])
         self.assertTrue(all(record["turma_key"] == "2A" for record in records))
 
+    def test_reads_mahatma_gandhi_ra_with_punctuation_and_uf_suffix(self):
+        output = io.BytesIO()
+        df = pd.DataFrame(
+            [
+                {
+                    "N\u00ba": "1",
+                    "RM": "1001",
+                    "NOME DO ALUNO": "ALUNA RA",
+                    "SEXO": "F",
+                    "Idade": "8",
+                    "NASC.": "2018-02-01",
+                    "R.A.": "121.519.315-4 / SP",
+                    "C\u00d3D.": "",
+                    "OBSERVA\u00c7\u00c3O": "",
+                    "TURMA": "2\u00ba A",
+                },
+            ]
+        )
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="Verifica\u00e7\u00e3o SED", index=False)
+        output.seek(0)
+
+        lista = read_lista_piloto(
+            output,
+            school_config=get_confere_school_config("mahatma_gandhi"),
+        )
+        sed = [
+            make_sed_record("ALUNA RA", "000121519315", "2\u00b0 ANO A TARDE ANUAL", "01/02/2018", "ATIVO"),
+        ]
+        sed[0]["ra_keys"] = sorted(ra_keys("000121519315", "4"))
+
+        result = compare_lista_piloto_sed(
+            lista,
+            sed,
+            {"total_files": 1, "successful_files": ["sed.pdf"], "errors": [], "duplicate_files": []},
+        )
+
+        self.assertEqual(lista[0]["ra"], "121.519.315-4")
+        self.assertIn("1215193154", lista[0]["ra_keys"])
+        self.assertEqual(result["summary"]["total_ok"], 1)
+        self.assertEqual(result["summary"]["total_divergencias_cadastrais"], 0)
+
     def test_compares_records_by_ra_and_separates_categories(self):
         lista = [
             make_lista_record("Jo\u00e3o da Silva", "0001", "2\u00baA", "01/02/2017", "MA"),
@@ -445,6 +487,50 @@ class ConferirListasServiceTests(unittest.TestCase):
         self.assertEqual(sum(1 for row in result["rows"] if "mais de uma turma/PDF" in row["observacao"]), 0)
         ok_row = next(row for row in result["rows"] if row["categoria"] == "ok")
         self.assertEqual(ok_row["turma_sed"], "3\u00b0 ANO CI TARDE ANUAL")
+
+    def test_accepts_active_lista_with_sed_rema_in_previous_turma(self):
+        lista = [
+            make_lista_record("ATHENA LUISA REIS DA CRUZ", "121.613.794-8", "3\u00baB", "12/09/2017", "MA"),
+        ]
+        sed = [
+            make_sed_record("ATHENA LUISA REIS DA CRUZ", "000121613794", "3\u00b0 ANO DI TARDE ANUAL", "12/09/2017", "REMA"),
+        ]
+
+        result = compare_lista_piloto_sed(
+            lista,
+            sed,
+            {"total_files": 1, "successful_files": ["3d.pdf"], "errors": [], "duplicate_files": []},
+        )
+
+        self.assertEqual(result["summary"]["total_ok"], 1)
+        self.assertEqual(result["summary"]["total_inconsistencias_situacao"], 0)
+        self.assertEqual(result["summary"]["total_divergencias_cadastrais"], 0)
+        row = result["rows"][0]
+        self.assertEqual(row["categoria"], "ok")
+        self.assertEqual(
+            row["observacao"],
+            "Aluno ativo na Lista Piloto e com registro de remanejamento no SED. Sem divergencia.",
+        )
+
+    def test_reports_active_lista_with_sed_rema_in_same_turma(self):
+        lista = [
+            make_lista_record("ATHENA LUISA REIS DA CRUZ", "121.613.794-8", "3\u00baD", "12/09/2017", "MA"),
+        ]
+        sed = [
+            make_sed_record("ATHENA LUISA REIS DA CRUZ", "000121613794", "3\u00b0 ANO DI TARDE ANUAL", "12/09/2017", "REMA"),
+        ]
+
+        result = compare_lista_piloto_sed(
+            lista,
+            sed,
+            {"total_files": 1, "successful_files": ["3d.pdf"], "errors": [], "duplicate_files": []},
+        )
+
+        self.assertEqual(result["summary"]["total_ok"], 0)
+        self.assertEqual(result["summary"]["total_inconsistencias_situacao"], 1)
+        row = result["rows"][0]
+        self.assertEqual(row["categoria"], "inconsistencia_situacao")
+        self.assertEqual(row["campos_divergentes"], ["situacao"])
 
     def test_reports_sed_student_found_in_lista_piloto_with_different_turma(self):
         lista = [

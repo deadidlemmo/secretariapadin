@@ -36,6 +36,8 @@ class ConfereSchoolConfig:
     columns: dict = field(default_factory=lambda: dict(DEFAULT_LISTA_COLUMNS))
     status_map: dict = field(default_factory=lambda: dict(DEFAULT_STATUS_MAP))
     description: str = ""
+    ra_digits_only: bool = False
+    strip_ra_uf_suffix: bool = False
 
     def to_template_dict(self):
         return {
@@ -82,6 +84,8 @@ CONFERE_SCHOOL_CONFIGS = {
             "REM": "REM",
         },
         description="Modelo da aba Verifica\u00e7\u00e3o SED.",
+        ra_digits_only=True,
+        strip_ra_uf_suffix=True,
     ),
 }
 

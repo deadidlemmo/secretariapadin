@@ -975,6 +975,14 @@
     white-space: nowrap;
   }
 
+  .confere-page .meta-item.meta-item-ra strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   .confere-page .meta-item.is-divergent-field strong {
     color: var(--confere-field-strong-text);
   }
@@ -1777,7 +1785,7 @@
                                 <span>Turma</span>
                                 <strong>{{ row.turma_lista_display|default(row.turma_lista or "-") }}</strong>
                               </div>
-                              <div class="meta-item{% if 'ra' in campos_divergentes %} is-divergent-field{% endif %}">
+                              <div class="meta-item meta-item-ra{% if 'ra' in campos_divergentes %} is-divergent-field{% endif %}">
                                 <span>RA</span>
                                 <strong>{{ row.ra_lista or "-" }}</strong>
                               </div>
@@ -1802,7 +1810,7 @@
                                 <span>Turma</span>
                                 <strong>{{ row.turma_sed_display|default(row.turma_sed or "-") }}</strong>
                               </div>
-                              <div class="meta-item{% if 'ra' in campos_divergentes %} is-divergent-field{% endif %}">
+                              <div class="meta-item meta-item-ra{% if 'ra' in campos_divergentes %} is-divergent-field{% endif %}">
                                 <span>RA</span>
                                 <strong>{{ row.ra_sed or "-" }}</strong>
                               </div>
