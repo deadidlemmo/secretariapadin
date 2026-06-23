@@ -11,7 +11,9 @@ import pandas as pd
 import pdfplumber
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import column_index_from_string, get_column_letter
+
+from services.confere_escolas import default_confere_school_config
 
 
 LISTA_STATUS_LABELS = {
@@ -334,7 +336,7 @@ def _pick_by_position(row, index):
     return clean_display(row[index])
 
 
-def _find_column_index(df, candidates, fallback):
+def _find_column_index(df, candidates, fallback=None):
     normalized_columns = [(index, normalize_text(column)) for index, column in enumerate(df.columns)]
     normalized_candidates = [normalize_text(candidate) for candidate in candidates]
 
@@ -351,37 +353,103 @@ def _find_column_index(df, candidates, fallback):
     return fallback
 
 
-def _lista_piloto_column_indexes(df):
-    return {
-        "turma": _find_column_index(df, ["SERIE", "SÉRIE", "TURMA"], 0),
-        "nome": _find_column_index(df, ["NOME", "NOME DO ALUNO", "ALUNO"], 2),
-        "data_nascimento": _find_column_index(df, ["DATA NASC", "DATA DE NASCIMENTO", "NASCIMENTO"], 5),
-        "ra": _find_column_index(df, ["RA"], 6),
-        "situacao": _find_column_index(df, ["COD", "CÓD", "SITUACAO", "SITUAÇÃO"], 7),
-        "observacoes": _find_column_index(df, ["OBS", "OBSERVACAO", "OBSERVAÇÃO"], 8),
-    }
+def _lista_piloto_column_indexes(df, school_config=None):
+    school_config = school_config or default_confere_school_config()
+    if school_config.column_mode == "letters":
+        columns = {}
+        for field_name, column_letter in school_config.columns.items():
+            try:
+                columns[field_name] = column_index_from_string(str(column_letter).strip()) - 1
+            except Exception as exc:
+                raise ValueError(
+                    f"Coluna invalida na configuracao da escola {school_config.nome}: "
+                    f"{field_name}={column_letter!r}."
+                ) from exc
+        return columns
+
+    configured_columns = {}
+    for field_name, candidates in school_config.columns.items():
+        if isinstance(candidates, str):
+            candidates = [candidates]
+        configured_columns[field_name] = _find_column_index(df, candidates)
+
+    missing_required = [
+        field_name
+        for field_name in ["turma", "nome", "data_nascimento", "ra", "situacao"]
+        if configured_columns.get(field_name) is None
+    ]
+    if missing_required:
+        missing = ", ".join(missing_required)
+        raise ValueError(
+            f"Campo obrigatorio nao localizado na planilha para {school_config.nome}: {missing}. "
+            "Confira se a escola selecionada corresponde ao modelo da Lista Piloto enviada."
+        )
+
+    if configured_columns.get("observacoes") is None:
+        configured_columns["observacoes"] = -1
+
+    return configured_columns
 
 
-def read_lista_piloto(file_obj):
+def _read_lista_dataframe(file_obj, school_config):
+    sheet_name = 0 if school_config.sheet_name is None else school_config.sheet_name
+    if school_config.column_mode == "letters":
+        return pd.read_excel(file_obj, sheet_name=sheet_name, header=None, dtype=str)
+
+    header_row = max(int(school_config.header_row or 1), 1) - 1
+    return pd.read_excel(file_obj, sheet_name=sheet_name, header=header_row, dtype=str)
+
+
+def _normalizar_status_lista_por_escola(value, school_config):
+    text = normalize_text(clean_display(value))
+    compact_text = text.replace(" ", "")
+    for key in (text, compact_text):
+        mapped = school_config.status_map.get(key)
+        if mapped:
+            return mapped
+    return normalizar_status_lista_piloto(value)
+
+
+def _safe_row_value(row, index):
+    if index is None or index < 0 or index >= len(row):
+        return ""
+    return row.iloc[index]
+
+
+def read_lista_piloto(file_obj, school_config=None):
+    school_config = school_config or default_confere_school_config()
     try:
-        df = pd.read_excel(file_obj, sheet_name="LISTA CORRIDA", header=0, dtype=str)
+        df = _read_lista_dataframe(file_obj, school_config)
     except Exception as exc:
-        raise ValueError(f"Erro ao ler a aba LISTA CORRIDA da Lista Piloto: {exc}") from exc
+        sheet_label = school_config.sheet_name if school_config.sheet_name is not None else "primeira aba"
+        raise ValueError(
+            f"Erro ao ler a Lista Piloto para {school_config.nome} ({sheet_label}): {exc}"
+        ) from exc
 
-    if df.shape[1] < 9:
-        raise ValueError("A Lista Piloto precisa ter pelo menos as colunas A ate I na aba LISTA CORRIDA.")
+    if df.empty:
+        raise ValueError("A Lista Piloto enviada esta vazia.")
 
-    columns = _lista_piloto_column_indexes(df)
+    columns = _lista_piloto_column_indexes(df, school_config)
+    data_start_row = int(school_config.data_start_row or 0)
+    header_offset = 0 if school_config.column_mode == "letters" else max(int(school_config.header_row or 1), 1)
     records = []
     for idx, row in df.iterrows():
-        turma = clean_display(row.iloc[columns["turma"]])
-        nome = clean_display(row.iloc[columns["nome"]])
-        data_nascimento = normalize_date(row.iloc[columns["data_nascimento"]])
-        ra_original = clean_display(row.iloc[columns["ra"]])
-        situacao = normalizar_status_lista_piloto(row.iloc[columns["situacao"]])
-        observacoes = clean_display(row.iloc[columns["observacoes"]])
+        row_number = int(idx) + 1 if school_config.column_mode == "letters" else int(idx) + header_offset + 1
+        if data_start_row and row_number < data_start_row:
+            continue
+
+        turma = clean_display(_safe_row_value(row, columns["turma"]))
+        nome = clean_display(_safe_row_value(row, columns["nome"]))
+        data_nascimento = normalize_date(_safe_row_value(row, columns["data_nascimento"]))
+        ra_original = clean_display(_safe_row_value(row, columns["ra"]))
+        situacao = _normalizar_status_lista_por_escola(_safe_row_value(row, columns["situacao"]), school_config)
+        observacoes = clean_display(_safe_row_value(row, columns.get("observacoes", -1)))
 
         if not nome or nome in {"0", "#REF#"}:
+            continue
+        if normalize_text(nome) in {"NOME", "NOME DO ALUNO", "ALUNO"}:
+            continue
+        if normalize_text(ra_original) in {"RA", "R A"}:
             continue
         if not turma and not ra_original and not situacao:
             continue
@@ -389,7 +457,9 @@ def read_lista_piloto(file_obj):
         records.append(
             {
                 "source": "lista",
-                "row_number": int(idx) + 2,
+                "row_number": row_number,
+                "school_id": school_config.id,
+                "school_name": school_config.nome,
                 "turma": turma,
                 "turma_key": normalize_turma_lista(turma),
                 "nome": nome,
@@ -589,6 +659,7 @@ def extract_sed_pdfs(file_items):
     errors = []
     successful_files = []
     duplicate_files = []
+    file_scopes = []
     seen_hashes = set()
 
     for file_item in file_items:
@@ -611,12 +682,24 @@ def extract_sed_pdfs(file_items):
             continue
         records.extend(extracted)
         successful_files.append(filename)
+        turma_keys = sorted(
+            {record.get("turma_key", "") for record in extracted if record.get("turma_key")}
+        )
+        file_scopes.append(
+            {
+                "arquivo": filename,
+                "turmas": [format_turma_key(key) for key in turma_keys],
+                "turma_keys": turma_keys,
+                "alunos": len(extracted),
+            }
+        )
 
     return {
         "records": records,
         "errors": errors,
         "successful_files": successful_files,
         "duplicate_files": duplicate_files,
+        "file_scopes": file_scopes,
         "total_files": len(file_items),
     }
 
@@ -634,6 +717,7 @@ def preview_sed_pdf_scope(file_items):
         "pdfs_selecionados": pdf_info["total_files"],
         "errors": pdf_info["errors"],
         "duplicate_files": pdf_info["duplicate_files"],
+        "file_scopes": pdf_info["file_scopes"],
     }
 
 
@@ -1163,10 +1247,13 @@ def compare_lista_piloto_sed(lista_records, sed_records, pdf_info):
     }
 
 
-def run_conferencia(lista_file, sed_file_items):
-    lista_records = read_lista_piloto(lista_file)
+def run_conferencia(lista_file, sed_file_items, school_config=None):
+    school_config = school_config or default_confere_school_config()
+    lista_records = read_lista_piloto(lista_file, school_config=school_config)
     pdf_info = extract_sed_pdfs(sed_file_items)
-    return compare_lista_piloto_sed(lista_records, pdf_info["records"], pdf_info)
+    result = compare_lista_piloto_sed(lista_records, pdf_info["records"], pdf_info)
+    result["school"] = {"id": school_config.id, "nome": school_config.nome}
+    return result
 
 
 def save_result(result, folder, result_id):

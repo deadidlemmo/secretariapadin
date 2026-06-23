@@ -1,5 +1,6 @@
 from flask import (
     Flask,
+    abort,
     request,
     redirect,
     url_for,
@@ -134,6 +135,16 @@ def get_escolas_df():
     return escolas_df
 
 
+def admin_json_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("logged_in"):
+            return jsonify({"error": "Acesso nao autorizado."}), 401
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
 @app.before_request
 def inicializar_escolas():
     """Garante que escolas.csv está carregado antes de cada requisição."""
@@ -142,7 +153,16 @@ def inicializar_escolas():
         carregar_escolas()
 
 
+@app.before_request
+def proteger_fotos_sensiveis():
+    """Impede acesso direto a fotos de alunos fora da sessao administrativa."""
+    path = (request.path or "").replace("\\", "/")
+    if path.startswith("/static/fotos/") and not session.get("logged_in"):
+        abort(404)
+
+
 @app.route("/escolas/search")
+@admin_json_required
 def escolas_search():
     """Endpoint para o Select2 buscar escolas no CSV."""
     df = get_escolas_df()

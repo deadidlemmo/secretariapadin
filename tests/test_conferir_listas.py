@@ -22,6 +22,7 @@ from services.conferir_listas import (
     status_observacao,
     status_compativel,
 )
+from services.confere_escolas import ConfereSchoolConfig, get_confere_school_config
 
 
 def make_lista_record(nome, ra, turma, nascimento, situacao):
@@ -110,6 +111,147 @@ class ConferirListasServiceTests(unittest.TestCase):
         self.assertEqual(records[0]["ra"], "121074859")
         self.assertEqual(records[0]["data_nascimento"], "09/04/2018")
         self.assertEqual(records[0]["situacao"], "MA")
+
+    def test_reads_lista_piloto_with_school_letter_config(self):
+        output = io.BytesIO()
+        rows = [[""] * 11 for _ in range(7)]
+        rows.append(
+            [
+                "ALUNA CONFIG",
+                "",
+                "",
+                "4\u00baB",
+                "",
+                "121371103-34",
+                "2016-07-03 00:00:00",
+                "",
+                "",
+                "Matricula Ativa",
+                "observacao",
+            ]
+        )
+        df = pd.DataFrame(rows)
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="Planilha1", index=False, header=False)
+        output.seek(0)
+
+        config = ConfereSchoolConfig(
+            id="escola_teste",
+            nome="Escola Teste",
+            sheet_name="Planilha1",
+            column_mode="letters",
+            data_start_row=8,
+            columns={
+                "nome": "A",
+                "turma": "D",
+                "ra": "F",
+                "data_nascimento": "G",
+                "situacao": "J",
+                "observacoes": "K",
+            },
+        )
+
+        records = read_lista_piloto(output, school_config=config)
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["school_id"], "escola_teste")
+        self.assertEqual(records[0]["row_number"], 8)
+        self.assertEqual(records[0]["turma"], "4\u00baB")
+        self.assertEqual(records[0]["nome"], "ALUNA CONFIG")
+        self.assertEqual(records[0]["ra"], "121371103-34")
+        self.assertEqual(records[0]["data_nascimento"], "03/07/2016")
+        self.assertEqual(records[0]["situacao"], "MA")
+
+    def test_reads_mahatma_gandhi_verificacao_sed_status_codes(self):
+        output = io.BytesIO()
+        df = pd.DataFrame(
+            [
+                {
+                    "N\u00ba": "1",
+                    "RM": "1001",
+                    "NOME DO ALUNO": "ALUNA ATIVA",
+                    "SEXO": "F",
+                    "Idade": "8",
+                    "NASC.": "2018-02-01",
+                    "R.A.": "111",
+                    "C\u00d3D.": "",
+                    "OBSERVA\u00c7\u00c3O": "",
+                    "TURMA": "2\u00ba A",
+                },
+                {
+                    "N\u00ba": "N\u00ba",
+                    "RM": "RM",
+                    "NOME DO ALUNO": "NOME DO ALUNO",
+                    "SEXO": "SEXO",
+                    "Idade": "Idade",
+                    "NASC.": "NASC.",
+                    "R.A.": "R.A.",
+                    "C\u00d3D.": "C\u00d3D.",
+                    "OBSERVA\u00c7\u00c3O": "OBSERVA\u00c7\u00c3O",
+                    "TURMA": "TURMA",
+                },
+                {
+                    "N\u00ba": "2",
+                    "RM": "1002",
+                    "NOME DO ALUNO": "ALUNA PNEE",
+                    "SEXO": "F",
+                    "Idade": "8",
+                    "NASC.": "2018-03-01",
+                    "R.A.": "222",
+                    "C\u00d3D.": "PNEE",
+                    "OBSERVA\u00c7\u00c3O": "",
+                    "TURMA": "2\u00ba A",
+                },
+                {
+                    "N\u00ba": "3",
+                    "RM": "1003",
+                    "NOME DO ALUNO": "ALUNO TR",
+                    "SEXO": "M",
+                    "Idade": "8",
+                    "NASC.": "2018-04-01",
+                    "R.A.": "333",
+                    "C\u00d3D.": "T.R.",
+                    "OBSERVA\u00c7\u00c3O": "",
+                    "TURMA": "2\u00ba A",
+                },
+                {
+                    "N\u00ba": "4",
+                    "RM": "1004",
+                    "NOME DO ALUNO": "ALUNO TE",
+                    "SEXO": "M",
+                    "Idade": "8",
+                    "NASC.": "2018-05-01",
+                    "R.A.": "444",
+                    "C\u00d3D.": "T.E.",
+                    "OBSERVA\u00c7\u00c3O": "",
+                    "TURMA": "2\u00ba A",
+                },
+                {
+                    "N\u00ba": "5",
+                    "RM": "1005",
+                    "NOME DO ALUNO": "ALUNO REM",
+                    "SEXO": "M",
+                    "Idade": "8",
+                    "NASC.": "2018-06-01",
+                    "R.A.": "555",
+                    "C\u00d3D.": "REM",
+                    "OBSERVA\u00c7\u00c3O": "",
+                    "TURMA": "2\u00ba A",
+                },
+            ]
+        )
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="Verifica\u00e7\u00e3o SED", index=False)
+        output.seek(0)
+
+        records = read_lista_piloto(
+            output,
+            school_config=get_confere_school_config("mahatma_gandhi"),
+        )
+
+        self.assertEqual([record["situacao"] for record in records], ["MA", "MA", "MA", "TE", "REM"])
+        self.assertEqual([record["nome"] for record in records], ["ALUNA ATIVA", "ALUNA PNEE", "ALUNO TR", "ALUNO TE", "ALUNO REM"])
+        self.assertTrue(all(record["turma_key"] == "2A" for record in records))
 
     def test_compares_records_by_ra_and_separates_categories(self):
         lista = [
@@ -460,6 +602,17 @@ class ConferirListasServiceTests(unittest.TestCase):
         self.assertEqual(preview["turmas"], ["2ºA"])
         self.assertEqual(preview["pdfs_validos"], 1)
         self.assertEqual(preview["pdfs_ignorados"], 0)
+        self.assertEqual(
+            preview["file_scopes"],
+            [
+                {
+                    "arquivo": "sed_teste.pdf",
+                    "turmas": ["2ºA"],
+                    "turma_keys": ["2A"],
+                    "alunos": 1,
+                }
+            ],
+        )
 
     def test_reuses_last_sed_turma_on_continuation_pages(self):
         output = io.BytesIO()

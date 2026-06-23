@@ -59,6 +59,13 @@ def configure_app(app):
     if not access_token:
         print("[AVISO] ACCESS_TOKEN nao configurado. Login ficara indisponivel ate configurar a variavel.")
 
+    confere_password = os.getenv("CONFERE_PASSWORD")
+    if not confere_password:
+        print(
+            "[AVISO] CONFERE_PASSWORD nao configurado. "
+            "Acesso externo ao conferidor ficara indisponivel ate configurar a variavel."
+        )
+
     school_year = env_int("SCHOOL_YEAR", datetime.now().year)
 
     app.config["UPLOAD_FOLDER"] = DEFAULT_UPLOAD_FOLDER
@@ -75,5 +82,6 @@ def configure_app(app):
     )
     app.config["HOLIDAYS_JSON_PATH"] = holidays_json_path(app)
     app.config["INFORMATIVO_WEEKDAY_DUE"] = env_int("INFORMATIVO_WEEKDAY_DUE", 4)
+    app.config["CONFERE_PASSWORD"] = confere_password
 
     return access_token

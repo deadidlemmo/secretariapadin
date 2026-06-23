@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Acesso ao Conferidor{% endblock %}
+
+{% block extra_styles %}
+  main {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .confere-auth-page {
+    width: min(460px, calc(100vw - 32px));
+  }
+
+  .confere-auth-card {
+    display: grid;
+    gap: 18px;
+    padding: 28px;
+    border: 1px solid var(--app-border);
+    border-left: 5px solid var(--app-primary);
+    border-radius: var(--app-radius);
+    background: var(--app-surface-glass);
+    box-shadow: var(--app-shadow-soft);
+  }
+
+  .confere-auth-card h2 {
+    margin: 0;
+    color: var(--app-primary-dark);
+    font-size: 1.55rem;
+    font-weight: 900;
+  }
+
+  .confere-auth-card p {
+    margin: 0;
+    color: var(--app-muted);
+    line-height: 1.45;
+  }
+
+  .confere-auth-field {
+    display: grid;
+    gap: 8px;
+    font-weight: 850;
+  }
+
+  .confere-auth-field input {
+    width: 100%;
+    min-height: var(--app-control-height);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface);
+    color: var(--app-text);
+    padding: 0 12px;
+    font: inherit;
+  }
+
+  .confere-auth-button {
+    min-height: var(--app-control-height);
+    border: 1px solid var(--app-primary-dark);
+    border-radius: var(--app-pill-radius);
+    background: linear-gradient(135deg, var(--app-primary-dark), var(--app-primary));
+    color: #fff;
+    font-weight: 900;
+  }
+
+  .confere-auth-note {
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--app-accent) 40%, var(--app-border));
+    border-radius: var(--app-control-radius);
+    background: color-mix(in srgb, var(--app-accent) 12%, var(--app-surface));
+    color: var(--app-text);
+    font-size: 0.9rem;
+  }
+{% endblock %}
+
+{% block content %}
+  <section class="confere-auth-page">
+    <form class="confere-auth-card" method="POST">
+      <div>
+        <h2>Acesso ao Conferidor</h2>
+        <p>Informe a senha do modulo de conferencia. Este acesso libera apenas a comparacao Lista Piloto x SED.</p>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div>
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% if not password_configured %}
+        <div class="confere-auth-note">
+          A variavel CONFERE_PASSWORD ainda nao esta configurada no ambiente.
+        </div>
+      {% endif %}
+
+      <label class="confere-auth-field" for="password">
+        Senha do conferidor
+        <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+      </label>
+
+      <button class="confere-auth-button" type="submit">
+        Entrar no conferidor
+      </button>
+    </form>
+  </section>
+{% endblock %}

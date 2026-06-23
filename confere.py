@@ -1,3 +1,4 @@
+import hmac
 import os
 import re
 import uuid
@@ -6,6 +7,7 @@ from functools import wraps
 from flask import (
     Blueprint,
     Flask,
+    current_app,
     flash,
     jsonify,
     redirect,
@@ -27,6 +29,11 @@ from services.conferir_listas import (
     run_conferencia,
     save_result,
 )
+from services.confere_escolas import (
+    default_confere_school_id,
+    get_confere_school_config,
+    list_confere_schools,
+)
 from utils.uploads import allowed_excel_file, allowed_extension
 
 
@@ -42,11 +49,41 @@ os.makedirs(RESULTS_FOLDER, exist_ok=True)
 def confere_login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get("logged_in"):
-            return redirect(url_for("login_route", next=request.url))
+        if not session.get("confere_logged_in"):
+            return redirect(url_for("confere.login", next=_confere_next_target()))
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+def _confere_password():
+    return current_app.config.get("CONFERE_PASSWORD") or os.getenv("CONFERE_PASSWORD")
+
+
+def _confere_next_target():
+    if request.query_string:
+        return request.full_path
+    return request.path
+
+
+def _safe_next_url(value):
+    if value and value.startswith("/confere") and not value.startswith("//"):
+        return value
+    return url_for("confere.index")
+
+
+def _confere_template_context(**extra):
+    selected_school_id = (
+        extra.pop("selected_school_id", None)
+        or session.get("confere_school_id")
+        or default_confere_school_id()
+    )
+    context = {
+        "school_configs": list_confere_schools(),
+        "selected_school_id": selected_school_id,
+    }
+    context.update(extra)
+    return context
 
 
 def _collect_sed_pdf_uploads():
@@ -133,11 +170,47 @@ def _build_result_groups(result):
     return groups
 
 
+@confere_bp.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("confere_logged_in") and request.method == "GET":
+        return redirect(_safe_next_url(request.args.get("next")))
+
+    password_configured = bool(_confere_password())
+    if request.method == "POST":
+        configured_password = _confere_password()
+        submitted_password = request.form.get("password", "")
+        if not configured_password:
+            flash("Senha do conferidor nao configurada. Defina CONFERE_PASSWORD no ambiente.", "danger")
+        elif hmac.compare_digest(submitted_password, configured_password):
+            session["confere_logged_in"] = True
+            session.setdefault("confere_school_id", default_confere_school_id())
+            return redirect(_safe_next_url(request.args.get("next")))
+        else:
+            flash("Senha do conferidor invalida.", "danger")
+
+    return render_template("confere_login.html", password_configured=password_configured)
+
+
+@confere_bp.route("/logout", methods=["GET", "POST"])
+def logout():
+    session.pop("confere_logged_in", None)
+    session.pop("confere_school_id", None)
+    flash("Acesso ao conferidor encerrado.", "success")
+    return redirect(url_for("confere.login"))
+
+
 @confere_bp.route("/", methods=["GET", "POST"])
 @confere_login_required
 def index():
     if request.method == "GET":
-        return render_template("index.html", result=None)
+        return render_template("index.html", **_confere_template_context(result=None))
+
+    school_id = request.form.get("school_id", "").strip()
+    school_config = get_confere_school_config(school_id)
+    if not school_config:
+        flash("Selecione a escola antes de iniciar a conferencia.", "danger")
+        return redirect(url_for("confere.index"))
+    session["confere_school_id"] = school_config.id
 
     lista_piloto = request.files.get("lista_piloto")
     if not lista_piloto or not lista_piloto.filename:
@@ -156,7 +229,7 @@ def index():
         return redirect(url_for("confere.index"))
 
     try:
-        result = run_conferencia(lista_piloto, sed_items)
+        result = run_conferencia(lista_piloto, sed_items, school_config=school_config)
     except Exception as exc:
         flash(f"Nao foi possivel executar a conferencia: {exc}", "danger")
         return redirect(url_for("confere.index"))
@@ -182,6 +255,7 @@ def preview_pdfs():
             "pdfs_selecionados": 0,
             "errors": [],
             "duplicate_files": [],
+            "file_scopes": [],
         }
     )
     errors = upload_errors + preview.get("errors", [])
@@ -194,6 +268,7 @@ def preview_pdfs():
             "pdfs_selecionados": len(uploaded_files),
             "errors": errors,
             "duplicate_files": duplicate_files,
+            "file_scopes": preview.get("file_scopes", []),
         }
     )
 
@@ -208,9 +283,12 @@ def resultado(result_id):
     result = prepare_result_for_view(result)
     return render_template(
         "index.html",
-        result=result,
-        result_groups=_build_result_groups(result),
-        result_id=result_id,
+        **_confere_template_context(
+            result=result,
+            result_groups=_build_result_groups(result),
+            result_id=result_id,
+            selected_school_id=result.get("school", {}).get("id"),
+        ),
     )
 
 

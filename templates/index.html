@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Conferência Lista Piloto x SED{% endblock %}
+{% block title %}Conferidor de Listas Escolares{% endblock %}
 
 {% block extra_styles %}
   main {
@@ -14,22 +14,12 @@
     --confere-warning: rgb(208, 138, 31);
     --confere-missing-sed: rgb(194, 65, 12);
     --confere-missing-lista: rgb(29, 78, 216);
-    --confere-warning-text: rgb(122, 77, 0);
-    --confere-warning-strong-text: rgb(58, 40, 0);
     --confere-field-color: var(--confere-warning);
-    --confere-field-text: var(--confere-warning-text);
-    --confere-field-strong-text: var(--confere-warning-strong-text);
+    --confere-field-text: rgb(122, 77, 0);
+    --confere-field-strong-text: rgb(58, 40, 0);
     width: min(calc(100vw - 56px), 1310px);
     margin: 0 auto;
     color: var(--app-text);
-  }
-
-  html[data-theme="dark"] .confere-page {
-    --confere-warning: rgb(239, 190, 107);
-    --confere-missing-sed: rgb(239, 153, 126);
-    --confere-missing-lista: rgb(151, 183, 255);
-    --confere-warning-text: rgb(246, 205, 131);
-    --confere-warning-strong-text: rgb(255, 240, 208);
   }
 
   .confere-page .confere-shell {
@@ -83,6 +73,149 @@
 
   .confere-page .confere-panel {
     padding: 24px;
+  }
+
+  .confere-page .confere-logout-link-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: -6px;
+  }
+
+  .confere-page .confere-logout-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid color-mix(in srgb, var(--app-danger) 28%, var(--app-border));
+    border-radius: var(--app-pill-radius);
+    background: color-mix(in srgb, var(--app-danger) 5%, var(--app-surface));
+    color: var(--app-danger);
+    font-size: 0.86rem;
+    font-weight: 900;
+    text-decoration: none !important;
+    box-shadow: var(--app-control-shadow);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  }
+
+  .confere-page .confere-logout-link:hover {
+    border-color: color-mix(in srgb, var(--app-danger) 52%, var(--app-border));
+    background: color-mix(in srgb, var(--app-danger) 10%, var(--app-surface));
+    color: var(--app-danger);
+    transform: translateY(-1px);
+  }
+
+  .confere-page .confere-logout-link i {
+    font-size: 0.9rem;
+  }
+
+  .confere-page .school-selector-card {
+    display: grid;
+    grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 14px;
+    margin-bottom: 18px;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 24%, var(--app-border));
+    border-radius: var(--app-control-radius);
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 6%, transparent), transparent),
+      var(--app-surface);
+  }
+
+  .confere-page .school-selector-label {
+    display: grid;
+    gap: 8px;
+    color: var(--app-primary-dark);
+    font-weight: 900;
+  }
+
+  .confere-page .school-label-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.84rem;
+  }
+
+  .confere-page .school-label-icon {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-dark);
+  }
+
+  .confere-page .school-select-shell {
+    position: relative;
+    display: block;
+  }
+
+  .confere-page .school-select {
+    width: 100%;
+    min-height: var(--app-control-height);
+    appearance: none;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 24%, var(--app-border));
+    border-radius: var(--app-control-radius);
+    background: var(--app-surface);
+    color: var(--app-text);
+    padding: 0 44px 0 14px;
+    font: inherit;
+    font-weight: 850;
+    box-shadow: var(--app-control-shadow);
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+
+  .confere-page .school-select-shell::after {
+    content: "\f078";
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--app-primary-dark);
+    font-family: "Font Awesome 6 Free", "Font Awesome 5 Free";
+    font-size: 0.8rem;
+    font-weight: 900;
+    pointer-events: none;
+  }
+
+  .confere-page .school-select:focus {
+    outline: none;
+    border-color: var(--app-primary);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-primary) 16%, transparent);
+  }
+
+  .confere-page .school-help-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 100%;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 16%, var(--app-border));
+    border-radius: var(--app-control-radius);
+    background: color-mix(in srgb, var(--app-primary) 4%, var(--app-surface-muted));
+  }
+
+  .confere-page .school-help-card i {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    flex: 0 0 36px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: var(--app-primary-dark);
+    color: #fff;
+  }
+
+  .confere-page .school-help-card p {
+    margin: 0;
+    color: var(--app-muted);
+    line-height: 1.35;
   }
 
   .confere-page .confere-grid {
@@ -197,12 +330,6 @@
     color: #8a5a00;
   }
 
-  html[data-theme="dark"] .confere-page .excel-count {
-    border: 1px solid color-mix(in srgb, var(--confere-warning) 42%, var(--app-border));
-    background: color-mix(in srgb, var(--confere-warning) 18%, var(--app-surface));
-    color: var(--confere-warning-strong-text);
-  }
-
   .confere-page .selected-files {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -283,11 +410,6 @@
     background: color-mix(in srgb, var(--app-primary) 5%, var(--app-surface));
   }
 
-  .confere-page .scope-preview.is-detecting {
-    border-color: color-mix(in srgb, var(--app-primary) 50%, var(--app-border));
-    background: color-mix(in srgb, var(--app-primary) 9%, var(--app-surface));
-  }
-
   .confere-page .scope-preview[hidden] {
     display: none;
   }
@@ -325,38 +447,30 @@
     white-space: nowrap;
   }
 
-  .confere-page .scope-preview.is-detecting #sed-scope-turmas {
-    color: var(--app-primary-dark);
+  .confere-page .scope-preview.is-loading {
+    border-color: color-mix(in srgb, var(--app-primary) 46%, var(--app-border));
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--app-primary) 8%, var(--app-surface)), var(--app-surface));
   }
 
-  .confere-page .scope-preview.is-detecting #sed-scope-turmas::after {
-    content: "...";
-    display: inline-block;
-    width: 1.2em;
-    text-align: left;
-    animation: scope-detect-dots 1.2s steps(4, end) infinite;
+  .confere-page .scope-preview.is-loading .scope-preview-item:first-child strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
   }
 
-  @keyframes scope-detect-dots {
-    0% {
-      content: "";
-    }
-    25% {
-      content: ".";
-    }
-    50% {
-      content: "..";
-    }
-    75%,
-    100% {
-      content: "...";
-    }
+  .confere-page .scope-preview.is-loading .scope-preview-item:first-child strong::after {
+    content: "";
+    width: 12px;
+    height: 12px;
+    border: 2px solid color-mix(in srgb, var(--app-primary) 28%, transparent);
+    border-top-color: var(--app-primary);
+    border-radius: 50%;
+    animation: confere-scope-spin 0.8s linear infinite;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .confere-page .scope-preview.is-detecting #sed-scope-turmas::after {
-      animation: none;
-    }
+  @keyframes confere-scope-spin {
+    to { transform: rotate(360deg); }
   }
 
   .confere-page .scope-errors {
@@ -581,6 +695,36 @@
     color: #fff;
   }
 
+  html[data-theme="dark"] .confere-page .btn-confere,
+  html[data-theme="dark"] .confere-page .btn-export,
+  html[data-theme="dark"] .confere-page .print-modal-actions .btn-confere {
+    border-color: rgb(91, 154, 141);
+    background: linear-gradient(135deg, rgb(31, 102, 89), rgb(43, 128, 113));
+    color: rgb(248, 255, 252) !important;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+  }
+
+  html[data-theme="dark"] .confere-page .btn-confere:hover,
+  html[data-theme="dark"] .confere-page .btn-export:hover,
+  html[data-theme="dark"] .confere-page .print-modal-actions .btn-confere:hover {
+    border-color: rgb(119, 184, 170);
+    background: linear-gradient(135deg, rgb(37, 118, 103), rgb(52, 145, 129));
+    color: rgb(255, 255, 255) !important;
+  }
+
+  html[data-theme="dark"] .confere-page .filter-row button.is-active,
+  html[data-theme="dark"] .confere-page .turma-filter-row button.is-active {
+    border-color: rgb(111, 174, 160);
+    background: linear-gradient(135deg, rgb(28, 91, 80), rgb(39, 115, 101));
+    color: rgb(248, 255, 252);
+  }
+
+  html[data-theme="dark"] .confere-page .filter-row button.is-active .filter-count,
+  html[data-theme="dark"] .confere-page .turma-filter-row button.is-active .filter-count {
+    background: rgba(255, 255, 255, 0.16);
+    color: rgb(255, 255, 255);
+  }
+
   .confere-page .result-controls {
     display: flex;
     align-items: center;
@@ -707,8 +851,8 @@
   .confere-page .result-card[data-category="divergencia_cadastral"] {
     border-left-color: var(--confere-warning);
     --confere-field-color: var(--confere-warning);
-    --confere-field-text: var(--confere-warning-text);
-    --confere-field-strong-text: var(--confere-warning-strong-text);
+    --confere-field-text: rgb(122, 77, 0);
+    --confere-field-strong-text: rgb(58, 40, 0);
   }
 
   .confere-page .result-status-cell {
@@ -911,12 +1055,12 @@
   .confere-page .result-card[data-category="divergencia_cadastral"] .result-observation {
     border-color: color-mix(in srgb, var(--confere-warning) 44%, var(--app-border));
     background: color-mix(in srgb, var(--confere-warning) 13%, var(--app-surface));
-    color: var(--confere-warning-text);
+    color: rgb(122, 77, 0);
   }
 
   .confere-page .result-card[data-category="divergencia_cadastral"] .result-observation i {
     background: color-mix(in srgb, var(--confere-warning) 18%, var(--app-surface));
-    color: var(--confere-warning-text);
+    color: rgb(138, 90, 0);
   }
 
   .confere-page .no-filter-results {
@@ -966,7 +1110,7 @@
 
   .confere-page .status-divergencia_cadastral {
     background: color-mix(in srgb, var(--confere-warning) 18%, var(--app-surface));
-    color: var(--confere-warning-text);
+    color: #8a5a00;
   }
 
   .confere-page .pdf-errors {
@@ -1088,6 +1232,7 @@
 
   @media (max-width: 980px) {
     .confere-page .confere-grid,
+    .confere-page .school-selector-card,
     .confere-page .summary-grid {
       grid-template-columns: 1fr;
     }
@@ -1377,10 +1522,16 @@
           <i class="fas fa-clipboard-check"></i>
         </div>
         <div>
-          <h2>Conferência Lista Piloto x SED</h2>
-          <p>Anexe a Lista Piloto e todos os PDFs do SED em uma única operação para gerar a conferência consolidada.</p>
+          <h2>Conferidor de Listas Escolares</h2>
+          <p>Compare a Lista Piloto com os PDFs do SED em uma conferência consolidada.</p>
         </div>
       </section>
+      <div class="confere-logout-link-wrap">
+        <a class="confere-logout-link" href="{{ url_for('confere.logout') }}">
+          <i class="fas fa-right-from-bracket" aria-hidden="true"></i>
+          Sair do conferidor
+        </a>
+      </div>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -1394,10 +1545,35 @@
 
       <section class="confere-panel">
         <form method="POST" action="{{ url_for('confere.index') }}" enctype="multipart/form-data" id="confere-form">
+          <div class="school-selector-card">
+            <label class="school-selector-label" for="school_id">
+              <span class="school-label-row">
+                <span class="school-label-icon" aria-hidden="true">
+                  <i class="fas fa-school"></i>
+                </span>
+                Escola
+              </span>
+              <span class="school-select-shell">
+                <select id="school_id" name="school_id" class="school-select" required>
+                  <option value="">Selecione a escola</option>
+                  {% for school in school_configs %}
+                    <option value="{{ school.id }}" {% if selected_school_id == school.id %}selected{% endif %}>
+                      {{ school.nome }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </span>
+            </label>
+            <div class="school-help-card">
+              <i class="fas fa-sliders" aria-hidden="true"></i>
+              <p>A Lista Piloto será lida conforme a configuração da escola selecionada.</p>
+            </div>
+          </div>
+
           <div class="confere-grid">
             <div class="upload-card is-excel">
               <h3>Lista Piloto</h3>
-              <p>Use a planilha oficial com a aba <strong>LISTA CORRIDA</strong>. A conferência lê turma, nome, nascimento, RA e situação.</p>
+              <p>Envie a Lista Piloto oficial da escola selecionada. O sistema lê os campos configurados para turma, nome, nascimento, RA e situação.</p>
               <label class="confere-dropzone excel-dropzone" id="excel-dropzone" for="lista_piloto">
                 <span class="dropzone-icon excel-icon" aria-hidden="true">
                   <i class="fas fa-file-excel"></i>
@@ -1419,7 +1595,7 @@
 
             <div class="upload-card is-pdf">
               <h3>PDFs do SED</h3>
-              <p>Selecione ou arraste todos os arquivos “Alunos por Classe”. Os PDFs serão consolidados antes da comparação.</p>
+              <p>Selecione ou arraste os PDFs do SED, como as listagens “Alunos por Classe”. É possível enviar várias turmas de uma vez; o sistema consolida tudo antes da comparação.</p>
               <label class="confere-dropzone" id="sed-dropzone" for="sed_pdfs">
                 <span class="dropzone-icon" aria-hidden="true">
                   <i class="fas fa-file-pdf"></i>
@@ -1671,29 +1847,30 @@
     </div>
 
     <div id="loadingOverlay" class="app-loading-overlay" aria-hidden="true" style="display: none;">
-      <div class="app-loading-panel">
-        <div class="app-loading-orb app-loading-spinner" aria-hidden="true">
+      <div class="app-loading-panel" role="status" aria-live="polite">
+        <div class="app-loading-orb" aria-hidden="true">
           <i class="fas fa-clipboard-check"></i>
         </div>
-        <p class="app-loading-kicker">Confer&ecirc;ncia em andamento</p>
-        <p class="app-loading-message" id="loadingStatusMessage">
-          Conferindo listas... Aguarde enquanto o sistema lê os PDFs do SED e compara com a Lista Piloto.
-        </p>
+        <div>
+          <p class="app-loading-kicker">Conferência em andamento</p>
+          <p class="app-loading-message" id="loadingMessage">
+            Conferindo listas... Lendo os PDFs do SED e preparando os dados da Lista Piloto.
+          </p>
+        </div>
         <div class="app-loading-progress" aria-hidden="true">
           <span></span>
         </div>
-        <ol class="app-loading-steps" aria-label="Etapas da confer&ecirc;ncia">
-          <li class="is-active" data-loading-step="0">Ler PDFs</li>
-          <li data-loading-step="1">Extrair alunos</li>
-          <li data-loading-step="2">Comparar bases</li>
-          <li data-loading-step="3">Montar resultado</li>
-        </ol>
-        <p class="app-loading-hint" id="loadingLongHint" hidden>
+        <ul class="app-loading-steps" id="loadingSteps" aria-label="Etapas da conferência">
+          <li data-loading-step="pdfs" class="is-active">Ler PDFs</li>
+          <li data-loading-step="alunos">Extrair alunos</li>
+          <li data-loading-step="comparar">Comparar bases</li>
+          <li data-loading-step="resultado">Montar resultado</li>
+        </ul>
+        <p class="app-loading-hint" id="loadingSlowHint" hidden>
           Esta conferência está demorando mais que o normal. Continue aguardando se foram enviados muitos PDFs.
         </p>
-        <p class="app-loading-error" id="loadingErrorMessage" hidden></p>
         <div class="app-loading-actions" id="loadingActions" hidden>
-          <button type="button" class="btn-secondary-action" id="btn-cancel-loading">
+          <button type="button" class="btn-secondary-action" id="loadingReturnButton">
             Voltar ao formulário
           </button>
         </div>
@@ -1768,6 +1945,7 @@
   <script>
     (function () {
       const form = document.getElementById("confere-form");
+      const schoolSelect = document.getElementById("school_id");
       const excelInput = document.getElementById("lista_piloto");
       const excelDropzone = document.getElementById("excel-dropzone");
       const excelFileList = document.getElementById("excel-file-list");
@@ -1783,12 +1961,11 @@
       const sedScopeErrors = document.getElementById("sed-scope-errors");
       const submitButton = document.getElementById("btn-executar-conferencia");
       const loadingOverlay = document.getElementById("loadingOverlay");
-      const loadingStatusMessage = document.getElementById("loadingStatusMessage");
-      const loadingLongHint = document.getElementById("loadingLongHint");
-      const loadingErrorMessage = document.getElementById("loadingErrorMessage");
+      const loadingMessage = document.getElementById("loadingMessage");
+      const loadingSteps = document.getElementById("loadingSteps");
+      const loadingSlowHint = document.getElementById("loadingSlowHint");
       const loadingActions = document.getElementById("loadingActions");
-      const loadingSteps = document.querySelectorAll("[data-loading-step]");
-      const cancelLoadingButton = document.getElementById("btn-cancel-loading");
+      const loadingReturnButton = document.getElementById("loadingReturnButton");
       const filterButtons = document.querySelectorAll("[data-confere-filter]");
       const turmaFilterButtons = document.querySelectorAll("[data-turma-filter]");
       const resultSearch = document.getElementById("confere-result-search");
@@ -1808,115 +1985,95 @@
       let activeTurmaFilter = "todas";
       let selectedExcelFile = null;
       let selectedFiles = [];
+      let detectedFileLabels = new Map();
       let sedPreviewRequestId = 0;
+      let isSedPreviewLoading = false;
+      let isSubmittingConferencia = false;
+      let loadingTimers = [];
       let printSelectionPrepared = false;
-      let loadingLongTimer = null;
-      let loadingStepTimer = null;
-      let loadingStepIndex = 0;
-      let activeConferenceController = null;
-      let sedScopePending = false;
-      let conferenceSubmitting = false;
-      const submitButtonReadyHtml = submitButton ? submitButton.innerHTML : "";
-      const submitButtonDetectingHtml = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Detectando turmas...';
-      const loadingMessages = [
-        "Lendo os PDFs do SED e preparando os dados da Lista Piloto.",
-        "Extraindo alunos, RAs, turmas e situa\u00e7\u00f5es dos arquivos anexados.",
-        "Comparando Lista Piloto com SED e identificando diverg\u00eancias.",
-        "Organizando o resultado final para exibi\u00e7\u00e3o."
-      ];
 
-      function updateSubmitButtonState() {
+      const submitButtonDefaultHtml = submitButton ? submitButton.innerHTML : "";
+      const loadingStepTexts = {
+        pdfs: "Conferindo listas... Lendo os PDFs do SED e preparando os dados da Lista Piloto.",
+        alunos: "Extraindo alunos, RAs, turmas e situações dos arquivos anexados.",
+        comparar: "Comparando Lista Piloto e SED para encontrar divergências.",
+        resultado: "Montando o resultado consolidado da conferência."
+      };
+
+      function setSubmitButtonState() {
         if (!submitButton) return;
-        const hasPdfs = selectedFiles.length > 0;
-        submitButton.disabled = conferenceSubmitting || sedScopePending || !hasPdfs;
 
-        if (sedScopePending) {
-          submitButton.innerHTML = submitButtonDetectingHtml;
-          submitButton.title = "Aguarde a detec\u00e7\u00e3o das turmas dos PDFs terminar.";
+        if (isSubmittingConferencia) {
+          submitButton.disabled = true;
+          submitButton.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Conferindo...';
+          submitButton.title = "Conferência em andamento.";
           return;
         }
 
-        submitButton.innerHTML = submitButtonReadyHtml;
-        submitButton.title = hasPdfs ? "" : "Anexe pelo menos um PDF do SED.";
-      }
-
-      function setSedScopePending(isPending) {
-        sedScopePending = Boolean(isPending);
-        updateSubmitButtonState();
-      }
-
-      function resetLoadingOverlay() {
-        window.clearTimeout(loadingLongTimer);
-        window.clearInterval(loadingStepTimer);
-        loadingLongTimer = null;
-        loadingStepTimer = null;
-        loadingStepIndex = 0;
-        if (loadingStatusMessage) loadingStatusMessage.textContent = loadingMessages[0];
-        loadingSteps.forEach((step, index) => {
-          step.classList.toggle("is-active", index === 0);
-          step.classList.remove("is-done");
-        });
-        if (loadingLongHint) loadingLongHint.hidden = true;
-        if (loadingErrorMessage) {
-          loadingErrorMessage.hidden = true;
-          loadingErrorMessage.textContent = "";
+        if (isSedPreviewLoading) {
+          submitButton.disabled = true;
+          submitButton.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Detectando turmas...';
+          submitButton.title = "Aguarde a detecção das turmas dos PDFs terminar.";
+          return;
         }
-        if (loadingActions) loadingActions.hidden = true;
+
+        if (!selectedFiles.length) {
+          submitButton.disabled = true;
+          submitButton.innerHTML = submitButtonDefaultHtml;
+          submitButton.title = "Anexe pelo menos um PDF do SED.";
+          return;
+        }
+
+        submitButton.disabled = false;
+        submitButton.innerHTML = submitButtonDefaultHtml;
+        submitButton.removeAttribute("title");
       }
 
-      function advanceLoadingStep() {
-        loadingStepIndex = Math.min(loadingStepIndex + 1, loadingMessages.length - 1);
-        if (loadingStatusMessage) {
-          loadingStatusMessage.textContent = loadingMessages[loadingStepIndex];
+      function setSedPreviewLoadingState(isLoading) {
+        isSedPreviewLoading = Boolean(isLoading);
+        if (sedScopePreview) {
+          sedScopePreview.classList.toggle("is-loading", isSedPreviewLoading);
         }
-        loadingSteps.forEach((step, index) => {
-          step.classList.toggle("is-active", index === loadingStepIndex);
-          step.classList.toggle("is-done", index < loadingStepIndex);
+        setSubmitButtonState();
+      }
+
+      function clearLoadingTimers() {
+        loadingTimers.forEach((timer) => window.clearTimeout(timer));
+        loadingTimers = [];
+      }
+
+      function setLoadingStep(activeStep) {
+        if (!loadingSteps) return;
+        let activeReached = false;
+        loadingSteps.querySelectorAll("[data-loading-step]").forEach((item) => {
+          const key = item.dataset.loadingStep;
+          const isActive = key === activeStep;
+          if (isActive) activeReached = true;
+          item.classList.toggle("is-active", isActive);
+          item.classList.toggle("is-done", !isActive && !activeReached);
         });
+        if (loadingMessage && loadingStepTexts[activeStep]) {
+          loadingMessage.textContent = loadingStepTexts[activeStep];
+        }
       }
 
       function showLoadingOverlay() {
-        resetLoadingOverlay();
-        conferenceSubmitting = true;
-        updateSubmitButtonState();
+        clearLoadingTimers();
+        setLoadingStep("pdfs");
+        if (loadingSlowHint) loadingSlowHint.hidden = true;
+        if (loadingActions) loadingActions.hidden = true;
         if (loadingOverlay) {
           loadingOverlay.style.display = "flex";
           loadingOverlay.setAttribute("aria-hidden", "false");
         }
-        loadingStepTimer = window.setInterval(advanceLoadingStep, 6500);
-        loadingLongTimer = window.setTimeout(function () {
-          if (loadingLongHint) loadingLongHint.hidden = false;
+
+        loadingTimers.push(window.setTimeout(() => setLoadingStep("alunos"), 4500));
+        loadingTimers.push(window.setTimeout(() => setLoadingStep("comparar"), 13000));
+        loadingTimers.push(window.setTimeout(() => setLoadingStep("resultado"), 24000));
+        loadingTimers.push(window.setTimeout(() => {
+          if (loadingSlowHint) loadingSlowHint.hidden = false;
           if (loadingActions) loadingActions.hidden = false;
-        }, 60000);
-      }
-
-      function hideLoadingOverlay() {
-        resetLoadingOverlay();
-        conferenceSubmitting = false;
-        updateSubmitButtonState();
-        if (loadingOverlay) {
-          loadingOverlay.style.display = "none";
-          loadingOverlay.setAttribute("aria-hidden", "true");
-        }
-      }
-
-      function showLoadingError(message) {
-        window.clearTimeout(loadingLongTimer);
-        window.clearInterval(loadingStepTimer);
-        loadingLongTimer = null;
-        loadingStepTimer = null;
-        conferenceSubmitting = false;
-        updateSubmitButtonState();
-        if (loadingLongHint) loadingLongHint.hidden = true;
-        if (loadingOverlay) {
-          loadingOverlay.style.display = "flex";
-          loadingOverlay.setAttribute("aria-hidden", "false");
-        }
-        if (loadingErrorMessage) {
-          loadingErrorMessage.textContent = message;
-          loadingErrorMessage.hidden = false;
-        }
-        if (loadingActions) loadingActions.hidden = false;
+        }, 45000));
       }
 
       function syncExcelInput() {
@@ -1977,8 +2134,9 @@
           icon.className = "selected-file-icon";
           icon.innerHTML = '<i class="fas fa-file-pdf" aria-hidden="true"></i>';
           name.className = "selected-file-name";
-          name.textContent = file.name;
-          name.title = file.name;
+          const detectedLabel = detectedFileLabels.get(file.name);
+          name.textContent = detectedLabel || file.name;
+          name.title = detectedLabel ? file.name : "";
           remove.type = "button";
           remove.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
           remove.setAttribute("aria-label", "Remover " + file.name);
@@ -1994,44 +2152,51 @@
           item.appendChild(remove);
           fileList.appendChild(item);
         });
-        updateSubmitButtonState();
       }
 
       function resetSedScopePreview() {
         if (!sedScopePreview) return;
+        sedPreviewRequestId += 1;
+        detectedFileLabels = new Map();
+        renderSelectedFiles();
+        setSedPreviewLoadingState(false);
         sedScopePreview.hidden = true;
-        sedScopePreview.classList.remove("is-detecting");
         sedScopeTurmas.textContent = "-";
-        sedScopeTurmas.title = "";
         sedScopeValidos.textContent = "0";
         sedScopeIgnorados.textContent = "0";
         sedScopeErrors.innerHTML = "";
-        setSedScopePending(false);
       }
 
       function renderSedScopeLoading() {
         if (!sedScopePreview) return;
         sedScopePreview.hidden = false;
-        sedScopePreview.classList.add("is-detecting");
-        sedScopeTurmas.textContent = "Detectando turmas dos PDFs";
-        sedScopeTurmas.title = "Detectando turmas dos PDFs";
+        setSedPreviewLoadingState(true);
+        sedScopeTurmas.textContent = "Detectando turmas dos PDFs...";
+        sedScopeTurmas.title = "Detectando turmas dos PDFs...";
         sedScopeValidos.textContent = "-";
         sedScopeIgnorados.textContent = "-";
         sedScopeErrors.innerHTML = "";
-        setSedScopePending(true);
       }
 
       function renderSedScopePreview(data) {
         if (!sedScopePreview) return;
         const turmas = data.turmas && data.turmas.length ? data.turmas.join(", ") : "Nenhuma turma detectada";
+        detectedFileLabels = new Map();
+        (data.file_scopes || []).forEach((item) => {
+          if (!item.arquivo) return;
+          const fileTurmas = item.turmas && item.turmas.length ? item.turmas.join(", ") : "";
+          if (!fileTurmas) return;
+          const alunosText = item.alunos === 1 ? "1 aluno" : item.alunos + " alunos";
+          detectedFileLabels.set(item.arquivo, fileTurmas + " · " + alunosText);
+        });
+        renderSelectedFiles();
+        setSedPreviewLoadingState(false);
         sedScopePreview.hidden = false;
-        sedScopePreview.classList.remove("is-detecting");
         sedScopeTurmas.textContent = turmas;
         sedScopeTurmas.title = turmas;
         sedScopeValidos.textContent = data.pdfs_validos || 0;
         sedScopeIgnorados.textContent = data.pdfs_ignorados || 0;
         sedScopeErrors.innerHTML = "";
-        setSedScopePending(false);
 
         const details = []
           .concat(data.errors || [])
@@ -2048,13 +2213,12 @@
       }
 
       function previewSedScope() {
-        const requestId = ++sedPreviewRequestId;
-
         if (!selectedFiles.length) {
           resetSedScopePreview();
           return;
         }
 
+        const requestId = ++sedPreviewRequestId;
         const formData = new FormData();
         selectedFiles.forEach((file) => formData.append("sed_pdfs", file));
         renderSedScopeLoading();
@@ -2074,14 +2238,15 @@
           })
           .catch(() => {
             if (requestId !== sedPreviewRequestId || !sedScopePreview) return;
+            detectedFileLabels = new Map();
+            renderSelectedFiles();
+            setSedPreviewLoadingState(false);
             sedScopePreview.hidden = false;
-            sedScopePreview.classList.remove("is-detecting");
             sedScopeTurmas.textContent = "Não foi possível detectar";
             sedScopeTurmas.title = "Não foi possível detectar";
             sedScopeValidos.textContent = "-";
             sedScopeIgnorados.textContent = "-";
             sedScopeErrors.innerHTML = "<li>Não foi possível gerar a prévia dos PDFs selecionados.</li>";
-            setSedScopePending(false);
           });
       }
 
@@ -2115,6 +2280,7 @@
             );
             if (!duplicate) selectedFiles.push(file);
           });
+        detectedFileLabels = new Map();
         syncInputFiles();
         renderSelectedFiles();
         previewSedScope();
@@ -2172,64 +2338,34 @@
         });
       }
 
+      if (loadingReturnButton) {
+        loadingReturnButton.addEventListener("click", function () {
+          clearLoadingTimers();
+          window.location.href = "{{ url_for('confere.index') }}";
+        });
+      }
+
       if (form) {
-        form.addEventListener("submit", async function (event) {
+        form.addEventListener("submit", function (event) {
+          if (schoolSelect && !schoolSelect.value) {
+            event.preventDefault();
+            alert("Selecione a escola antes de iniciar a conferência.");
+            schoolSelect.focus();
+            return;
+          }
           if (!sedInput.files.length) {
             event.preventDefault();
             alert("Anexe pelo menos um PDF do SED antes de executar a conferência.");
             return;
           }
-          if (sedScopePending) {
+          if (isSedPreviewLoading) {
             event.preventDefault();
             alert("Aguarde a detecção das turmas dos PDFs terminar antes de executar a conferência.");
             return;
           }
-          event.preventDefault();
+          isSubmittingConferencia = true;
+          setSubmitButtonState();
           showLoadingOverlay();
-          activeConferenceController = new AbortController();
-
-          try {
-            const response = await fetch(form.action, {
-              method: "POST",
-              body: new FormData(form),
-              credentials: "same-origin",
-              signal: activeConferenceController.signal
-            });
-            activeConferenceController = null;
-
-            if (response.redirected) {
-              window.location.href = response.url;
-              return;
-            }
-
-            if (response.ok) {
-              const html = await response.text();
-              document.open();
-              document.write(html);
-              document.close();
-              return;
-            }
-
-            throw new Error("O servidor não concluiu a conferência. Tente novamente ou reduza a quantidade de PDFs por execução.");
-          } catch (error) {
-            activeConferenceController = null;
-            if (error && error.name === "AbortError") return;
-            showLoadingError(
-              error && error.message
-                ? error.message
-                : "A conferência foi interrompida. Verifique os arquivos e tente novamente."
-            );
-          }
-        });
-      }
-
-      if (cancelLoadingButton) {
-        cancelLoadingButton.addEventListener("click", function () {
-          if (activeConferenceController) {
-            activeConferenceController.abort();
-            activeConferenceController = null;
-          }
-          hideLoadingOverlay();
         });
       }
 
@@ -2416,7 +2552,6 @@
       renderExcelFile();
       renderSelectedFiles();
       resetSedScopePreview();
-      updateSubmitButtonState();
       const activeFilter = document.querySelector("[data-confere-filter].is-active");
       if (activeFilter) applyResultFilter(activeFilter.dataset.confereFilter);
     })();

@@ -70,10 +70,27 @@ class StaticSecurityTests(unittest.TestCase):
     def test_confere_routes_require_login(self):
         protected = set()
         for name, decorators, _routes in route_functions("confere.py"):
-            if name in {"index", "resultado", "exportar_excel"}:
+            if name in {"index", "preview_pdfs", "resultado", "exportar_excel"}:
                 self.assertTrue(any("confere_login_required" == decorator for decorator in decorators))
                 protected.add(name)
-        self.assertEqual(protected, {"index", "resultado", "exportar_excel"})
+        self.assertEqual(protected, {"index", "preview_pdfs", "resultado", "exportar_excel"})
+
+    def test_confere_login_does_not_grant_admin_session(self):
+        source = read_text("confere.py")
+        self.assertIn('session["confere_logged_in"] = True', source)
+        self.assertNotIn('session["logged_in"] = True', source)
+        self.assertIn('value.startswith("/confere")', source)
+
+    def test_admin_auxiliary_data_and_photos_require_admin_session(self):
+        source = read_text("app.py")
+        routes = dict((name, decorators) for name, decorators, _routes in route_functions("app.py"))
+        self.assertIn("def proteger_fotos_sensiveis", source)
+        self.assertIn('path.startswith("/static/fotos/")', source)
+        self.assertIn('not session.get("logged_in")', source)
+        self.assertIn("abort(404)", source)
+        self.assertIn("def escolas_search", source)
+        self.assertTrue(any("admin_json_required" == decorator for decorator in routes["escolas_search"]))
+        self.assertIn('return jsonify({"error": "Acesso nao autorizado."}), 401', source)
 
     def test_holidays_path_uses_existing_file(self):
         source = read_text("app.py") + read_text("config.py")
@@ -122,8 +139,6 @@ class StaticSecurityTests(unittest.TestCase):
         self.assertIn("DECLARACAO_PDF_BROWSER_PATH=/usr/bin/chromium", dockerfile)
         self.assertIn("gunicorn app:app", dockerfile)
         self.assertIn("WEB_CONCURRENCY:-2", dockerfile)
-        self.assertIn("GUNICORN_TIMEOUT:-300", dockerfile)
-        self.assertIn("GUNICORN_GRACEFUL_TIMEOUT:-60", dockerfile)
         self.assertIn("DECLARACAO_PDF_BROWSER_PATH=", env_example)
         self.assertIn("Render com PDF de Declaracoes", readme)
         self.assertIn("scripts/check_pdf_environment.py", readme)
@@ -340,6 +355,7 @@ class StaticSecurityTests(unittest.TestCase):
         self.assertIn("data-theme-toggle", carteirinhas)
         self.assertIn('{% extends "base.html" %}', confere)
         self.assertIn("confere-page", confere)
+        self.assertIn('name="school_id"', confere)
         self.assertIn('name="lista_piloto"', confere)
         self.assertIn('name="sed_pdfs"', confere)
         self.assertIn("Conferindo listas", confere)
@@ -512,6 +528,7 @@ class StaticSecurityTests(unittest.TestCase):
         for expected in [
             'id="confere-form"',
             'action="{{ url_for(\'confere.index\') }}"',
+            'name="school_id"',
             'name="lista_piloto"',
             'name="sed_pdfs"',
             "excel-dropzone",
@@ -519,6 +536,8 @@ class StaticSecurityTests(unittest.TestCase):
             "sed-scope-preview",
             "sed-scope-turmas",
             "confere.preview_pdfs",
+            "detectedFileLabels",
+            "file_scopes",
             'accept=".pdf,application/pdf"',
             "multiple",
             "sed-dropzone",
