@@ -23,9 +23,11 @@ LISTA_STATUS_LABELS = {
 }
 
 SED_TRANSFER_STATUSES = {"BXTR", "TRANSF", "TRANS", "TRAN"}
+SED_NO_SHOW_STATUSES = {"NCOM"}
 SED_STATUS_LABELS = {
     "ATIVO": "ativo",
     "REMA": "remanejado",
+    "NCOM": "nao compareceu",
     **{status: "transferido" for status in SED_TRANSFER_STATUSES},
 }
 NAME_PARTICLES = {"DA", "DE", "DO", "DAS", "DOS", "E"}
@@ -102,6 +104,7 @@ EXCEL_LISTA_STATUS_LABELS = {
 EXCEL_SED_STATUS_LABELS = {
     "ATIVO": "Ativo",
     "REMA": "Remanejado",
+    "NCOM": "Nao Compareceu",
     **{status: "Transferido" for status in SED_TRANSFER_STATUSES},
 }
 
@@ -114,6 +117,7 @@ VIEW_LISTA_STATUS_LABELS = {
 VIEW_SED_STATUS_LABELS = {
     "ATIVO": "Ativo",
     "REMA": "Remanejado",
+    "NCOM": "Nao Compareceu",
     **{status: "Transferido" for status in SED_TRANSFER_STATUSES},
 }
 
@@ -389,7 +393,9 @@ def normalizar_status_lista_piloto(status):
 
 def normalizar_status_sed(status):
     text = normalize_text(status)
-    for candidate in ["TRANSF", "TRANS", "TRAN", "BXTR", "REMA", "ATIVO"]:
+    if "NAO COMPARECIMENTO" in text or "NAO COMPARECEU" in text or text.startswith("NCOM"):
+        return "NCOM"
+    for candidate in ["TRANSF", "TRANS", "TRAN", "BXTR", "NCOM", "REMA", "ATIVO"]:
         if candidate in text.split() or candidate == text:
             return candidate
     return text
@@ -425,7 +431,11 @@ def is_sed_transfer_status(status):
 
 
 def is_sed_inactive_status(status):
-    return is_sed_transfer_status(status) or normalizar_status_sed(status) == "REMA"
+    return (
+        is_sed_transfer_status(status)
+        or normalizar_status_sed(status) == "REMA"
+        or normalizar_status_sed(status) in SED_NO_SHOW_STATUSES
+    )
 
 
 def fallback_key(record):
@@ -663,10 +673,10 @@ def _turma_for_page_position(turma_marks, top, fallback_turma):
 
 def _extract_status_from_sed_cells(*cells):
     combined = normalize_text(" ".join(clean_display(cell) for cell in cells))
-    for candidate in ["TRANSF", "TRANS", "TRAN", "BXTR", "REMA", "ATIVO"]:
+    for candidate in ["TRANSF", "TRANS", "TRAN", "BXTR", "NCOM", "REMA", "ATIVO"]:
         if re.search(rf"\b{candidate}\b", combined):
             return candidate
-    return combined
+    return normalizar_status_sed(combined)
 
 
 def _is_sed_header_row(nome, ra_original, data_nascimento, situacao):
@@ -1280,7 +1290,8 @@ def _sed_turma_mismatch_observation(lista_record, sed_record):
 def _is_sed_duplicate_group_relevant(records):
     statuses = [normalizar_status_sed(record.get("situacao")) for record in records]
     active_count = sum(1 for status in statuses if status == "ATIVO")
-    unknown_count = sum(1 for status in statuses if status not in {"ATIVO", "REMA"} and status not in SED_TRANSFER_STATUSES)
+    known_inactive_statuses = {"REMA"} | SED_TRANSFER_STATUSES | SED_NO_SHOW_STATUSES
+    unknown_count = sum(1 for status in statuses if status not in {"ATIVO"} and status not in known_inactive_statuses)
     return active_count > 1 or unknown_count > 0
 
 

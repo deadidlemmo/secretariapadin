@@ -13,6 +13,7 @@ from services.conferir_listas import (
     compare_lista_piloto_sed,
     extract_sed_pdf_records,
     normalize_name_for_match,
+    normalizar_status_sed,
     normalize_text,
     normalize_turma_lista,
     normalize_turma_sed,
@@ -83,6 +84,9 @@ class ConferirListasServiceTests(unittest.TestCase):
             status_observacao("MA", "TRANSF"),
             "Aluno ativo na Lista Piloto, mas no SED aparece como transferido.",
         )
+        self.assertEqual(normalizar_status_sed("NCOM"), "NCOM")
+        self.assertEqual(normalizar_status_sed("Nao Comparecimento"), "NCOM")
+        self.assertEqual(normalizar_status_sed("Nao Compareceu"), "NCOM")
 
     def test_reads_lista_piloto_by_real_headers_not_fixed_rm_column(self):
         output = io.BytesIO()
@@ -450,6 +454,9 @@ class ConferirListasServiceTests(unittest.TestCase):
         sed = [
             make_sed_record("Aluno Ativo Lista", "1", "2\u00b0 ANO G TARDE ANUAL", "01/02/2018", "ATIVO"),
             make_sed_record("Alice Muraca Said", "000122217587", "2\u00b0 ANO G TARDE ANUAL", "26/02/2019", "TRAN"),
+            make_sed_record("Aluno NCOM", "000122217588", "2\u00b0 ANO G TARDE ANUAL", "27/02/2019", "NCOM"),
+            make_sed_record("Aluno Nao Comparecimento", "000122217589", "2\u00b0 ANO G TARDE ANUAL", "28/02/2019", "Nao Comparecimento"),
+            make_sed_record("Aluno Nao Compareceu", "000122217590", "2\u00b0 ANO G TARDE ANUAL", "01/03/2019", "Nao Compareceu"),
         ]
 
         result = compare_lista_piloto_sed(
@@ -460,8 +467,9 @@ class ConferirListasServiceTests(unittest.TestCase):
 
         self.assertEqual(result["summary"]["total_ok"], 1)
         self.assertEqual(result["summary"]["total_nao_encontrados_lista"], 0)
-        self.assertEqual(result["summary"]["total_sed_inativos_sem_lista_ignorados"], 1)
+        self.assertEqual(result["summary"]["total_sed_inativos_sem_lista_ignorados"], 4)
         self.assertFalse(any(row["nome_sed"] == "Alice Muraca Said" for row in result["rows"]))
+        self.assertFalse(any("NCOM" in row["nome_sed"] for row in result["rows"]))
 
     def test_prefers_active_same_turma_when_sed_has_remanejamento_history(self):
         lista = [
