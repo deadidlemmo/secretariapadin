@@ -1016,6 +1016,18 @@
     color: var(--app-primary-dark);
   }
 
+  .confere-page .result-observation-list {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .confere-page .result-observation-list li {
+    margin: 0;
+  }
+
   .confere-page .result-card[data-category="ok"] .result-observation {
     border-color: color-mix(in srgb, var(--app-success) 36%, var(--app-border));
     background: color-mix(in srgb, var(--app-success) 11%, var(--app-surface));
@@ -1448,6 +1460,10 @@
       color: rgb(0, 0, 0) !important;
     }
 
+    .confere-page .result-observation-list {
+      gap: 1mm !important;
+    }
+
     .confere-page .comparison-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
       gap: 2mm !important;
@@ -1771,7 +1787,16 @@
                       <div class="result-content">
                         <div class="result-observation">
                           <i class="fas fa-circle-info" aria-hidden="true"></i>
-                          <span>{{ row.observacao }}</span>
+                          {% set observacao_linhas = row.observacao_linhas|default([]) %}
+                          {% if observacao_linhas|length > 1 %}
+                            <ul class="result-observation-list">
+                              {% for item in observacao_linhas %}
+                                <li>{{ item }}</li>
+                              {% endfor %}
+                            </ul>
+                          {% else %}
+                            <span>{{ row.observacao }}</span>
+                          {% endif %}
                         </div>
 
                         <div class="comparison-grid">

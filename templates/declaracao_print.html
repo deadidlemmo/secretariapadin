@@ -58,10 +58,10 @@
       padding: 0;
     }
     .signature .line {
-      height: 1px;
-      background-color: #333;
+      height: 0;
       width: 60%;
       margin: 0 auto 5px auto;
+      border-top: 1px solid #333;
     }
     .footer {
       text-align: center;
@@ -163,7 +163,7 @@
     body.modelo-siae .signature .line {
       width: 90mm;
       margin: 0 auto 4mm;
-      background-color: #000;
+      border-top-color: #000;
     }
     body.modelo-siae .signature p {
       margin: 0 0 3mm;
@@ -355,6 +355,43 @@
     }
     .declaracao-extra table {
       font-size: 11px;
+    }
+
+    .acoes-preview {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 1000;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .print-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 10px 14px;
+      border: 1px solid #174f44;
+      border-radius: 8px;
+      background: #176b5b;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      text-decoration: none;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+    }
+    .print-button.secondary {
+      border-color: #c7d7d2;
+      background: #fff;
+      color: #174f44;
+    }
+    .print-button-disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
 
     @media print {
@@ -605,8 +642,11 @@
     </div>
   </div>
   <div class="no-print acoes-preview">
+    <button type="button" class="print-button" onclick="window.print()">
+      Imprimir declaração
+    </button>
     {% if pdf_url %}
-      <a href="{{ pdf_url }}" target="_blank" rel="noopener" class="print-button">
+      <a href="{{ pdf_url }}" target="_blank" rel="noopener" class="print-button secondary">
         Gerar PDF da Declaração
       </a>
     {% else %}

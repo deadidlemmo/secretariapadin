@@ -9,6 +9,7 @@ from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, 
 from reportlab.lib.styles import getSampleStyleSheet
 
 from services.conferir_listas import (
+    _observacao_display_lines,
     build_excel_report,
     compare_lista_piloto_sed,
     extract_sed_pdf_records,
@@ -324,6 +325,20 @@ class ConferirListasServiceTests(unittest.TestCase):
         self.assertEqual(counts["total_nao_encontrados_lista"], 1)
         status_row = next(row for row in result["rows"] if row["categoria"] == "inconsistencia_situacao")
         self.assertEqual(status_row["campos_divergentes"], ["situacao"])
+
+    def test_formats_multi_sentence_observation_as_display_lines(self):
+        observacao = (
+            "Aluno ativo na Lista Piloto, mas no SED aparece como transferido. "
+            "Nome divergente entre as bases. Turma divergente entre as bases."
+        )
+        self.assertEqual(
+            _observacao_display_lines(observacao),
+            [
+                "Aluno ativo na Lista Piloto, mas no SED aparece como transferido.",
+                "Nome divergente entre as bases.",
+                "Turma divergente entre as bases.",
+            ],
+        )
 
     def test_limits_lista_piloto_scope_to_uploaded_sed_turmas(self):
         lista = [

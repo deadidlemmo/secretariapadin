@@ -175,8 +175,8 @@ class StaticSecurityTests(unittest.TestCase):
             "frequencia-help-text",
             "frequencia-footnote",
             'formtarget="_blank"',
-            "Gerar declaração em PDF",
-            "Gerar declaração personalizada em PDF",
+            "Gerar declaração",
+            "Gerar declaração personalizada",
         ]:
             self.assertIn(expected, template)
         self.assertIn("declaracao-page-header", template)
@@ -203,7 +203,9 @@ class StaticSecurityTests(unittest.TestCase):
             "is_modelo_siae",
             "pdf_url",
             "acoes-preview",
+            "Imprimir declaração",
             "Gerar PDF da Declaração",
+            "window.print()",
             "max-width: 182mm",
             "min-height: calc(297mm - 20mm)",
             "margin: 10mm 14mm",
@@ -255,7 +257,6 @@ class StaticSecurityTests(unittest.TestCase):
             "siae-option-status",
             "Georgia",
             "Times New Roman",
-            "window.print()",
         ]:
             self.assertNotIn(removed, template)
 

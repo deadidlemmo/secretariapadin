@@ -1041,6 +1041,15 @@ def _find_match(lista_record, sed_records, sed_by_ra, sed_by_fallback, used_sed)
     return None, None
 
 
+def _observacao_display_lines(observacao):
+    text = clean_display(observacao)
+    if not text:
+        return []
+    parts = re.split(r"(?<=\.)\s+(?=[A-Z])", text)
+    lines = [clean_display(part) for part in parts if clean_display(part)]
+    return lines or [text]
+
+
 def _result_row(category, label, lista=None, sed=None, observacao="", campos_divergentes=None):
     lista = lista or {}
     sed = sed or {}
@@ -1067,6 +1076,7 @@ def _result_row(category, label, lista=None, sed=None, observacao="", campos_div
         "situacao_sed_display": _view_sed_status_label(situacao_sed),
         "pdf_origem": sed.get("pdf_origem", ""),
         "observacao": observacao,
+        "observacao_linhas": _observacao_display_lines(observacao),
         "campos_divergentes": sorted(set(campos_divergentes or [])),
     }
 

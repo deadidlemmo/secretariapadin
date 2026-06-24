@@ -108,7 +108,7 @@ class DeclaracoesPdfTests(unittest.TestCase):
         self.assertEqual(response.mimetype, "application/pdf")
         self.assertIn("inline", response.headers.get("Content-Disposition", ""))
 
-    def test_declaracao_tipo_post_returns_pdf_for_main_flow(self):
+    def test_declaracao_tipo_post_returns_html_preview_by_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             lista_path = Path(tmpdir) / "lista_ficticia.xlsx"
             self._write_lista_fundamental(lista_path)
@@ -128,6 +128,35 @@ class DeclaracoesPdfTests(unittest.TestCase):
                             "segmento_escolhido": "Fundamental",
                             "rm": "19034",
                             "tipo": "Escolaridade",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "text/html")
+        self.assertIn(b"<html", response.data.lower())
+        self.assertIn(b"Imprimir", response.data)
+
+    def test_declaracao_tipo_post_can_still_return_pdf_when_requested(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lista_path = Path(tmpdir) / "lista_ficticia.xlsx"
+            self._write_lista_fundamental(lista_path)
+
+            with app.test_client() as client:
+                with client.session_transaction() as flask_session:
+                    flask_session["logged_in"] = True
+                    flask_session["lista_fundamental"] = str(lista_path)
+
+                with patch(
+                    "app.render_declaracao_pdf_bytes",
+                    return_value=b"%PDF-1.4\n%%EOF",
+                ):
+                    response = client.post(
+                        "/declaracao/tipo",
+                        data={
+                            "segmento_escolhido": "Fundamental",
+                            "rm": "19034",
+                            "tipo": "Escolaridade",
+                            "preview": "0",
                         },
                     )
 

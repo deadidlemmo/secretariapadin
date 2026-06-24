@@ -380,9 +380,9 @@
           e.preventDefault();
           return false;
         }
-        // Gerando PDF da declaração personalizada.
+        // Abrindo a declaração em HTML para conferência/impressão.
         $(this).attr('target', '_blank');
-        mostrarOverlay('Gerando PDF da declaração, aguarde...');
+        mostrarOverlay('Abrindo declaração, aguarde...');
         liberarTelaAposAbrirPdf();
         return true;
       });
@@ -652,13 +652,13 @@
             aplicarHighlightPadrao('#frequencia-container');
             return;
           }
-          $indicatorText.text('Passo 4 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração em PDF".');
+          $indicatorText.text('Passo 4 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração".');
           aplicarHighlightPadrao('#btn-gerar');
           return;
         }
 
         if (!isTransfOuConc) {
-          $indicatorText.text('Passo 3 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração em PDF".');
+          $indicatorText.text('Passo 3 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração".');
           aplicarHighlightPadrao('#btn-gerar');
           return;
         }
@@ -675,7 +675,7 @@
           return;
         }
 
-        $indicatorText.text('Passo ' + totalSteps + ' de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração em PDF".');
+        $indicatorText.text('Passo ' + totalSteps + ' de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração".');
         aplicarHighlightPadrao('#btn-gerar');
       }
 
@@ -810,9 +810,9 @@
 
         if (confirmandoEnvio) {
           confirmandoEnvio = false;
-          // Gerando PDF da declaração após confirmação.
+          // Abrindo a declaração em HTML para conferência/impressão após confirmação.
           $form.attr('target', '_blank');
-          mostrarOverlay('Gerando PDF da declaração, aguarde...');
+          mostrarOverlay('Abrindo declaração, aguarde...');
           liberarTelaAposAbrirPdf();
           return true;
         }
@@ -840,9 +840,9 @@
           return false;
         }
 
-        // Geração de PDF sem modal (ex.: escolaridade ou frequência).
+        // Abertura da declaração sem modal (ex.: escolaridade ou frequência).
         $form.attr('target', '_blank');
-        mostrarOverlay('Gerando PDF da declaração, aguarde...');
+        mostrarOverlay('Abrindo declaração, aguarde...');
         liberarTelaAposAbrirPdf();
         return true;
       });

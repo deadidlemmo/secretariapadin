@@ -663,7 +663,7 @@ def declaracao_conclusao_5ano():
 def declaracao_tipo():
     if request.method == "POST":
         modo_declaracao = request.form.get("modo_declaracao")
-        preview = request.form.get("preview") == "1"
+        preview = request.form.get("preview", "1") == "1"
 
         # -------------------------------
         # FLUXO: DECLARAÇÃO PERSONALIZADA
