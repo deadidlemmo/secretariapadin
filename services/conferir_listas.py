@@ -516,8 +516,9 @@ def _lista_piloto_column_indexes(df, school_config=None):
     return configured_columns
 
 
-def _read_lista_dataframe(file_obj, school_config):
-    sheet_name = 0 if school_config.sheet_name is None else school_config.sheet_name
+def _read_lista_dataframe(file_obj, school_config, sheet_name=None):
+    if sheet_name is None:
+        sheet_name = 0 if school_config.sheet_name is None else school_config.sheet_name
     if school_config.column_mode == "letters":
         return pd.read_excel(file_obj, sheet_name=sheet_name, header=None, dtype=str)
 
@@ -557,14 +558,21 @@ def read_lista_piloto(file_obj, school_config=None):
     try:
         if school_config.allow_class_sheets:
             with pd.ExcelFile(file_obj) as excel:
-                # A aba consolidada oficial continua sendo a fonte preferencial.
-                if school_config.sheet_name not in excel.sheet_names:
+                # A aba consolidada da escola tem prioridade sobre as abas por turma.
+                configured_sheets = (school_config.sheet_name, *school_config.sheet_aliases)
+                available_sheets = {normalize_text(name): name for name in excel.sheet_names}
+                selected_sheet = next(
+                    (available_sheets[normalize_text(name)] for name in configured_sheets
+                     if isinstance(name, str) and normalize_text(name) in available_sheets),
+                    None,
+                )
+                if selected_sheet is None:
                     class_records = read_class_sheet_records(file_obj)
                     if class_records is not None:
                         if not class_records:
                             raise ValueError("Nenhum aluno encontrado nas abas visíveis por turma da Lista Piloto.")
                         return _normalize_lista_records(class_records, school_config)
-                df = _read_lista_dataframe(excel, school_config)
+                df = _read_lista_dataframe(excel, school_config, selected_sheet)
         else:
             df = _read_lista_dataframe(file_obj, school_config)
     except Exception as exc:

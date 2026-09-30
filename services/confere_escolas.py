@@ -39,6 +39,7 @@ class ConfereSchoolConfig:
     ra_digits_only: bool = False
     strip_ra_uf_suffix: bool = False
     allow_class_sheets: bool = False
+    sheet_aliases: tuple[str, ...] = ()
 
     def to_template_dict(self):
         return {
@@ -104,7 +105,9 @@ CONFERE_SCHOOL_CONFIGS["maria_nilza"] = replace(
     CONFERE_SCHOOL_CONFIGS["mahatma_gandhi"],
     id="maria_nilza",
     nome="E.M. Maria Nilza da Silva Rom\u00e3o, Prof.\u00aa",
-    description="Mesmo modelo de leitura do Mahatma Gandhi, incluindo abas vis\u00edveis por turma.",
+    sheet_name="Confer\u00eancia SED",
+    sheet_aliases=("Verifica\u00e7\u00e3o SED",),
+    description="Aba Confer\u00eancia SED, com suporte ao modelo anterior e \u00e0s abas vis\u00edveis por turma.",
 )
 
 

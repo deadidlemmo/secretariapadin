@@ -284,6 +284,37 @@ class ConfereProjetoTests(unittest.TestCase):
                 self.assertEqual([record["turma_key"] for record in records], ["3A", "4A"])
                 self.assertEqual([record["row_number"] for record in records], [2, 3])
 
+    def test_maria_nilza_prefers_its_conferencia_sed_sheet(self):
+        workbook = load_workbook(make_project_workbook())
+        worksheet = workbook.create_sheet("Conferência SED")
+        worksheet.append(["Nº", "RM", "NOME DO ALUNO", "", "", "NASC.", "R.A.", "CÓD.", "OBSERVAÇÃO", "TURMA"])
+        worksheet.append([1, "900001", "ALUNO FICTICIO PROJETO 3", "", "", "01/01/2017", "990003", "M.N.", "", "3ºA"])
+        make_class_sheet(workbook, "5AP", "5º ANO AP")["C9"] = "ALUNO FICTICIO DA ABA AUXILIAR"
+
+        for sheet_title in ("Conferência SED", "Conferencia sed"):
+            with self.subTest(sheet_title=sheet_title):
+                worksheet.title = sheet_title
+                records = read_lista_piloto(
+                    as_stream(workbook), school_config=get_confere_school_config("maria_nilza"),
+                )
+                self.assertEqual(len(records), 1)
+                self.assertEqual(records[0]["turma_key"], "3A")
+                self.assertEqual(records[0]["situacao"], "MA")
+                self.assertEqual(records[0]["sheet_name"], "")
+                result = run_conferencia(
+                    as_stream(workbook),
+                    [{"filename": "sed_ficticio.pdf", "content": self.project_pdf}],
+                    school_config=get_confere_school_config("maria_nilza"),
+                )
+                self.assertEqual(result["summary"]["total_ok"], 1)
+                self.assertEqual(result["summary"]["total_lista_piloto_geral"], 1)
+                self.assertEqual(result["summary"]["total_divergencias_cadastrais"], 0)
+
+        mahatma_records = read_lista_piloto(
+            as_stream(workbook), school_config=get_confere_school_config("mahatma_gandhi"),
+        )
+        self.assertEqual([record["turma_key"] for record in mahatma_records], ["3A", "4A"])
+
     def test_class_sheets_mn_status_matches_active_sed_for_both_schools(self):
         for school_id in ("maria_nilza", "mahatma_gandhi"):
             for status in ("M.N.", "MN", "M. N."):
