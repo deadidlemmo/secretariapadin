@@ -14,12 +14,15 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import column_index_from_string, get_column_letter
 
 from services.confere_escolas import default_confere_school_config
+from services.confere_abas import read_class_sheet_records
 
 
 LISTA_STATUS_LABELS = {
     "MA": "ativo",
     "TE": "transferido",
     "REM": "remanejado",
+    "NF": "não frequente",
+    "NCOM": "não compareceu",
 }
 
 SED_TRANSFER_STATUSES = {"BXTR", "TRANSF", "TRANS", "TRAN"}
@@ -99,6 +102,8 @@ EXCEL_LISTA_STATUS_LABELS = {
     "MA": "Matricula Ativa",
     "REM": "Remanejado",
     "TE": "Transferido",
+    "NF": "Não frequente",
+    "NCOM": "Não compareceu",
 }
 
 EXCEL_SED_STATUS_LABELS = {
@@ -112,6 +117,8 @@ VIEW_LISTA_STATUS_LABELS = {
     "MA": "Ativo",
     "REM": "Remanejado",
     "TE": "Transferido",
+    "NF": "Não frequente",
+    "NCOM": "Não compareceu",
 }
 
 VIEW_SED_STATUS_LABELS = {
@@ -273,37 +280,35 @@ def ra_keys_digits_only(ra, digito=None):
     return {key for key in keys if key}
 
 
-def _ra_keys_for_school(ra, school_config):
+def _ra_keys_for_school(ra, school_config, digito=None):
     if getattr(school_config, "ra_digits_only", False):
-        return ra_keys_digits_only(ra)
-    return ra_keys(ra)
+        return ra_keys_digits_only(ra, digito)
+    return ra_keys(ra, digito)
 
 
-def _display_lista_ra_por_escola(value, school_config):
+def _display_lista_ra_por_escola(value, school_config, digito=None):
     text = clean_display(value)
     if getattr(school_config, "strip_ra_uf_suffix", False):
         text = re.sub(r"\s*/\s*[A-Z]{2}\b.*$", "", text, flags=re.IGNORECASE).strip()
-    return format_ra_display(text) or text
+    return format_ra_display(text, digito) or text
+
+
+def _normalize_turma(value):
+    # Remova os ordinais antes do NFKD, que transforma º na letra O.
+    text = normalize_text(str(value or "").replace("º", "").replace("°", ""))
+    # I (integral) e P (projeto) são complementos da letra da turma.
+    match = re.search(r"\b(\d{1,2})\s*(?:ANO\s+)?([A-Z])(?:\s*[IP])?\b", text)
+    if not match:
+        return ""
+    return f"{match.group(1)}{match.group(2)}"
 
 
 def normalize_turma_lista(value):
-    text = normalize_text(value)
-    match = re.search(r"\b(\d{1,2})\s*O?\s*([A-Z])\b", text)
-    if not match:
-        match = re.search(r"\b(\d{1,2})O?([A-Z])\b", text)
-    if not match:
-        return ""
-    return f"{match.group(1)}{match.group(2)}"
+    return _normalize_turma(value)
 
 
 def normalize_turma_sed(value):
-    text = normalize_text(value)
-    match = re.search(r"\b(\d{1,2})\s*ANO\s*([A-Z])(?:I)?\b", text)
-    if not match:
-        match = re.search(r"\b(\d{1,2})\D+([A-Z])I\b", text)
-    if not match:
-        return ""
-    return f"{match.group(1)}{match.group(2)}"
+    return _normalize_turma(value)
 
 
 def format_turma_key(value):
@@ -410,6 +415,8 @@ def status_compativel(status_lista, status_sed):
         return sed_norm in SED_TRANSFER_STATUSES
     if lista_norm == "REM":
         return sed_norm == "REMA"
+    if lista_norm == "NCOM":
+        return sed_norm == "NCOM"
     return False
 
 
@@ -423,6 +430,8 @@ def status_observacao(status_lista, status_sed):
         return f"Aluno transferido na Lista Piloto, mas no SED aparece como {sed_label}."
     if lista_norm == "REM":
         return f"Aluno remanejado na Lista Piloto, mas no SED aparece como {sed_label}."
+    if lista_norm in {"NF", "NCOM"}:
+        return f"Aluno com situação {LISTA_STATUS_LABELS[lista_norm]} na Lista Piloto; no SED aparece como {sed_label}. Confira a situação de matrícula."
     return f"Status da Lista Piloto nao mapeado: {status_lista or '-'}."
 
 
@@ -546,7 +555,18 @@ def _safe_row_value(row, index):
 def read_lista_piloto(file_obj, school_config=None):
     school_config = school_config or default_confere_school_config()
     try:
-        df = _read_lista_dataframe(file_obj, school_config)
+        if school_config.allow_class_sheets:
+            with pd.ExcelFile(file_obj) as excel:
+                # A aba consolidada oficial continua sendo a fonte preferencial.
+                if school_config.sheet_name not in excel.sheet_names:
+                    class_records = read_class_sheet_records(file_obj)
+                    if class_records is not None:
+                        if not class_records:
+                            raise ValueError("Nenhum aluno encontrado nas abas visíveis por turma da Lista Piloto.")
+                        return _normalize_lista_records(class_records, school_config)
+                df = _read_lista_dataframe(excel, school_config)
+        else:
+            df = _read_lista_dataframe(file_obj, school_config)
     except Exception as exc:
         sheet_label = school_config.sheet_name if school_config.sheet_name is not None else "primeira aba"
         raise ValueError(
@@ -559,19 +579,29 @@ def read_lista_piloto(file_obj, school_config=None):
     columns = _lista_piloto_column_indexes(df, school_config)
     data_start_row = int(school_config.data_start_row or 0)
     header_offset = 0 if school_config.column_mode == "letters" else max(int(school_config.header_row or 1), 1)
-    records = []
+    raw_records = []
     for idx, row in df.iterrows():
         row_number = int(idx) + 1 if school_config.column_mode == "letters" else int(idx) + header_offset + 1
         if data_start_row and row_number < data_start_row:
             continue
 
-        turma = clean_display(_safe_row_value(row, columns["turma"]))
-        nome = clean_display(_safe_row_value(row, columns["nome"]))
-        data_nascimento = normalize_date(_safe_row_value(row, columns["data_nascimento"]))
-        ra_original = clean_display(_safe_row_value(row, columns["ra"]))
-        ra_display = _display_lista_ra_por_escola(ra_original, school_config)
-        situacao = _normalizar_status_lista_por_escola(_safe_row_value(row, columns["situacao"]), school_config)
-        observacoes = clean_display(_safe_row_value(row, columns.get("observacoes", -1)))
+        raw_records.append({
+            "row_number": row_number,
+            **{field: _safe_row_value(row, index) for field, index in columns.items()},
+        })
+    return _normalize_lista_records(raw_records, school_config)
+
+
+def _normalize_lista_records(raw_records, school_config):
+    records = []
+    for raw in raw_records:
+        turma = clean_display(raw.get("turma"))
+        nome = clean_display(raw.get("nome"))
+        data_nascimento = normalize_date(raw.get("data_nascimento"))
+        ra_original = clean_display(raw.get("ra"))
+        ra_display = _display_lista_ra_por_escola(ra_original, school_config, raw.get("digito_ra"))
+        situacao = _normalizar_status_lista_por_escola(raw.get("situacao"), school_config)
+        observacoes = clean_display(raw.get("observacoes"))
 
         if not nome or nome in {"0", "#REF#"}:
             continue
@@ -585,7 +615,8 @@ def read_lista_piloto(file_obj, school_config=None):
         records.append(
             {
                 "source": "lista",
-                "row_number": row_number,
+                "row_number": raw["row_number"],
+                "sheet_name": raw.get("sheet_name", ""),
                 "school_id": school_config.id,
                 "school_name": school_config.nome,
                 "turma": turma,
@@ -596,7 +627,7 @@ def read_lista_piloto(file_obj, school_config=None):
                 "data_nascimento": data_nascimento,
                 "data_nascimento_norm": data_nascimento,
                 "ra": ra_display,
-                "ra_keys": sorted(_ra_keys_for_school(ra_original, school_config)),
+                "ra_keys": sorted(_ra_keys_for_school(ra_original, school_config, raw.get("digito_ra"))),
                 "situacao": situacao,
                 "observacoes": observacoes,
             }

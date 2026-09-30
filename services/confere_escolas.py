@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 
 DEFAULT_LISTA_COLUMNS = {
@@ -38,6 +38,7 @@ class ConfereSchoolConfig:
     description: str = ""
     ra_digits_only: bool = False
     strip_ra_uf_suffix: bool = False
+    allow_class_sheets: bool = False
 
     def to_template_dict(self):
         return {
@@ -77,17 +78,34 @@ CONFERE_SCHOOL_CONFIGS = {
             "": "MA",
             "0": "MA",
             "PNEE": "MA",
-            "TR": "MA",
-            "T R": "MA",
+            "TR": "TE",
+            "T R": "TE",
             "TE": "TE",
             "T E": "TE",
+            "MN": "MA",
+            "M N": "MA",
+            "MATRICULA NORMAL": "MA",
             "REM": "REM",
+            "NF": "NF",
+            "N F": "NF",
+            "NAO FREQUENTE": "NF",
+            "NCOM": "NCOM",
+            "N COM": "NCOM",
+            "NAO COMPARECEU": "NCOM",
         },
-        description="Modelo da aba Verifica\u00e7\u00e3o SED.",
+        description="Aba Verifica\u00e7\u00e3o SED ou abas vis\u00edveis por turma da Lista Piloto.",
         ra_digits_only=True,
         strip_ra_uf_suffix=True,
+        allow_class_sheets=True,
     ),
 }
+
+CONFERE_SCHOOL_CONFIGS["maria_nilza"] = replace(
+    CONFERE_SCHOOL_CONFIGS["mahatma_gandhi"],
+    id="maria_nilza",
+    nome="E.M. Maria Nilza da Silva Rom\u00e3o, Prof.\u00aa",
+    description="Mesmo modelo de leitura do Mahatma Gandhi, incluindo abas vis\u00edveis por turma.",
+)
 
 
 def default_confere_school_id():
