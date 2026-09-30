@@ -254,7 +254,7 @@ class ConferirListasServiceTests(unittest.TestCase):
             school_config=get_confere_school_config("mahatma_gandhi"),
         )
 
-        self.assertEqual([record["situacao"] for record in records], ["MA", "MA", "TE", "TE", "REM"])
+        self.assertEqual([record["situacao"] for record in records], ["MA", "MA", "MA", "TE", "REM"])
         self.assertEqual([record["nome"] for record in records], ["ALUNA ATIVA", "ALUNA PNEE", "ALUNO TR", "ALUNO TE", "ALUNO REM"])
         self.assertTrue(all(record["turma_key"] == "2A" for record in records))
 

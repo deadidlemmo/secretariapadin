@@ -881,6 +881,8 @@ def extract_sed_pdf_records(pdf_bytes, filename):
             else:
                 pending_page_tail_record = None
                 pending_page_tail_number = None
+            # Evita reter o layout de todas as páginas no PDF de várias turmas.
+            page.flush_cache()
     if not records:
         raise ValueError("Nenhum aluno foi extraido do PDF.")
     return records

@@ -340,7 +340,7 @@ class ConfereProjetoTests(unittest.TestCase):
     def test_school_legend_statuses_are_normalized_in_both_workbook_layouts(self):
         cases = [
             ("TE", "TE"), ("T.E.", "TE"), ("T. E.", "TE"),
-            ("TR", "TE"), ("T.R.", "TE"), ("T. R.", "TE"),
+            ("TR", "MA"), ("T.R.", "MA"), ("T. R.", "MA"),
             ("Transferência Expedida", "TE"),
             ("MN", "MA"), ("M.N.", "MA"), ("M. N.", "MA"),
             ("Matrícula Normal", "MA"),
@@ -358,22 +358,23 @@ class ConfereProjetoTests(unittest.TestCase):
                     )
                     self.assertEqual([record["situacao"] for record in records], [expected for _, expected in cases])
 
-    def test_transfer_legend_matches_transfer_sed_and_still_flags_active_sed(self):
+    def test_transfer_legend_distinguishes_received_from_expedited(self):
         for school_id in ("maria_nilza", "mahatma_gandhi"):
-            records = read_lista_piloto(
-                make_status_workbook(["TE", "T.E.", "TR", "T.R."], class_layout=True),
-                school_config=get_confere_school_config(school_id),
-            )
-            for sed_status in ("BXTR", "TRANSF", "ATIVO"):
-                with self.subTest(school_id=school_id, sed_status=sed_status):
-                    sed_records = [
-                        {**record, "source": "sed", "situacao": sed_status, "pdf_origem": "sed_ficticio.pdf"}
-                        for record in records
-                    ]
-                    result = compare_lista_piloto_sed(records, sed_records, PDF_INFO)
-                    expected_ok = 0 if sed_status == "ATIVO" else 4
-                    self.assertEqual(result["summary"]["total_ok"], expected_ok)
-                    self.assertEqual(result["summary"]["total_inconsistencias_situacao"], 4 - expected_ok)
+            for class_layout in (False, True):
+                records = read_lista_piloto(
+                    make_status_workbook(["TE", "T.E.", "TR", "T.R."], class_layout=class_layout),
+                    school_config=get_confere_school_config(school_id),
+                )
+                self.assertEqual([record["situacao"] for record in records], ["TE", "TE", "MA", "MA"])
+                for sed_status, expected_ok in (("BXTR", 2), ("TRANSF", 2), ("ATIVO", 2)):
+                    with self.subTest(school_id=school_id, class_layout=class_layout, sed_status=sed_status):
+                        sed_records = [
+                            {**record, "source": "sed", "situacao": sed_status, "pdf_origem": "sed_ficticio.pdf"}
+                            for record in records
+                        ]
+                        result = compare_lista_piloto_sed(records, sed_records, PDF_INFO)
+                        self.assertEqual(result["summary"]["total_ok"], expected_ok)
+                        self.assertEqual(result["summary"]["total_inconsistencias_situacao"], 4 - expected_ok)
 
     def test_attendance_codes_remain_pending_with_readable_view_and_excel_labels(self):
         labels = {"NF": "Não frequente", "NCOM": "Não compareceu"}

@@ -79,8 +79,9 @@ CONFERE_SCHOOL_CONFIGS = {
             "": "MA",
             "0": "MA",
             "PNEE": "MA",
-            "TR": "TE",
-            "T R": "TE",
+            # Transferência recebida: o aluno entrou na escola e segue ativo no SED.
+            "TR": "MA",
+            "T R": "MA",
             "TE": "TE",
             "T E": "TE",
             "MN": "MA",
