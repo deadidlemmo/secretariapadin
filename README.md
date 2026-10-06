@@ -1,12 +1,28 @@
-# Sistema da Secretaria Escolar - E.M Jose Padin Mouta
+# Secretaria PADIN
 
-**Menos trabalho repetitivo na secretaria, mais tempo para atender pessoas.** Esta aplicação reúne geração de documentos, carteirinhas, quadros em Excel e conferência de listas em uma interface única.
+<p align="center">
+  <img src="assets/readme-cover.svg" alt="Secretaria PADIN — documentos, planilhas e conferência escolar" width="100%" />
+</p>
 
-[Funcionalidades](#funcionalidades) · [Tecnologias](#stack) · [Instalação](#preparando-o-ambiente) · [Cuidados com dados](#cuidados-com-dados)
+<p align="center"><strong>Rotinas da secretaria escolar em um fluxo mais claro e confiável.</strong></p>
 
-| Entrada | Resultado |
-| --- | --- |
-| Lista Piloto, fotos autorizadas e modelos oficiais | Declarações, carteirinhas, quadros de acompanhamento e conferências com a SED |
+<p align="center">
+  <a href="#funcionalidades">Funcionalidades</a> ·
+  <a href="#stack">Tecnologias</a> ·
+  <a href="#preparando-o-ambiente">Executar localmente</a> ·
+  <a href="#cuidados-com-dados">Cuidados com dados</a>
+</p>
+
+## Em resumo
+
+A aplicação recebe planilhas da Lista Piloto e usa modelos oficiais para apoiar a produção de **declarações**, **carteirinhas** e **quadros em Excel**. Também compara listas escolares com PDFs da SED e ajuda a acompanhar prazos.
+
+- **Documentos:** geração individual e em lote para necessidades da secretaria.
+- **Carteirinhas:** composição com fotos e controle de impressão.
+- **Planilhas:** quadros de atendimento, inclusão e transferências.
+- **Conferência:** comparação entre Lista Piloto e documentos da SED.
+
+O sistema é de **uso interno**; por isso, esta apresentação não mostra dados reais de alunos nem oferece uma demonstração pública.
 
 Aplicacao web interna em Flask para apoiar rotinas da secretaria escolar da E.M Jose Padin Mouta. O sistema trabalha principalmente com a Lista Piloto em Excel, fotos de alunos e modelos oficiais de planilhas/documentos para gerar declaracoes, carteirinhas e quadros de acompanhamento.
 
