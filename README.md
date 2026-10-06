@@ -1,5 +1,13 @@
 # Sistema da Secretaria Escolar - E.M Jose Padin Mouta
 
+**Menos trabalho repetitivo na secretaria, mais tempo para atender pessoas.** Esta aplicação reúne geração de documentos, carteirinhas, quadros em Excel e conferência de listas em uma interface única.
+
+[Funcionalidades](#funcionalidades) · [Tecnologias](#stack) · [Instalação](#preparando-o-ambiente) · [Cuidados com dados](#cuidados-com-dados)
+
+| Entrada | Resultado |
+| --- | --- |
+| Lista Piloto, fotos autorizadas e modelos oficiais | Declarações, carteirinhas, quadros de acompanhamento e conferências com a SED |
+
 Aplicacao web interna em Flask para apoiar rotinas da secretaria escolar da E.M Jose Padin Mouta. O sistema trabalha principalmente com a Lista Piloto em Excel, fotos de alunos e modelos oficiais de planilhas/documentos para gerar declaracoes, carteirinhas e quadros de acompanhamento.
 
 > Este projeto manipula dados pessoais de alunos. Trate arquivos em `uploads/`, `static/fotos/`, planilhas e documentos gerados como informacao sensivel.
