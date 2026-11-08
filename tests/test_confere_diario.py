@@ -145,6 +145,7 @@ class DiarioConferenceTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 html = response.get_data(as_text=True)
                 self.assertIn("Conferência tripla", html)
+                self.assertIn("confere-diario.css?v=1", html)
                 self.assertIn("ALUNO FICTICIO A", html)
                 self.assertIn("Sem pendências", html)
 

@@ -1,0 +1,38 @@
+.confere-page #diario-card[hidden] { display: none; }
+.confere-page #diario-card { grid-column: 1 / -1; }
+.confere-page .diario-file-input {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  color: var(--app-text);
+}
+.confere-page .diario-file-input::file-selector-button {
+  margin-right: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-primary);
+  color: #fff;
+  cursor: pointer;
+}
+.confere-page .diario-note { margin: 8px 0 0; color: var(--app-muted); }
+.confere-page .confere-results.triple-results { padding: 24px; }
+.confere-page .triple-summary { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+.confere-page .triple-summary span {
+  padding: 10px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface);
+}
+.confere-page .triple-table-wrap { overflow-x: auto; }
+.confere-page .triple-table { width: 100%; border-collapse: collapse; min-width: 1080px; }
+.confere-page .triple-table th, .confere-page .triple-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--app-border);
+  text-align: left;
+  vertical-align: top;
+}
+.confere-page .triple-table th { color: var(--app-primary-dark); }
+.confere-page .triple-table td small { display: block; color: var(--app-muted); }
+.confere-page .triple-issues { margin: 0; padding-left: 18px; }
+.confere-page .triple-row-ok { color: var(--app-primary-dark); font-weight: 700; }
