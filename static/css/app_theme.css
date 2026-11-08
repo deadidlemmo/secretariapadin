@@ -53,8 +53,7 @@ main::after {
   display: none;
 }
 
-header#app-header,
-.confere-page header {
+header#app-header {
   background: rgba(255, 255, 255, 0.94);
   color: var(--app-text);
   border-bottom: 1px solid rgba(31, 111, 95, 0.16);
@@ -66,8 +65,7 @@ header#app-header {
   padding: 16px 24px 14px;
 }
 
-header#app-header h1,
-.confere-page header h1 {
+header#app-header h1 {
   color: var(--app-primary-dark);
   font-weight: 700;
 }
@@ -726,15 +724,6 @@ body:not(#carteirinhas-page) .btn-danger,
   display: none !important;
 }
 
-.confere-page header {
-  border-radius: 0;
-  padding: 24px 18px 20px;
-}
-
-.confere-page header h1 {
-  margin: 0;
-}
-
 .confere-page .container {
   max-width: 1050px;
 }
@@ -931,14 +920,12 @@ html[data-theme="dark"] .theme-toggle:focus {
   box-shadow: 0 0 0 0.18rem rgba(127, 184, 170, 0.20), var(--app-shadow-soft);
 }
 
-header#app-header,
-.confere-page header {
+header#app-header {
   background: var(--app-surface-glass);
   border-bottom-color: var(--app-border);
 }
 
 header#app-header h1,
-.confere-page header h1,
 header#app-header span {
   color: var(--app-primary-dark);
 }
@@ -1975,8 +1962,7 @@ html[data-theme="dark"] .auth-card .toggle-password {
 }
 
 /* Header global e revisao final de contraste. */
-header#app-header,
-.confere-page header {
+header#app-header {
   position: sticky;
   top: 0;
   z-index: 70;
@@ -2001,8 +1987,7 @@ header#app-header .app-header-inner {
   min-width: 0;
 }
 
-header#app-header h1,
-.confere-page header h1 {
+header#app-header h1 {
   margin: 0;
   color: var(--app-primary-dark);
   font-size: clamp(1.42rem, 2vw, 1.9rem);
@@ -2010,8 +1995,7 @@ header#app-header h1,
   line-height: 1.05;
 }
 
-header#app-header span,
-.confere-page header p {
+header#app-header span {
   display: block;
   margin: 0;
   color: var(--app-primary);
@@ -2020,8 +2004,7 @@ header#app-header span,
   line-height: 1.25;
 }
 
-html[data-theme="dark"] header#app-header,
-html[data-theme="dark"] .confere-page header {
+html[data-theme="dark"] header#app-header {
   background: rgba(18, 29, 25, 0.96);
   border-bottom-color: #31443e;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
@@ -2237,8 +2220,7 @@ html[data-theme="dark"] .form-control option:checked {
 }
 
 @media (max-width: 768px) {
-  header#app-header,
-  .confere-page header {
+  header#app-header {
     min-height: 78px;
     padding: 16px 60px 14px 16px;
   }
@@ -2248,13 +2230,11 @@ html[data-theme="dark"] .form-control option:checked {
     text-align: left;
   }
 
-  header#app-header h1,
-  .confere-page header h1 {
+  header#app-header h1 {
     font-size: 1.32rem;
   }
 
-  header#app-header span,
-  .confere-page header p {
+  header#app-header span {
     font-size: 0.9rem;
   }
 

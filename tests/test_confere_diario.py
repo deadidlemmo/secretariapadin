@@ -215,7 +215,7 @@ class DiarioConferenceTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 html = response.get_data(as_text=True)
                 self.assertTrue("Lista Piloto × SED × Diário Online" in html, "Título da conferência tripla ausente")
-                self.assertIn("confere-diario.css?v=5", html)
+                self.assertIn("confere-diario.css?v=6", html)
                 self.assertIn("ALUNO FICTICIO A", html)
                 self.assertIn('data-triple-filter="dados"', html)
                 self.assertIn('data-triple-filter="nome"', html)

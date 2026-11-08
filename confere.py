@@ -174,8 +174,8 @@ def _build_diario_groups(result):
     diario = result.get("diario") or {}
     groups_by_key = {}
     priority = {
-        "identidade": 0, "matricula": 1, "situacao": 2,
-        "turma": 3, "remanejamento": 4, "chamada": 5, "ok": 6,
+        "identidade": 0, "nome": 1, "matricula": 2, "situacao": 3,
+        "turma": 4, "remanejamento": 5, "chamada": 6, "ok": 7,
     }
     for row in diario.get("rows", []):
         key = row.get("turma_key") or normalize_turma_lista(

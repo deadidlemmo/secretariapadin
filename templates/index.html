@@ -3,7 +3,7 @@
 {% block title %}Conferidor de Listas Escolares{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/confere-diario.css', v='5') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/confere-diario.css', v='6') }}">
 {% endblock %}
 
 {% block extra_styles %}
@@ -775,7 +775,7 @@
 
   .confere-page .result-group-header {
     position: sticky;
-    top: 0;
+    top: 88px;
     z-index: 1;
     display: flex;
     align-items: center;
@@ -1303,6 +1303,10 @@
     .confere-page .btn-secondary-action {
       width: 100%;
     }
+  }
+
+  @media (max-width: 768px) {
+    .confere-page .result-group-header { top: 78px; }
   }
 
   @media print {
