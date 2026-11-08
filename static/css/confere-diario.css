@@ -1,3 +1,5 @@
+.confere-page .confere-shell { grid-template-columns: minmax(0, 1fr); }
+.confere-page .confere-results { min-width: 0; }
 .confere-page #diario-card[hidden] { display: none; }
 .confere-page #diario-card { grid-column: 1 / -1; }
 .confere-page .diario-file-input {
@@ -17,22 +19,43 @@
 }
 .confere-page .diario-note { margin: 8px 0 0; color: var(--app-muted); }
 .confere-page .confere-results.triple-results { padding: 24px; }
-.confere-page .triple-summary { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
-.confere-page .triple-summary span {
-  padding: 10px 14px;
-  border: 1px solid var(--app-border);
-  border-radius: 10px;
-  background: var(--app-surface);
+.confere-page .triple-subtitle,
+.confere-page .triple-context {
+  margin: 8px 0 0;
+  color: var(--app-muted);
+  line-height: 1.45;
 }
-.confere-page .triple-table-wrap { overflow-x: auto; }
-.confere-page .triple-table { width: 100%; border-collapse: collapse; min-width: 1080px; }
-.confere-page .triple-table th, .confere-page .triple-table td {
-  padding: 10px;
-  border-bottom: 1px solid var(--app-border);
-  text-align: left;
-  vertical-align: top;
+.confere-page .triple-summary-grid { margin-top: 16px; }
+.confere-page .triple-context { margin-bottom: 12px; }
+.confere-page .comparison-grid.triple-comparison-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.confere-page .triple-table th { color: var(--app-primary-dark); }
-.confere-page .triple-table td small { display: block; color: var(--app-muted); }
-.confere-page .triple-issues { margin: 0; padding-left: 18px; }
-.confere-page .triple-row-ok { color: var(--app-primary-dark); font-weight: 700; }
+.confere-page .triple-card .comparison-meta {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.confere-page .triple-card .meta-item strong {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.confere-page .triple-card .comparison-box.triple-missing {
+  border-color: color-mix(in srgb, var(--app-danger) 36%, var(--app-border));
+  background: color-mix(in srgb, var(--app-danger) 5%, var(--app-surface-muted));
+}
+.confere-page .triple-card .meta-item.triple-emphasis {
+  border-color: color-mix(in srgb, var(--confere-warning) 68%, var(--app-border));
+  background: color-mix(in srgb, var(--confere-warning) 14%, var(--app-surface));
+}
+.confere-page .triple-card[data-category="inconsistencia_situacao"] .meta-item.triple-emphasis {
+  border-color: color-mix(in srgb, var(--app-danger) 62%, var(--app-border));
+  background: color-mix(in srgb, var(--app-danger) 12%, var(--app-surface));
+}
+.confere-page #diario-empty-filter { display: none; }
+
+@media (max-width: 1180px) {
+  .confere-page .comparison-grid.triple-comparison-grid { grid-template-columns: 1fr; }
+  .confere-page .result-card.triple-card { grid-template-columns: 1fr; }
+  .confere-page .triple-card .result-status-cell { justify-content: flex-start; }
+  .confere-page .triple-card .status-pill { width: auto; }
+}

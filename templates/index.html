@@ -3,7 +3,7 @@
 {% block title %}Conferidor de Listas Escolares{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/confere-diario.css', v='1') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/confere-diario.css', v='4') }}">
 {% endblock %}
 
 {% block extra_styles %}
@@ -1683,39 +1683,114 @@
       {% if result %}
         {% if result.diario is defined %}
           <section class="confere-results triple-results" id="resultado-diario">
-            <h2>Conferência tripla: Lista Piloto × SED × Diário Online</h2>
-            <p>Turmas com PDF nas duas fontes: {{ result.diario.turmas_conferidas|join(', ') or 'nenhuma' }}.</p>
-            {% if result.diario.turmas_diario_sem_sed %}<p>Turmas do Diário sem PDF do SED, fora da conferência tripla: {{ result.diario.turmas_diario_sem_sed|join(', ') }}.</p>{% endif %}
-            {% if result.diario.turmas_sed_sem_diario %}<p>Turmas do SED sem PDF do Diário, fora da conferência tripla: {{ result.diario.turmas_sed_sem_diario|join(', ') }}.</p>{% endif %}
-            <div class="triple-summary">
-              <span><strong>{{ result.diario.summary.total_pendencias }}</strong> alunos com pendências</span>
-              <span><strong>{{ result.diario.summary.total_ok }}</strong> alunos sem pendências</span>
-              <span><strong>{{ result.diario.summary.total_pdfs_lidos }}</strong> PDFs do Diário lidos</span>
-              <span><strong>{{ result.diario.summary.total_turmas_conferidas }}</strong> turmas conferidas</span>
+            {% set diario_tipos = result.diario.summary.get('totais_tipos', {}) %}
+            {% set diario_rotulos = {'identidade': 'Identidade', 'matricula': 'Matrícula', 'situacao': 'Situação', 'turma': 'Turma', 'remanejamento': 'Remanejamento', 'chamada': 'Chamada', 'ok': 'OK'} %}
+            <div class="result-header-row">
+              <div class="result-title-block">
+                <h2>Lista Piloto × SED × Diário Online</h2>
+                <p class="triple-subtitle">Confira primeiro as pendências de matrícula e situação. As diferenças apenas no número da chamada aparecem em filtro próprio.</p>
+              </div>
+              {% if result_id %}
+                <div class="result-actions">
+                  <a class="btn-export" href="{{ url_for('confere.exportar_excel', result_id=result_id) }}">
+                    <i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel
+                  </a>
+                </div>
+              {% endif %}
             </div>
-            <p>Movimentações “REM. DE” indicam entrada na turma do relatório; “REM. P/” indicam saída. Diferenças no número de chamada pedem revisão, pois ele pode mudar com novas matrículas ou transferências.</p>
-            <div class="triple-table-wrap">
-              <table class="triple-table">
-                <thead><tr>
-                  <th>Aluno</th><th>Lista Piloto</th><th>SED</th><th>Diário Online</th><th>Verificar</th>
-                </tr></thead>
-                <tbody>
-                  {% for row in result.diario.rows %}
-                    <tr>
-                      <td><strong>{{ row.nome }}</strong></td>
-                      <td>{{ row.turma_lista or '-' }} · {{ row.situacao_lista_display }}<small>Nº {{ row.numero_lista or '-' }}</small></td>
-                      <td>{{ row.turma_sed or '-' }} · {{ row.situacao_sed_display }}</td>
-                      <td>{{ row.turma_diario or '-' }} · {{ row.situacao_diario_display }}<small>Nº {{ row.numero_diario or '-' }}{% if row.movimentacao_diario %} · {{ row.movimentacao_diario }}{% endif %}</small></td>
-                      <td>
-                        {% if row.pendencias %}
-                          <ul class="triple-issues">{% for issue in row.pendencias %}<li>{{ issue }}</li>{% endfor %}</ul>
-                        {% else %}<span class="triple-row-ok">Sem pendências</span>{% endif %}
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+            <div class="summary-grid triple-summary-grid">
+              <div class="summary-card is-alert"><span>Pendências de dados</span><strong>{{ result.diario.summary.get('total_outros_alertas', result.diario.summary.total_pendencias) }}</strong></div>
+              <div class="summary-card"><span>Somente chamada</span><strong>{{ result.diario.summary.get('total_somente_chamada', 0) }}</strong></div>
+              <div class="summary-card is-success"><span>Sem pendências</span><strong>{{ result.diario.summary.total_ok }}</strong></div>
+              <div class="summary-card is-focus"><span>PDFs do Diário</span><strong>{{ result.diario.summary.total_pdfs_lidos }}</strong></div>
+              <div class="summary-card"><span>Turmas conferidas</span><strong>{{ result.diario.summary.total_turmas_conferidas }}</strong></div>
             </div>
+            <p class="triple-context">A conferência tripla cobre as turmas presentes nos PDFs do SED e do Diário. “REM. DE” indica entrada na turma do relatório; “REM. P/” indica saída. O número da chamada ajuda a revisar o vínculo, mas não identifica o aluno sozinho.</p>
+            {% if result.diario.turmas_diario_sem_sed %}<p class="triple-context">Turmas do Diário sem PDF do SED: {{ result.diario.turmas_diario_sem_sed|join(', ') }}.</p>{% endif %}
+            {% if result.diario.turmas_sed_sem_diario %}<p class="triple-context">Turmas do SED sem PDF do Diário: {{ result.diario.turmas_sed_sem_diario|join(', ') }}.</p>{% endif %}
+
+            <div class="result-controls">
+              <div class="filter-row" aria-label="Filtros da conferência tripla">
+                <button type="button" class="is-active" data-triple-filter="dados">Dados <span class="filter-count">{{ result.diario.summary.get('total_outros_alertas', result.diario.summary.total_pendencias) }}</span></button>
+                <button type="button" data-triple-filter="pendencias">Pendências <span class="filter-count">{{ result.diario.summary.total_pendencias }}</span></button>
+                <button type="button" data-triple-filter="chamada">Chamada <span class="filter-count">{{ diario_tipos.get('chamada', 0) }}</span></button>
+                <button type="button" data-triple-filter="matricula">Matrícula <span class="filter-count">{{ diario_tipos.get('matricula', 0) }}</span></button>
+                <button type="button" data-triple-filter="situacao">Situação <span class="filter-count">{{ diario_tipos.get('situacao', 0) }}</span></button>
+                <button type="button" data-triple-filter="turma">Turma <span class="filter-count">{{ diario_tipos.get('turma', 0) }}</span></button>
+                <button type="button" data-triple-filter="remanejamento">Remanejamento <span class="filter-count">{{ diario_tipos.get('remanejamento', 0) }}</span></button>
+                <button type="button" data-triple-filter="identidade">Identidade <span class="filter-count">{{ diario_tipos.get('identidade', 0) }}</span></button>
+                <button type="button" data-triple-filter="ok">OK <span class="filter-count">{{ result.diario.summary.total_ok }}</span></button>
+                <button type="button" data-triple-filter="todos">Todos <span class="filter-count">{{ result.diario.rows|length }}</span></button>
+              </div>
+              <label class="result-search" for="diario-result-search">
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <input type="search" id="diario-result-search" placeholder="Buscar por aluno, RA ou turma">
+              </label>
+            </div>
+            <div class="turma-filter-row" aria-label="Filtrar Diário por turma">
+              <button type="button" class="is-active" data-triple-turma="todas">Todas <span class="filter-count">{{ result.diario.rows|length }}</span></button>
+              {% for group in diario_groups %}
+                <button type="button" data-triple-turma="{{ group.key }}">{{ group.label }} <span class="filter-count">{{ group.rows|length }}</span></button>
+              {% endfor %}
+            </div>
+            <div class="result-list" id="diario-result-list">
+              {% for group in diario_groups %}
+                <section class="result-group" data-triple-group data-turma-key="{{ group.key }}">
+                  <header class="result-group-header"><span>{{ group.label }}</span><span class="result-group-count" data-triple-group-count>{{ group.rows|length }}</span></header>
+                  <div class="result-group-items">
+                    {% for row in group.rows %}
+                      {% set tipos_linha = row.pendencias_tipos|default([]) %}
+                      {% set principal = row.tipo_principal|default('ok' if not row.pendencias else 'pendente') %}
+                      {% set cor_cartao = 'ok' if not row.pendencias else 'inconsistencia_situacao' if principal == 'situacao' else 'nao_encontrado_sed' if principal == 'matricula' else 'divergencia_cadastral' %}
+                      <article class="result-card triple-card" data-category="{{ cor_cartao }}" data-triple-card data-triple-status="{{ row.categoria }}" data-triple-types="{{ tipos_linha|join(' ') }}" data-triple-search="{{ (row.nome ~ ' ' ~ row.turma_lista ~ ' ' ~ row.turma_sed ~ ' ' ~ row.turma_diario ~ ' ' ~ (row.ra_lista|default('')) ~ ' ' ~ (row.ra_sed|default('')) ~ ' ' ~ row.movimentacao_diario ~ ' ' ~ (row.pendencias|join(' ')))|lower }}">
+                        <div class="result-status-cell"><span class="status-pill status-{{ cor_cartao }}">{{ diario_rotulos.get(principal, 'Conferir') }}</span></div>
+                        <div class="result-content">
+                          <div class="result-observation">
+                            <i class="fas {{ 'fa-circle-info' if row.pendencias else 'fa-circle-check' }}" aria-hidden="true"></i>
+                            {% if row.pendencias %}
+                              <ul class="result-observation-list">{% for issue in row.pendencias %}<li>{{ issue }}</li>{% endfor %}</ul>
+                            {% else %}<span>Dados compatíveis nas três fontes.</span>{% endif %}
+                          </div>
+                          <div class="comparison-grid triple-comparison-grid">
+                            <section class="comparison-box{% if row.situacao_lista == 'AUSENTE' %} triple-missing{% endif %}">
+                              <span class="comparison-label">Lista Piloto</span>
+                              <strong class="comparison-name">{{ row.nome if row.situacao_lista != 'AUSENTE' else 'Não localizado' }}</strong>
+                              <div class="comparison-meta">
+                                <div class="meta-item{% if 'turma' in tipos_linha %} triple-emphasis{% endif %}"><span>Turma</span><strong>{{ row.turma_lista or '-' }}</strong></div>
+                                <div class="meta-item{% if 'situacao' in tipos_linha %} triple-emphasis{% endif %}"><span>Situação</span><strong>{{ row.situacao_lista_display }}</strong></div>
+                                <div class="meta-item meta-item-ra{% if 'identidade' in tipos_linha %} triple-emphasis{% endif %}"><span>RA</span><strong>{{ row.ra_lista|default('') or '-' }}</strong></div>
+                                <div class="meta-item{% if 'chamada' in tipos_linha %} triple-emphasis{% endif %}"><span>Chamada</span><strong>{{ row.numero_lista or '-' }}</strong></div>
+                              </div>
+                            </section>
+                            <section class="comparison-box{% if row.situacao_sed == 'AUSENTE' %} triple-missing{% endif %}">
+                              <span class="comparison-label">SED</span>
+                              <strong class="comparison-name">{{ row.nome if row.situacao_sed != 'AUSENTE' else 'Não localizado' }}</strong>
+                              <div class="comparison-meta">
+                                <div class="meta-item{% if 'turma' in tipos_linha %} triple-emphasis{% endif %}"><span>Turma</span><strong>{{ row.turma_sed or '-' }}</strong></div>
+                                <div class="meta-item{% if 'situacao' in tipos_linha %} triple-emphasis{% endif %}"><span>Situação</span><strong>{{ row.situacao_sed_display }}</strong></div>
+                                <div class="meta-item meta-item-ra{% if 'identidade' in tipos_linha %} triple-emphasis{% endif %}"><span>RA</span><strong>{{ row.ra_sed|default('') or '-' }}</strong></div>
+                                <div class="meta-item"><span>Nascimento</span><strong>{{ row.nascimento_sed|default('') or '-' }}</strong></div>
+                              </div>
+                            </section>
+                            <section class="comparison-box{% if row.situacao_diario == 'AUSENTE' %} triple-missing{% endif %}">
+                              <span class="comparison-label">Diário Online</span>
+                              <strong class="comparison-name">{{ row.nome if row.situacao_diario != 'AUSENTE' else 'Não localizado' }}</strong>
+                              <div class="comparison-meta">
+                                <div class="meta-item{% if 'turma' in tipos_linha %} triple-emphasis{% endif %}"><span>Turma</span><strong>{{ row.turma_diario or '-' }}</strong></div>
+                                <div class="meta-item{% if 'situacao' in tipos_linha %} triple-emphasis{% endif %}"><span>Situação</span><strong>{{ row.situacao_diario_display }}</strong></div>
+                                <div class="meta-item{% if 'chamada' in tipos_linha %} triple-emphasis{% endif %}"><span>Chamada</span><strong>{{ row.numero_diario or '-' }}</strong></div>
+                                <div class="meta-item{% if 'remanejamento' in tipos_linha %} triple-emphasis{% endif %}"><span>Movimentação</span><strong>{{ row.movimentacao_diario or '-' }}</strong></div>
+                              </div>
+                            </section>
+                          </div>
+                        </div>
+                      </article>
+                    {% endfor %}
+                  </div>
+                </section>
+              {% endfor %}
+            </div>
+            <div class="no-filter-results" id="diario-empty-filter">Nenhum aluno encontrado com os filtros atuais.</div>
             {% if result.diario.pdf_errors or result.diario.duplicate_files %}
               <div class="pdf-errors">
                 <h3>Ocorrências nos PDFs do Diário</h3>
@@ -2066,6 +2141,10 @@
       const turmaFilterButtons = document.querySelectorAll("[data-turma-filter]");
       const resultSearch = document.getElementById("confere-result-search");
       const emptyFilterMessage = document.getElementById("confere-empty-filter");
+      const tripleFilterButtons = document.querySelectorAll("[data-triple-filter]");
+      const tripleTurmaButtons = document.querySelectorAll("[data-triple-turma]");
+      const tripleSearch = document.getElementById("diario-result-search");
+      const tripleEmptyMessage = document.getElementById("diario-empty-filter");
       const printCurrentResultsButton = document.getElementById("btn-print-current-results");
       const printOptionsModal = document.getElementById("print-options-modal");
       const closePrintModalButton = document.getElementById("btn-close-print-modal");
@@ -2079,6 +2158,8 @@
       ]);
       let activeResultFilter = "pendencias";
       let activeTurmaFilter = "todas";
+      let activeTripleFilter = "dados";
+      let activeTripleTurma = "todas";
       let selectedExcelFile = null;
       let selectedFiles = [];
       let detectedFileLabels = new Map();
@@ -2483,6 +2564,74 @@
         });
       }
 
+      function tripleMatches(card, filter) {
+        const status = card.dataset.tripleStatus || "";
+        const types = (card.dataset.tripleTypes || "").split(" ").filter(Boolean);
+        if (filter === "todos") return true;
+        if (filter === "pendencias") return status === "pendente";
+        if (filter === "ok") return status === "ok";
+        if (filter === "dados") {
+          return status === "pendente" && (!types.length || types.some((type) => type !== "chamada"));
+        }
+        return types.includes(filter);
+      }
+
+      function normalizedTripleSearch(value) {
+        return (value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      }
+
+      function applyTripleFilters() {
+        const search = normalizedTripleSearch(tripleSearch ? tripleSearch.value.trim() : "");
+        const countsByTurma = new Map();
+        let visibleCount = 0;
+        let matchingCount = 0;
+
+        document.querySelectorAll("[data-triple-group]").forEach((group) => {
+          const turmaKey = group.dataset.turmaKey || "";
+          const turmaVisible = activeTripleTurma === "todas" || turmaKey === activeTripleTurma;
+          let groupVisibleCount = 0;
+          let groupMatchingCount = 0;
+          group.querySelectorAll("[data-triple-card]").forEach((card) => {
+            const searchVisible = !search || normalizedTripleSearch(card.dataset.tripleSearch).includes(search);
+            const matches = tripleMatches(card, activeTripleFilter) && searchVisible;
+            const visible = matches && turmaVisible;
+            card.style.display = visible ? "" : "none";
+            if (matches) groupMatchingCount += 1;
+            if (visible) groupVisibleCount += 1;
+          });
+          group.style.display = groupVisibleCount ? "" : "none";
+          const count = group.querySelector("[data-triple-group-count]");
+          if (count) count.textContent = groupVisibleCount;
+          countsByTurma.set(turmaKey, groupMatchingCount);
+          matchingCount += groupMatchingCount;
+          visibleCount += groupVisibleCount;
+        });
+
+        tripleTurmaButtons.forEach((button) => {
+          const count = button.querySelector(".filter-count");
+          if (!count) return;
+          const key = button.dataset.tripleTurma;
+          count.textContent = key === "todas" ? matchingCount : (countsByTurma.get(key) || 0);
+        });
+        if (tripleEmptyMessage) tripleEmptyMessage.style.display = visibleCount ? "none" : "block";
+      }
+
+      tripleFilterButtons.forEach((button) => {
+        button.addEventListener("click", function () {
+          activeTripleFilter = button.dataset.tripleFilter || "dados";
+          tripleFilterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+          applyTripleFilters();
+        });
+      });
+      tripleTurmaButtons.forEach((button) => {
+        button.addEventListener("click", function () {
+          activeTripleTurma = button.dataset.tripleTurma || "todas";
+          tripleTurmaButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+          applyTripleFilters();
+        });
+      });
+      if (tripleSearch) tripleSearch.addEventListener("input", applyTripleFilters);
+
       function categoryMatchesResultFilter(category, filter) {
         return filter === "todos" || category === filter || (filter === "pendencias" && category !== "ok");
       }
@@ -2668,6 +2817,7 @@
       resetSedScopePreview();
       const activeFilter = document.querySelector("[data-confere-filter].is-active");
       if (activeFilter) applyResultFilter(activeFilter.dataset.confereFilter);
+      if (document.getElementById("diario-result-list")) applyTripleFilters();
     })();
   </script>
 {% endblock %}

@@ -170,6 +170,26 @@ def _build_result_groups(result):
     return groups
 
 
+def _build_diario_groups(result):
+    diario = result.get("diario") or {}
+    groups_by_key = {}
+    priority = {
+        "identidade": 0, "matricula": 1, "situacao": 2,
+        "turma": 3, "remanejamento": 4, "chamada": 5, "ok": 6,
+    }
+    for row in diario.get("rows", []):
+        key = row.get("turma_key") or normalize_turma_lista(
+            row.get("turma_diario") or row.get("turma_lista") or row.get("turma_sed")
+        ) or "SEM_TURMA"
+        label = "Sem turma" if key == "SEM_TURMA" else format_turma_key(key)
+        group = groups_by_key.setdefault(key, {"key": key, "label": label, "rows": []})
+        group["rows"].append(row)
+    groups = sorted(groups_by_key.values(), key=lambda group: _turma_sort_key(group["key"]))
+    for group in groups:
+        group["rows"].sort(key=lambda row: (priority.get(row.get("tipo_principal", "ok"), 99), row.get("nome", "")))
+    return groups
+
+
 @confere_bp.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("confere_logged_in") and request.method == "GET":
@@ -300,6 +320,7 @@ def resultado(result_id):
         **_confere_template_context(
             result=result,
             result_groups=_build_result_groups(result),
+            diario_groups=_build_diario_groups(result),
             result_id=result_id,
             selected_school_id=result.get("school", {}).get("id"),
         ),

@@ -167,12 +167,22 @@ def _effective_status(records, source):
 
 def _display_source(records, source):
     status, current, ambiguous = _effective_status(records, source)
-    selected = current or (records[0] if records else None)
+    status_records = {
+        "lista": {"TE": {"TE"}, "REM": {"REM"}, "NCOM": {"NCOM"}},
+        "sed": {"TE": SED_TRANSFER_STATUSES, "REM": {"REMA"}, "NCOM": {"NCOM"}},
+        "diario": {"TE": {"TE"}, "REM": {"REM_P"}, "NCOM": {"NCOM"}},
+    }
+    selected = current or next(
+        (record for record in records if record.get("situacao") in status_records[source].get(status, set())),
+        records[0] if records else None,
+    )
     return {
         "status": status if records else "AUSENTE",
         "turma": format_turma_key(current.get("turma_key")) if current else (format_turma_key(selected.get("turma_key")) if selected else ""),
         "turma_key": current.get("turma_key", "") if current else "",
         "numero": clean_display(current.get("numero_chamada")) if current else "",
+        "ra": clean_display(selected.get("ra")) if selected else "",
+        "nascimento": clean_display(selected.get("data_nascimento")) if selected else "",
         "pdf": selected.get("pdf_origem", "") if selected else "",
         "ambiguous": ambiguous,
     }
@@ -200,36 +210,47 @@ def compare_three_sources(lista_records, sed_records, diario_info):
         views = {source: _display_source(records, source) for source, records in name_groups.items()}
         nome = next((r["nome"] for source in ("lista", "sed", "diario") for r in name_groups[source]), "")
         issues = []
+        issue_types = []
+
+        def add_issue(kind, message):
+            issues.append(message)
+            issue_types.append(kind)
+
         ra_sets = [
             {tuple(r.get("ra_keys") or ()) for r in name_groups["lista"] if r.get("ra_keys")},
             {tuple(r.get("ra_keys") or ()) for r in name_groups["sed"] if r.get("ra_keys")},
         ]
-        ambiguous_identity = any(len(values) > 1 for values in ra_sets)
+        repeated_identity = any(len(values) > 1 for values in ra_sets) or any(view["ambiguous"] for view in views.values())
         lista_ra = {key for values in ra_sets[0] for key in values}
         sed_ra = {key for values in ra_sets[1] for key in values}
-        if lista_ra and sed_ra and not lista_ra.intersection(sed_ra):
-            ambiguous_identity = True
-        if ambiguous_identity or any(view["ambiguous"] for view in views.values()):
-            issues.append("Nome repetido, RA divergente ou mais de uma turma ativa: conferir a identidade manualmente.")
+        divergent_ra = bool(lista_ra and sed_ra and not lista_ra.intersection(sed_ra))
+        if repeated_identity or divergent_ra:
+            if repeated_identity:
+                add_issue("identidade", "Nome repetido ou mais de uma turma ativa: conferir a identidade manualmente.")
+            if divergent_ra:
+                if views["lista"]["ra"] in {"", "0"}:
+                    add_issue("identidade", "RA não informado na Lista Piloto; confira o cadastro antes de vincular os registros.")
+                else:
+                    add_issue("identidade", "RA divergente entre Lista Piloto e SED; confirme a identidade antes de vincular o Diário.")
         else:
             present = {source: view for source, view in views.items() if view["status"] != "AUSENTE"}
             if any(view["status"] == "ATIVO" for view in present.values()):
                 for source, label in (("lista", "na Lista Piloto"), ("sed", "no SED"), ("diario", "no Diário Online")):
                     if views[source]["status"] == "AUSENTE":
-                        issues.append(f"Aluno ativo não localizado {label}.")
+                        add_issue("matricula", f"Aluno ativo não localizado {label}.")
             statuses = {view["status"] for view in present.values()}
             if len(statuses) > 1 and "DESCONHECIDO" not in statuses:
-                issues.append("Situação diferente entre as fontes (ativo, transferido, remanejado ou não compareceu).")
+                add_issue("situacao", "Situação diferente entre as fontes (ativo, transferido, remanejado ou não compareceu).")
             if "DESCONHECIDO" in statuses:
-                issues.append("Situação não reconhecida em uma das fontes: conferir manualmente.")
+                add_issue("situacao", "Situação não reconhecida em uma das fontes: conferir manualmente.")
             active_classes = {view["turma_key"] for view in present.values() if view["status"] == "ATIVO"}
             if len(active_classes) > 1:
-                issues.append("Aluno ativo em turmas diferentes entre as fontes.")
+                add_issue("turma", "Aluno ativo em turmas diferentes entre as fontes.")
             if (views["lista"]["status"] == "ATIVO" and views["diario"]["status"] == "ATIVO"
                     and views["lista"]["turma_key"] == views["diario"]["turma_key"]
                     and views["lista"]["numero"] and views["diario"]["numero"]
                     and views["lista"]["numero"] != views["diario"]["numero"]):
-                issues.append("Número da chamada diferente entre Lista Piloto e Diário Online.")
+                add_issue("chamada", "Número da chamada diferente entre Lista Piloto e Diário Online.")
 
             for record in name_groups["diario"]:
                 if record["situacao"] not in {"REM_DE", "REM_P"}:
@@ -238,11 +259,11 @@ def compare_three_sources(lista_records, sed_records, diario_info):
                 if (record["situacao"] == "REM_P" and record["outra_turma_key"] in scope
                         and not any(r["turma_key"] == record["outra_turma_key"] and r["situacao"] in {"ATIVO", "REM_DE"}
                                     for r in name_groups["diario"])):
-                    issues.append("Remanejado para outra turma, mas não localizado no relatório de destino do Diário.")
+                    add_issue("remanejamento", "Remanejado para outra turma, mas não localizado no relatório de destino do Diário.")
                 if origin not in scope:
                     continue
                 if not any(r.get("turma_key") == origin and r.get("situacao") == "REMA" for r in name_groups["sed"]):
-                    issues.append("Remanejamento do Diário sem registro correspondente na turma de origem do SED.")
+                    add_issue("remanejamento", "Remanejamento do Diário sem registro correspondente na turma de origem do SED.")
                     break
             for record in name_groups["sed"]:
                 if record.get("situacao") != "REMA" or record.get("turma_key") not in scope:
@@ -250,12 +271,23 @@ def compare_three_sources(lista_records, sed_records, diario_info):
                 if not any(r["situacao"] in {"REM_DE", "REM_P"} and
                            (r["outra_turma_key"] if r["situacao"] == "REM_DE" else r["turma_key"]) == record["turma_key"]
                            for r in name_groups["diario"]):
-                    issues.append("Remanejamento do SED sem registro correspondente no Diário Online.")
+                    add_issue("remanejamento", "Remanejamento do SED sem registro correspondente no Diário Online.")
                     break
 
         movement = "; ".join(sorted({r["movimentacao"] for r in name_groups["diario"] if r.get("movimentacao")}))
+        unique_types = list(dict.fromkeys(issue_types))
+        priority = next(
+            (kind for kind in ("identidade", "matricula", "situacao", "turma", "remanejamento", "chamada")
+             if kind in unique_types),
+            "ok",
+        )
+        turma_key = next(
+            (views[source]["turma_key"] for source in ("diario", "lista", "sed") if views[source]["turma_key"]),
+            normalize_turma_lista(views["diario"]["turma"] or views["lista"]["turma"] or views["sed"]["turma"]),
+        )
         rows.append({
             "nome": nome,
+            "turma_key": turma_key,
             "turma_lista": views["lista"]["turma"],
             "turma_sed": views["sed"]["turma"],
             "turma_diario": views["diario"]["turma"],
@@ -267,12 +299,22 @@ def compare_three_sources(lista_records, sed_records, diario_info):
             "situacao_diario_display": STATUS_LABELS.get(views["diario"]["status"], views["diario"]["status"]),
             "numero_lista": views["lista"]["numero"],
             "numero_diario": views["diario"]["numero"],
+            "ra_lista": views["lista"]["ra"],
+            "ra_sed": views["sed"]["ra"],
+            "nascimento_lista": views["lista"]["nascimento"],
+            "nascimento_sed": views["sed"]["nascimento"],
             "movimentacao_diario": movement,
             "pdf_diario": views["diario"]["pdf"],
             "pendencias": list(dict.fromkeys(issues)),
+            "pendencias_tipos": unique_types,
+            "tipo_principal": priority,
             "categoria": "pendente" if issues else "ok",
         })
     rows.sort(key=lambda r: (r["categoria"] != "pendente", normalize_turma_lista(r["turma_lista"] or r["turma_sed"] or r["turma_diario"]), normalize_text(r["nome"])))
+    type_totals = {
+        kind: sum(kind in row["pendencias_tipos"] for row in rows)
+        for kind in ("identidade", "matricula", "situacao", "turma", "remanejamento", "chamada")
+    }
     return {
         "summary": {
             "total_alunos": len(rows),
@@ -280,6 +322,9 @@ def compare_three_sources(lista_records, sed_records, diario_info):
             "total_ok": sum(not row["pendencias"] for row in rows),
             "total_pdfs_lidos": len(diario_info["successful_files"]),
             "total_turmas_conferidas": len(scope),
+            "total_somente_chamada": sum(row["pendencias_tipos"] == ["chamada"] for row in rows),
+            "total_outros_alertas": sum(bool(set(row["pendencias_tipos"]) - {"chamada"}) for row in rows),
+            "totais_tipos": type_totals,
         },
         "turmas_conferidas": [format_turma_key(key) for key in sorted(scope)],
         "turmas_diario_sem_sed": [format_turma_key(key) for key in sorted(diario_classes - sed_classes)],

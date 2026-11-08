@@ -36,12 +36,12 @@ def make_diario_pdf(rows):
     return output.getvalue()
 
 
-def make_lista():
+def make_lista(ra="990003"):
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "LISTA CORRIDA"
     sheet.append(["SÉRIE", "Nº", "RM", "NOME", "SEXO", "DATA NASC.", "RA", "COD.", "OBS"])
-    sheet.append(["3ºA", 7, "900001", "ALUNO FICTICIO A", "M", "01/01/2017", "990003", "MA", ""])
+    sheet.append(["3ºA", 7, "900001", "ALUNO FICTICIO A", "M", "01/01/2017", ra, "MA", ""])
     output = io.BytesIO()
     workbook.save(output)
     output.seek(0)
@@ -96,6 +96,16 @@ class DiarioConferenceTests(unittest.TestCase):
         self.assertEqual(result["summary"]["total_alunos"], 2)
         self.assertTrue(all(row["pendencias"] for row in result["rows"]))
 
+    def test_call_only_alert_is_separate_from_enrollment_alerts(self):
+        name = "ALUNO FICTICIO A"
+        lista = [record("lista", name, "3A", "MA", "7")]
+        sed = [record("sed", name, "3A", "ATIVO")]
+        diario = [record("diario", name, "3A", "ATIVO", "8")]
+        result = compare_three_sources(lista, sed, {"records": diario, "successful_files": ["diario_ficticio.pdf"], "errors": [], "duplicate_files": []})
+        self.assertEqual(result["summary"]["total_somente_chamada"], 1)
+        self.assertEqual(result["summary"]["total_outros_alertas"], 0)
+        self.assertEqual(result["rows"][0]["tipo_principal"], "chamada")
+
     def test_two_versions_of_same_class_are_rejected(self):
         files = [
             {"filename": "diario_antigo_ficticio.pdf", "content": make_diario_pdf([(1, "ALUNO FICTICIO A", "")])},
@@ -126,6 +136,19 @@ class DiarioConferenceTests(unittest.TestCase):
         self.assertIn("Diário pendências", export.sheetnames)
         self.assertIn("Diário completo", export.sheetnames)
         self.assertEqual(export["Diário completo"].max_row, 2)
+        self.assertEqual(export["Diário completo"]["E1"].value, "RA Lista")
+        self.assertEqual(export["Diário completo"]["F1"].value, "RA SED")
+        self.assertEqual(export["Diário completo"]["E2"].value, result["diario"]["rows"][0]["ra_lista"])
+
+    def test_zero_ra_is_reported_as_missing_in_both_views(self):
+        result = run_conferencia(
+            make_lista(ra="0"), [{"filename": "sed_ficticio.pdf", "content": make_sed_pdf()}],
+            school_config=get_confere_school_config("padin"),
+            diario_file_items=[{"filename": "diario_ficticio.pdf", "content": make_diario_pdf([(7, "ALUNO FICTICIO A", "")])}],
+        )
+        self.assertIn("RA não informado na Lista Piloto.", result["rows"][0]["observacao"])
+        self.assertIn("RA não informado na Lista Piloto", result["diario"]["rows"][0]["pendencias"][0])
+        self.assertEqual(result["diario"]["rows"][0]["tipo_principal"], "identidade")
 
     def test_padin_form_accepts_diario_and_renders_triple_result(self):
         root = Path(__file__).resolve().parents[1]
@@ -144,10 +167,12 @@ class DiarioConferenceTests(unittest.TestCase):
                 }, follow_redirects=True)
                 self.assertEqual(response.status_code, 200)
                 html = response.get_data(as_text=True)
-                self.assertIn("Conferência tripla", html)
-                self.assertIn("confere-diario.css?v=1", html)
+                self.assertTrue("Lista Piloto × SED × Diário Online" in html, "Título da conferência tripla ausente")
+                self.assertIn("confere-diario.css?v=4", html)
                 self.assertIn("ALUNO FICTICIO A", html)
-                self.assertIn("Sem pendências", html)
+                self.assertIn('data-triple-filter="dados"', html)
+                self.assertIn('data-triple-status="ok"', html)
+                self.assertIn('id="diario-result-search"', html)
 
 
 if __name__ == "__main__":

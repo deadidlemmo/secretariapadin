@@ -1153,7 +1153,12 @@ def _data_divergence_details(lista, sed, match_method):
         lista_keys = set(lista.get("ra_keys", []))
         sed_keys = set(sed.get("ra_keys", []))
         if lista_keys and sed_keys and lista_keys.isdisjoint(sed_keys):
-            divergences.append(("ra", "RA divergente entre as bases."))
+            message = (
+                "RA não informado na Lista Piloto."
+                if normalize_ra(lista.get("ra")) in {"", "0"}
+                else "RA divergente entre as bases."
+            )
+            divergences.append(("ra", message))
     return divergences
 
 
@@ -1805,6 +1810,7 @@ def build_excel_report(result):
         diario_columns = [
             ("nome", "Aluno"), ("turma_lista", "Turma Lista"),
             ("turma_sed", "Turma SED"), ("turma_diario", "Turma Diário"),
+            ("ra_lista", "RA Lista"), ("ra_sed", "RA SED"),
             ("situacao_lista_display", "Sit. Lista"), ("situacao_sed_display", "Sit. SED"),
             ("situacao_diario_display", "Sit. Diário"),
             ("numero_lista", "Nº Lista"), ("numero_diario", "Nº Diário"),
@@ -1823,7 +1829,7 @@ def build_excel_report(result):
                     for key, _ in diario_columns
                 ])
             _style_tabular_sheet(ws, header_fill, header_font, thin)
-            _set_widths(ws, [38, 15, 15, 15, 16, 16, 16, 12, 12, 44, 46, 85])
+            _set_widths(ws, [38, 15, 15, 15, 18, 18, 16, 16, 16, 12, 12, 44, 46, 85])
             _configure_print_sheet(ws)
         ws_diario_errors = wb.create_sheet("Diário PDFs")
         ws_diario_errors.append(["Arquivo", "Ocorrência"])
