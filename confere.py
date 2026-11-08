@@ -86,8 +86,8 @@ def _confere_template_context(**extra):
     return context
 
 
-def _collect_sed_pdf_uploads():
-    files = [file for file in request.files.getlist("sed_pdfs") if file and file.filename]
+def _collect_sed_pdf_uploads(field_name="sed_pdfs", source_label="SED"):
+    files = [file for file in request.files.getlist(field_name) if file and file.filename]
     items = []
     errors = []
 
@@ -97,7 +97,7 @@ def _collect_sed_pdf_uploads():
             errors.append(
                 {
                     "arquivo": original_name,
-                    "erro": "Arquivo rejeitado: envie apenas PDFs gerados pelo SED.",
+                    "erro": f"Arquivo rejeitado: envie apenas PDFs gerados pelo {source_label}.",
                 }
             )
             continue
@@ -228,13 +228,27 @@ def index():
         flash("Anexe pelo menos um PDF valido do SED para executar a conferencia.", "danger")
         return redirect(url_for("confere.index"))
 
+    diario_files, diario_items, diario_upload_errors = ([], [], [])
+    if school_config.id == "padin":
+        diario_files, diario_items, diario_upload_errors = _collect_sed_pdf_uploads(
+            "diario_pdfs", "Diário Online"
+        )
+        if diario_files and not diario_items:
+            flash("Nenhum PDF válido do Diário Online foi enviado.", "danger")
+            return redirect(url_for("confere.index"))
+
     try:
-        result = run_conferencia(lista_piloto, sed_items, school_config=school_config)
+        result = run_conferencia(
+            lista_piloto, sed_items, school_config=school_config,
+            diario_file_items=diario_items,
+        )
     except Exception as exc:
         flash(f"Nao foi possivel executar a conferencia: {exc}", "danger")
         return redirect(url_for("confere.index"))
 
     result = _attach_upload_errors(result, uploaded_files, upload_errors)
+    if result.get("diario"):
+        result["diario"]["pdf_errors"] = diario_upload_errors + result["diario"]["pdf_errors"]
     result_id = uuid.uuid4().hex
     save_result(result, RESULTS_FOLDER, result_id)
     return redirect(url_for("confere.resultado", result_id=result_id))

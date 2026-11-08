@@ -56,7 +56,10 @@ CONFERE_SCHOOL_CONFIGS = {
         sheet_name="LISTA CORRIDA",
         column_mode="headers",
         header_row=1,
-        columns=DEFAULT_LISTA_COLUMNS,
+        columns={
+            **DEFAULT_LISTA_COLUMNS,
+            "numero_chamada": ["Nº", "N°", "NÚMERO", "NUMERO", "N. CHAMADA"],
+        },
         description="Modelo atual da Lista Piloto com aba LISTA CORRIDA.",
     ),
     "mahatma_gandhi": ConfereSchoolConfig(

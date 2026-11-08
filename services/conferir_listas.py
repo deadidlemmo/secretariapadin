@@ -610,6 +610,8 @@ def _normalize_lista_records(raw_records, school_config):
         ra_display = _display_lista_ra_por_escola(ra_original, school_config, raw.get("digito_ra"))
         situacao = _normalizar_status_lista_por_escola(raw.get("situacao"), school_config)
         observacoes = clean_display(raw.get("observacoes"))
+        numero_chamada = clean_display(raw.get("numero_chamada"))
+        numero_chamada = str(int(float(numero_chamada))) if re.fullmatch(r"\d+(?:\.0)?", numero_chamada) else ""
 
         if not nome or nome in {"0", "#REF#"}:
             continue
@@ -629,6 +631,7 @@ def _normalize_lista_records(raw_records, school_config):
                 "school_name": school_config.nome,
                 "turma": turma,
                 "turma_key": normalize_turma_lista(turma),
+                "numero_chamada": numero_chamada,
                 "nome": nome,
                 "nome_norm": normalize_text(nome),
                 "nome_match_norm": normalize_name_for_match(nome),
@@ -1553,11 +1556,18 @@ def compare_lista_piloto_sed(lista_records, sed_records, pdf_info):
     }
 
 
-def run_conferencia(lista_file, sed_file_items, school_config=None):
+def run_conferencia(lista_file, sed_file_items, school_config=None, diario_file_items=None):
     school_config = school_config or default_confere_school_config()
     lista_records = read_lista_piloto(lista_file, school_config=school_config)
     pdf_info = extract_sed_pdfs(sed_file_items)
     result = compare_lista_piloto_sed(lista_records, pdf_info["records"], pdf_info)
+    if diario_file_items and school_config.id == "padin":
+        from services.confere_diario import compare_three_sources, extract_diario_pdfs
+
+        diario_info = extract_diario_pdfs(diario_file_items)
+        if not diario_info["successful_files"]:
+            raise ValueError("Nenhum PDF válido do Diário Online foi lido. Confira os arquivos enviados.")
+        result["diario"] = compare_three_sources(lista_records, pdf_info["records"], diario_info)
     result["school"] = {"id": school_config.id, "nome": school_config.nome}
     return result
 
@@ -1784,6 +1794,46 @@ def build_excel_report(result):
     _style_tabular_sheet(ws_complete, header_fill, header_font, thin, category_column=2)
     _set_widths(ws_complete, [24, 24, 16, 24, 30, 30, 18, 18, 20, 20, 18, 18, 28, 55])
     _configure_print_sheet(ws_complete)
+
+    diario = result.get("diario")
+    if diario:
+        def safe_diario_cell(value):
+            if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+                return "'" + value
+            return value
+
+        diario_columns = [
+            ("nome", "Aluno"), ("turma_lista", "Turma Lista"),
+            ("turma_sed", "Turma SED"), ("turma_diario", "Turma Diário"),
+            ("situacao_lista_display", "Sit. Lista"), ("situacao_sed_display", "Sit. SED"),
+            ("situacao_diario_display", "Sit. Diário"),
+            ("numero_lista", "Nº Lista"), ("numero_diario", "Nº Diário"),
+            ("movimentacao_diario", "Movimentação Diário"),
+            ("pdf_diario", "PDF Diário"), ("pendencias", "O que verificar"),
+        ]
+        for sheet_name, diario_rows in (
+            ("Diário pendências", [r for r in diario["rows"] if r["pendencias"]]),
+            ("Diário completo", diario["rows"]),
+        ):
+            ws = wb.create_sheet(sheet_name)
+            ws.append([label for _, label in diario_columns])
+            for row in diario_rows:
+                ws.append([
+                    safe_diario_cell("; ".join(row.get(key, [])) if key == "pendencias" else row.get(key, ""))
+                    for key, _ in diario_columns
+                ])
+            _style_tabular_sheet(ws, header_fill, header_font, thin)
+            _set_widths(ws, [38, 15, 15, 15, 16, 16, 16, 12, 12, 44, 46, 85])
+            _configure_print_sheet(ws)
+        ws_diario_errors = wb.create_sheet("Diário PDFs")
+        ws_diario_errors.append(["Arquivo", "Ocorrência"])
+        for error in diario.get("pdf_errors", []):
+            ws_diario_errors.append([safe_diario_cell(error.get("arquivo", "")), safe_diario_cell(error.get("erro", ""))])
+        for duplicate in diario.get("duplicate_files", []):
+            ws_diario_errors.append([safe_diario_cell(duplicate), "PDF duplicado ignorado na conferência."])
+        _style_tabular_sheet(ws_diario_errors, header_fill, header_font, thin)
+        _set_widths(ws_diario_errors, [46, 90])
+        _configure_print_sheet(ws_diario_errors)
 
     wb.active = wb.sheetnames.index("Para imprimir") if "Para imprimir" in wb.sheetnames else 0
     output = io.BytesIO()
