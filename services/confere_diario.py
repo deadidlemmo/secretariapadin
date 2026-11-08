@@ -178,6 +178,7 @@ def _display_source(records, source):
     )
     return {
         "status": status if records else "AUSENTE",
+        "nome": clean_display(selected.get("nome")) if selected else "",
         "turma": format_turma_key(current.get("turma_key")) if current else (format_turma_key(selected.get("turma_key")) if selected else ""),
         "turma_key": current.get("turma_key", "") if current else "",
         "numero": clean_display(current.get("numero_chamada")) if current else "",
@@ -188,8 +189,72 @@ def _display_source(records, source):
     }
 
 
+def _one_character_edit(first, second):
+    if abs(len(first) - len(second)) > 1:
+        return False
+    if len(first) == len(second):
+        return sum(left != right for left, right in zip(first, second)) == 1
+    shorter, longer = sorted((first, second), key=len)
+    return any(shorter == longer[:index] + longer[index + 1:] for index in range(len(longer)))
+
+
+def _names_differ_by_one_letter(first, second):
+    first_tokens = normalize_text(first).split()
+    second_tokens = normalize_text(second).split()
+    if len(first_tokens) < 3 or len(first_tokens) != len(second_tokens):
+        return False
+    differences = [(left, right) for left, right in zip(first_tokens, second_tokens) if left != right]
+    return (
+        len(differences) == 1
+        and min(map(len, differences[0])) >= 4
+        and _one_character_edit(*differences[0])
+    )
+
+
+def _unique_active_record(records, source):
+    status, current, ambiguous = _effective_status(records, source)
+    return current if status == "ATIVO" and not ambiguous else None
+
+
+def _reconcile_diario_name_typos(groups, scope):
+    """Une apenas grafias quase iguais com turma, chamada e RA concordantes."""
+    anchors = {}
+    diario_only = {}
+    for key, group in groups.items():
+        if group["lista"] and group["sed"] and not group["diario"]:
+            lista = _unique_active_record(group["lista"], "lista")
+            sed = _unique_active_record(group["sed"], "sed")
+            if not lista or not sed or lista.get("turma_key") != sed.get("turma_key"):
+                continue
+            lista_ra = set(lista.get("ra_keys") or ())
+            sed_ra = set(sed.get("ra_keys") or ())
+            if (lista.get("turma_key") not in scope or not lista.get("numero_chamada")
+                    or not lista_ra or not sed_ra or lista_ra.isdisjoint(sed_ra)):
+                continue
+            anchors[key] = lista
+        elif group["diario"] and not group["lista"] and not group["sed"]:
+            diario = _unique_active_record(group["diario"], "diario")
+            if diario and diario.get("turma_key") in scope and diario.get("numero_chamada"):
+                diario_only[key] = diario
+
+    candidates = []
+    for diario_key, diario in diario_only.items():
+        for anchor_key, lista in anchors.items():
+            if (diario["turma_key"] == lista["turma_key"]
+                    and diario["numero_chamada"] == lista["numero_chamada"]
+                    and _names_differ_by_one_letter(lista["nome"], diario["nome"])):
+                candidates.append((diario_key, anchor_key))
+
+    diario_counts = {key: sum(diario_key == key for diario_key, _ in candidates) for key in diario_only}
+    anchor_counts = {key: sum(anchor_key == key for _, anchor_key in candidates) for key in anchors}
+    for diario_key, anchor_key in candidates:
+        if diario_counts[diario_key] == 1 and anchor_counts[anchor_key] == 1:
+            groups[anchor_key]["diario"].extend(groups[diario_key]["diario"])
+            del groups[diario_key]
+
+
 def compare_three_sources(lista_records, sed_records, diario_info):
-    """Compara a identidade pelo nome; o número da chamada só confirma o vínculo."""
+    """Compara por nome; pequenas grafias só são vinculadas com evidências extras."""
     diario_records = diario_info["records"]
     sed_classes = {r.get("turma_key") for r in sed_records if r.get("turma_key")}
     diario_classes = {r.get("turma_key") for r in diario_records if r.get("turma_key")}
@@ -202,6 +267,7 @@ def compare_three_sources(lista_records, sed_records, diario_info):
             key = record.get("nome_match_norm") or normalize_name_for_match(record.get("nome"))
             if key:
                 groups[key][source].append(record)
+    _reconcile_diario_name_typos(groups, scope)
 
     rows = []
     for name_groups in groups.values():
@@ -215,6 +281,11 @@ def compare_three_sources(lista_records, sed_records, diario_info):
         def add_issue(kind, message):
             issues.append(message)
             issue_types.append(kind)
+
+        if (views["lista"]["nome"] and views["sed"]["nome"] and views["diario"]["nome"]
+                and normalize_name_for_match(views["diario"]["nome"])
+                != normalize_name_for_match(views["lista"]["nome"])):
+            add_issue("nome", "Nome cadastrado de forma diferente no Diário Online; confira a grafia.")
 
         ra_sets = [
             {tuple(r.get("ra_keys") or ()) for r in name_groups["lista"] if r.get("ra_keys")},
@@ -277,7 +348,7 @@ def compare_three_sources(lista_records, sed_records, diario_info):
         movement = "; ".join(sorted({r["movimentacao"] for r in name_groups["diario"] if r.get("movimentacao")}))
         unique_types = list(dict.fromkeys(issue_types))
         priority = next(
-            (kind for kind in ("identidade", "matricula", "situacao", "turma", "remanejamento", "chamada")
+            (kind for kind in ("identidade", "nome", "matricula", "situacao", "turma", "remanejamento", "chamada")
              if kind in unique_types),
             "ok",
         )
@@ -287,6 +358,9 @@ def compare_three_sources(lista_records, sed_records, diario_info):
         )
         rows.append({
             "nome": nome,
+            "nome_lista": views["lista"]["nome"],
+            "nome_sed": views["sed"]["nome"],
+            "nome_diario": views["diario"]["nome"],
             "turma_key": turma_key,
             "turma_lista": views["lista"]["turma"],
             "turma_sed": views["sed"]["turma"],
@@ -313,7 +387,7 @@ def compare_three_sources(lista_records, sed_records, diario_info):
     rows.sort(key=lambda r: (r["categoria"] != "pendente", normalize_turma_lista(r["turma_lista"] or r["turma_sed"] or r["turma_diario"]), normalize_text(r["nome"])))
     type_totals = {
         kind: sum(kind in row["pendencias_tipos"] for row in rows)
-        for kind in ("identidade", "matricula", "situacao", "turma", "remanejamento", "chamada")
+        for kind in ("identidade", "nome", "matricula", "situacao", "turma", "remanejamento", "chamada")
     }
     return {
         "summary": {

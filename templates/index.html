@@ -3,7 +3,7 @@
 {% block title %}Conferidor de Listas Escolares{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/confere-diario.css', v='4') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/confere-diario.css', v='5') }}">
 {% endblock %}
 
 {% block extra_styles %}
@@ -1684,7 +1684,7 @@
         {% if result.diario is defined %}
           <section class="confere-results triple-results" id="resultado-diario">
             {% set diario_tipos = result.diario.summary.get('totais_tipos', {}) %}
-            {% set diario_rotulos = {'identidade': 'Identidade', 'matricula': 'Matrícula', 'situacao': 'Situação', 'turma': 'Turma', 'remanejamento': 'Remanejamento', 'chamada': 'Chamada', 'ok': 'OK'} %}
+            {% set diario_rotulos = {'identidade': 'Identidade', 'nome': 'Nome divergente', 'matricula': 'Matrícula', 'situacao': 'Situação', 'turma': 'Turma', 'remanejamento': 'Remanejamento', 'chamada': 'Chamada', 'ok': 'OK'} %}
             <div class="result-header-row">
               <div class="result-title-block">
                 <h2>Lista Piloto × SED × Diário Online</h2>
@@ -1718,6 +1718,7 @@
                 <button type="button" data-triple-filter="situacao">Situação <span class="filter-count">{{ diario_tipos.get('situacao', 0) }}</span></button>
                 <button type="button" data-triple-filter="turma">Turma <span class="filter-count">{{ diario_tipos.get('turma', 0) }}</span></button>
                 <button type="button" data-triple-filter="remanejamento">Remanejamento <span class="filter-count">{{ diario_tipos.get('remanejamento', 0) }}</span></button>
+                <button type="button" data-triple-filter="nome">Nome <span class="filter-count">{{ diario_tipos.get('nome', 0) }}</span></button>
                 <button type="button" data-triple-filter="identidade">Identidade <span class="filter-count">{{ diario_tipos.get('identidade', 0) }}</span></button>
                 <button type="button" data-triple-filter="ok">OK <span class="filter-count">{{ result.diario.summary.total_ok }}</span></button>
                 <button type="button" data-triple-filter="todos">Todos <span class="filter-count">{{ result.diario.rows|length }}</span></button>
@@ -1742,7 +1743,7 @@
                       {% set tipos_linha = row.pendencias_tipos|default([]) %}
                       {% set principal = row.tipo_principal|default('ok' if not row.pendencias else 'pendente') %}
                       {% set cor_cartao = 'ok' if not row.pendencias else 'inconsistencia_situacao' if principal == 'situacao' else 'nao_encontrado_sed' if principal == 'matricula' else 'divergencia_cadastral' %}
-                      <article class="result-card triple-card" data-category="{{ cor_cartao }}" data-triple-card data-triple-status="{{ row.categoria }}" data-triple-types="{{ tipos_linha|join(' ') }}" data-triple-search="{{ (row.nome ~ ' ' ~ row.turma_lista ~ ' ' ~ row.turma_sed ~ ' ' ~ row.turma_diario ~ ' ' ~ (row.ra_lista|default('')) ~ ' ' ~ (row.ra_sed|default('')) ~ ' ' ~ row.movimentacao_diario ~ ' ' ~ (row.pendencias|join(' ')))|lower }}">
+                      <article class="result-card triple-card" data-category="{{ cor_cartao }}" data-triple-card data-triple-status="{{ row.categoria }}" data-triple-types="{{ tipos_linha|join(' ') }}" data-triple-search="{{ (row.nome ~ ' ' ~ (row.nome_lista|default('')) ~ ' ' ~ (row.nome_sed|default('')) ~ ' ' ~ (row.nome_diario|default('')) ~ ' ' ~ row.turma_lista ~ ' ' ~ row.turma_sed ~ ' ' ~ row.turma_diario ~ ' ' ~ (row.ra_lista|default('')) ~ ' ' ~ (row.ra_sed|default('')) ~ ' ' ~ row.movimentacao_diario ~ ' ' ~ (row.pendencias|join(' ')))|lower }}">
                         <div class="result-status-cell"><span class="status-pill status-{{ cor_cartao }}">{{ diario_rotulos.get(principal, 'Conferir') }}</span></div>
                         <div class="result-content">
                           <div class="result-observation">
@@ -1754,7 +1755,7 @@
                           <div class="comparison-grid triple-comparison-grid">
                             <section class="comparison-box{% if row.situacao_lista == 'AUSENTE' %} triple-missing{% endif %}">
                               <span class="comparison-label">Lista Piloto</span>
-                              <strong class="comparison-name">{{ row.nome if row.situacao_lista != 'AUSENTE' else 'Não localizado' }}</strong>
+                              <strong class="comparison-name">{{ (row.nome_lista|default(row.nome)) if row.situacao_lista != 'AUSENTE' else 'Não localizado' }}</strong>
                               <div class="comparison-meta">
                                 <div class="meta-item{% if 'turma' in tipos_linha %} triple-emphasis{% endif %}"><span>Turma</span><strong>{{ row.turma_lista or '-' }}</strong></div>
                                 <div class="meta-item{% if 'situacao' in tipos_linha %} triple-emphasis{% endif %}"><span>Situação</span><strong>{{ row.situacao_lista_display }}</strong></div>
@@ -1764,7 +1765,7 @@
                             </section>
                             <section class="comparison-box{% if row.situacao_sed == 'AUSENTE' %} triple-missing{% endif %}">
                               <span class="comparison-label">SED</span>
-                              <strong class="comparison-name">{{ row.nome if row.situacao_sed != 'AUSENTE' else 'Não localizado' }}</strong>
+                              <strong class="comparison-name">{{ (row.nome_sed|default(row.nome)) if row.situacao_sed != 'AUSENTE' else 'Não localizado' }}</strong>
                               <div class="comparison-meta">
                                 <div class="meta-item{% if 'turma' in tipos_linha %} triple-emphasis{% endif %}"><span>Turma</span><strong>{{ row.turma_sed or '-' }}</strong></div>
                                 <div class="meta-item{% if 'situacao' in tipos_linha %} triple-emphasis{% endif %}"><span>Situação</span><strong>{{ row.situacao_sed_display }}</strong></div>
@@ -1772,9 +1773,9 @@
                                 <div class="meta-item"><span>Nascimento</span><strong>{{ row.nascimento_sed|default('') or '-' }}</strong></div>
                               </div>
                             </section>
-                            <section class="comparison-box{% if row.situacao_diario == 'AUSENTE' %} triple-missing{% endif %}">
+                            <section class="comparison-box{% if row.situacao_diario == 'AUSENTE' %} triple-missing{% endif %}{% if 'nome' in tipos_linha %} triple-name-warning{% endif %}">
                               <span class="comparison-label">Diário Online</span>
-                              <strong class="comparison-name">{{ row.nome if row.situacao_diario != 'AUSENTE' else 'Não localizado' }}</strong>
+                              <strong class="comparison-name">{{ (row.nome_diario|default(row.nome)) if row.situacao_diario != 'AUSENTE' else 'Não localizado' }}</strong>
                               <div class="comparison-meta">
                                 <div class="meta-item{% if 'turma' in tipos_linha %} triple-emphasis{% endif %}"><span>Turma</span><strong>{{ row.turma_diario or '-' }}</strong></div>
                                 <div class="meta-item{% if 'situacao' in tipos_linha %} triple-emphasis{% endif %}"><span>Situação</span><strong>{{ row.situacao_diario_display }}</strong></div>

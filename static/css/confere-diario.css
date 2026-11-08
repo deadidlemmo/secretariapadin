@@ -43,6 +43,15 @@
   border-color: color-mix(in srgb, var(--app-danger) 36%, var(--app-border));
   background: color-mix(in srgb, var(--app-danger) 5%, var(--app-surface-muted));
 }
+.confere-page .triple-card .comparison-box.triple-name-warning {
+  border-color: color-mix(in srgb, var(--confere-warning) 68%, var(--app-border));
+}
+.confere-page .triple-card .triple-name-warning .comparison-name {
+  text-decoration: underline;
+  text-decoration-color: var(--confere-warning);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
 .confere-page .triple-card .meta-item.triple-emphasis {
   border-color: color-mix(in srgb, var(--confere-warning) 68%, var(--app-border));
   background: color-mix(in srgb, var(--confere-warning) 14%, var(--app-surface));

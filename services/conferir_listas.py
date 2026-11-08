@@ -1808,7 +1808,8 @@ def build_excel_report(result):
             return value
 
         diario_columns = [
-            ("nome", "Aluno"), ("turma_lista", "Turma Lista"),
+            ("nome", "Aluno"), ("nome_diario", "Nome Diário"),
+            ("turma_lista", "Turma Lista"),
             ("turma_sed", "Turma SED"), ("turma_diario", "Turma Diário"),
             ("ra_lista", "RA Lista"), ("ra_sed", "RA SED"),
             ("situacao_lista_display", "Sit. Lista"), ("situacao_sed_display", "Sit. SED"),
@@ -1829,7 +1830,7 @@ def build_excel_report(result):
                     for key, _ in diario_columns
                 ])
             _style_tabular_sheet(ws, header_fill, header_font, thin)
-            _set_widths(ws, [38, 15, 15, 15, 18, 18, 16, 16, 16, 12, 12, 44, 46, 85])
+            _set_widths(ws, [38, 38, 15, 15, 15, 18, 18, 16, 16, 16, 12, 12, 44, 46, 85])
             _configure_print_sheet(ws)
         ws_diario_errors = wb.create_sheet("Diário PDFs")
         ws_diario_errors.append(["Arquivo", "Ocorrência"])
